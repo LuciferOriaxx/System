@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0a0e14">
+<title>The System</title>
+<style>
+:root{
+  --bg:#0a0e14; --panel:#111823; --line:#1d2836;
+  --txt:#c8d4e4; --dim:#6b7c93; --accent:#4da6ff;
+  --gold:#ffc857; --danger:#ff5c5c;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{
+  margin:0;background:var(--bg);color:var(--txt);
+  font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  padding-bottom:76px;
+}
+.mono{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+.wrap{max-width:640px;margin:0 auto;padding:16px}
+h1,h2,h3{margin:0;font-weight:600}
+h1{font-size:13px;letter-spacing:.22em;color:var(--accent);text-transform:uppercase}
+h2{font-size:11px;letter-spacing:.18em;color:var(--dim);text-transform:uppercase;margin:24px 0 10px}
+h3{font-size:15px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:12px}
+.row{display:flex;align-items:center;gap:10px}
+.between{justify-content:space-between}
+.bar{height:6px;background:#0a0e14;border-radius:3px;overflow:hidden;margin-top:8px}
+.bar>i{display:block;height:100%;background:var(--accent);border-radius:3px;transition:width .3s}
+button{
+  font:inherit;color:var(--txt);background:#16202e;border:1px solid var(--line);
+  border-radius:8px;padding:10px 14px;cursor:pointer;min-height:42px;
+}
+button:active{background:#1d2836}
+button.primary{background:var(--accent);color:#06121f;border-color:var(--accent);font-weight:600}
+button.ghost{background:transparent}
+button.sm{padding:6px 10px;min-height:34px;font-size:13px}
+input,select{
+  font:inherit;color:var(--txt);background:#0a0e14;border:1px solid var(--line);
+  border-radius:8px;padding:10px;width:100%;min-height:42px;
+}
+.big{font-size:38px;font-weight:700;letter-spacing:-.02em;line-height:1}
+.dim{color:var(--dim)}
+.small{font-size:12px}
+.tag{font-size:11px;letter-spacing:.1em;padding:3px 8px;border-radius:4px;background:#1d2836;color:var(--dim)}
+.tag.on{background:rgba(77,166,255,.15);color:var(--accent)}
+.quest{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+.quest:last-child{border-bottom:none}
+.chk{width:24px;height:24px;border:2px solid var(--line);border-radius:6px;flex:0 0 auto;display:grid;place-items:center;font-size:14px}
+.chk.done{background:var(--accent);border-color:var(--accent);color:#06121f}
+.stat{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)}
+.stat:last-child{border-bottom:none}
+.stat b{font-family:ui-monospace,monospace;font-size:19px}
+nav{
+  position:fixed;bottom:0;left:0;right:0;background:#0d131c;border-top:1px solid var(--line);
+  display:flex;padding-bottom:env(safe-area-inset-bottom);
+}
+nav button{
+  flex:1;background:none;border:none;border-radius:0;padding:14px 4px;min-height:60px;
+  font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);
+}
+nav button.active{color:var(--accent)}
+.hide{display:none}
+.logrow{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--line);font-size:13px}
+.logrow:last-child{border-bottom:none}
+.xp{color:var(--accent);font-family:ui-monospace,monospace}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+hr{border:none;border-top:1px solid var(--line);margin:14px 0}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <h1>The System</h1>
+</div>
+
+<main class="wrap" id="app"></main>
+
+<nav>
+  <button data-tab="status" class="active">Status</button>
+  <button data-tab="quests">Quests</button>
+  <button data-tab="skills">Skills</button>
+  <button data-tab="log">Log</button>
+  <button data-tab="more">More</button>
+</nav>
+
+<script>
+/* ─────────────────────────────────────────
+   RULES — the maths lives here, once
+   ───────────────────────────────────────── */
+
+const xpForLevel = n => 50 * n * (n - 1);
+
+function levelFromXP(xp){
+  let n = 1;
+  while (xpForLevel(n + 1) <= xp) n++;
+  return n;
+}
+
+const RANK_TABLE = [[50,'S'],[40,'A'],[30,'B'],[20,'C'],[10,'D'],[1,'E']];
+const rankOf = lvl => RANK_TABLE.find(([min]) => lvl >= min)[1];
+
+const skillXpForLevel = L => 10 * L;
+
+function addSkillXP(skill, amount){
+  skill.xp += amount;
+  let leveled = 0;
+  while (skill.level < 50 && skill.xp >= skillXpForLevel(skill.level)){
+    skill.xp -= skillXpForLevel(skill.level);
+    skill.level++;
+    leveled++;
+  }
+  if (skill.level >= 50) skill.xp = 0;
+  return leveled;
+}
+
+/* ─────────────────────────────────────────
+   STATE
+   ───────────────────────────────────────── */
+
+const DAILY_QUESTS = [
+  '25 pushups',
+  '30 squats',
+  '1 min plank',
+  '5 min mobility',
+  'Read 30 min, phone away',
+  '1 business task',
+  '20 min coding',
+  "Log today's XP"
+];
+const MINIMUM_QUESTS = [0, 1, 5]; // pushups, squats, business task
+
+const DEFAULT_STATE = () => ({
+  v: 1,
+  totalXP: 0,
+  stats:   { STR:30, AGI:5, VIT:15, INT:5, PER:1 },
+  statDates:{ STR:'2026-11-04', AGI:'2026-11-04', VIT:'2026-11-04', INT:'2026-11-04', PER:null },
+  skills: [
+    { id:'cali',    name:'Calisthenics', active:true,  level:1, xp:0 },
+    { id:'biz',     name:'Business',     active:true,  level:1, xp:0 },
+    { id:'code',    name:'Coding',       active:true,  level:1, xp:0 },
+    { id:'spanish', name:'Spanish',      active:false, level:1, xp:0 },
+    { id:'writing', name:'Writing',      active:false, level:1, xp:0 },
+    { id:'eng',     name:'Engineering',  active:false, level:1, xp:0 }
+  ],
+  streak: 0,
+  lastComplete: null,
+  questAwarded: [],
+  quests: {},
+  log: [],
+  benchmarks: [],
+  mainQuests: [
+    'AGI 20 — palms to floor',
+    'Site live + 10 profiles + first paid introduction',
+    'Ship one working web app'
+  ],
+  mainDeadline: '2027-02-02',
+  titles: []
+});
+
+const KEY = 'the-system-v1';
+
+let state = load();
+
+function load(){
+  try{
+    const raw = localStorage.getItem(KEY);
+    if (!raw) return DEFAULT_STATE();
+    const parsed = JSON.parse(raw);
+    return Object.assign(DEFAULT_STATE(), parsed);
+  }catch(e){
+    return DEFAULT_STATE();
+  }
+}
+
+function save(){
+  localStorage.setItem(KEY, JSON.stringify(state));
+  render();
+}
+
+/* ─────────────────────────────────────────
+   HELPERS
+   ───────────────────────────────────────── */
+
+const pad = n => String(n).padStart(2,'0');
+
+function today(){
+  const d = new Date();
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+
+function yesterday(){
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+
+function esc(s){
+  return String(s).replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function addXP(amount, note){
+  state.totalXP += amount;
+  state.log.unshift({ date: today(), xp: amount, note });
+  state.log = state.log.slice(0, 400);
+}
+
+/* ─────────────────────────────────────────
+   QUEST / STREAK LOGIC
+   ───────────────────────────────────────── */
+
+function questsToday(){
+  return state.quests[today()] || [];
+}
+
+function toggleQuest(i){
+  const t = today();
+  const list = state.quests[t] || [];
+  const at = list.indexOf(i);
+  if (at >= 0) list.splice(at, 1);
+  else list.push(i);
+  state.quests[t] = list;
+
+  // clear bonus, awarded once per day
+  if (list.length === DAILY_QUESTS.length && !state.questAwarded.includes(t)){
+    state.questAwarded.push(t);
+    addXP(20, 'All daily quests cleared');
+  }
+
+  updateStreak();
+  save();
+}
+
+function updateStreak(){
+  const t = today();
+  const q = state.quests[t] || [];
+  const minimumMet = MINIMUM_QUESTS.every(i => q.includes(i));
+  if (!minimumMet) return;
+  if (state.lastComplete === t) return;
+
+  state.streak = (state.lastComplete === yesterday()) ? state.streak + 1 : 1;
+  state.lastComplete = t;
+
+  if (state.streak % 7 === 0){
+    addXP(50, `7-day streak bonus (day ${state.streak})`);
+  }
+}
+
+/* ─────────────────────────────────────────
+   RENDER
+   ───────────────────────────────────────── */
+
+let tab = 'status';
+
+function render(){
+  const app = document.getElementById('app');
+  document.querySelectorAll('nav button').forEach(b =>
+    b.classList.toggle('active', b.dataset.tab === tab));
+
+  if (tab === 'status')  app.innerHTML = viewStatus();
+  if (tab === 'quests')  app.innerHTML = viewQuests();
+  if (tab === 'skills')  app.innerHTML = viewSkills();
+  if (tab === 'log')     app.innerHTML = viewLog();
+  if (tab === 'more')    app.innerHTML = viewMore();
+
+  bind();
+}
+
+function xpBar(){
+  const lvl = levelFromXP(state.totalXP);
+  const lo = xpForLevel(lvl);
+  const hi = xpForLevel(lvl + 1);
+  const pct = Math.min(100, ((state.totalXP - lo) / (hi - lo)) * 100);
+  return `
+    <div class="bar"><i style="width:${pct}%"></i></div>
+    <div class="row between small dim mono" style="margin-top:6px">
+      <span>${state.totalXP} / ${hi} XP</span>
+      <span>${hi - state.totalXP} to next</span>
+    </div>`;
+}
+
+function viewStatus(){
+  const lvl = levelFromXP(state.totalXP);
+  const rank = rankOf(lvl);
+
+  const stats = ['STR','AGI','VIT','INT','PER'].map(k => `
+    <div class="stat">
+      <div>
+        <div class="small dim">${k}</div>
+        <div class="small dim mono">${state.statDates[k] || 'untested'}</div>
+      </div>
+      <div class="row" style="gap:14px">
+        <b>${state.stats[k]}</b>
+        <button class="sm ghost" data-stat="${k}">Test</button>
+      </div>
+    </div>`).join('');
+
+  const mains = state.mainQuests.map((q,i) => `
+    <div class="row between" style="padding:8px 0">
+      <span>${esc(q)}</span>
+      <button class="sm primary" data-main="${i}">+500</button>
+    </div>`).join('');
+
+  return `
+    <div class="card">
+      <div class="row between">
+        <div>
+          <div class="dim small mono">LEVEL</div>
+          <div class="big mono">${lvl}</div>
+        </div>
+        <div style="text-align:right">
+          <div class="dim small mono">RANK</div>
+          <div class="big mono" style="color:var(--accent)">${rank}</div>
+        </div>
+      </div>
+      ${xpBar()}
+    </div>
+
+    <div class="card row between">
+      <span class="dim small">STREAK</span>
+      <span class="mono" style="font-size:20px">${state.streak} <span class="dim small">days</span></span>
+    </div>
+
+    <h2>Stats</h2>
+    <div class="card">${stats}</div>
+
+    <h2>Main quests · 90 days</h2>
+    <div class="card">${mains}
+      <div class="small dim" style="margin-top:10px">Deadline ${state.mainDeadline}</div>
+    </div>
+
+    <h2>Titles</h2>
+    <div class="card">${
+      state.titles.length
+        ? state.titles.map(t => `<span class="tag on" style="margin:2px">${esc(t)}</span>`).join('')
+        : '<span class="dim small">None yet</span>'
+    }</div>`;
+}
+
+function viewQuests(){
+  const done = questsToday();
+  const items = DAILY_QUESTS.map((q,i) => `
+    <div class="quest" data-quest="${i}">
+      <div class="chk ${done.includes(i) ? 'done' : ''}">${done.includes(i) ? '✓' : ''}</div>
+      <span style="${done.includes(i) ? 'color:var(--dim);text-decoration:line-through' : ''}">${esc(q)}</span>
+    </div>`).join('');
+
+  const cleared = done.length === DAILY_QUESTS.length;
+
+  return `
+    <h2>Daily quests · ${today()}</h2>
+    <div class="card">${items}</div>
+    <div class="card row between">
+      <span class="small dim">${done.length} / ${DAILY_QUESTS.length} cleared</span>
+      <span class="small ${cleared ? 'xp' : 'dim'}">${cleared ? '+20 awarded' : 'clear all for +20'}</span>
+    </div>
+    <div class="small dim" style="padding:0 4px">
+      Streak counts days where pushups, squats and one business task are all done.
+    </div>`;
+}
+
+function viewSkills(){
+  const rows = state.skills.map(s => {
+    const need = skillXpForLevel(s.level);
+    const pct = s.level >= 50 ? 100 : (s.xp / need) * 100;
+    return `
+      <div class="card">
+        <div class="row between">
+          <div class="row" style="gap:8px">
+            <h3>${esc(s.name)}</h3>
+            <span class="tag ${s.active ? 'on' : ''}">${s.active ? rankOf(s.level) : 'queued'}</span>
+          </div>
+          <span class="mono small dim">Lv ${s.level} · ${s.xp}/${need}</span>
+        </div>
+        <div class="bar"><i style="width:${pct}%"></i></div>
+        <div class="row" style="gap:8px;margin-top:12px">
+          <input type="number" min="1" placeholder="minutes" data-mins="${s.id}" ${s.active ? '' : 'disabled'}>
+          <button class="sm primary" data-log="${s.id}" ${s.active ? '' : 'disabled'}>Log</button>
+          <button class="sm ghost" data-toggle="${s.id}">${s.active ? 'Queue' : 'Activate'}</button>
+        </div>
+      </div>`;
+  }).join('');
+
+  const activeCount = state.skills.filter(s => s.active).length;
+
+  return `
+    <h2>Skills · ${activeCount}/4 active</h2>
+    ${rows}
+    <div class="small dim" style="padding:0 4px">
+      Active skills earn XP. Queued skills earn nothing. Swap only at a weekly review.
+    </div>`;
+}
+
+function viewLog(){
+  const rows = state.log.length
+    ? state.log.map(e => `
+        <div class="logrow">
+          <span><span class="dim mono">${e.date.slice(5)}</span> ${esc(e.note)}</span>
+          <span class="xp">${e.xp > 0 ? '+' : ''}${e.xp}</span>
+        </div>`).join('')
+    : '<div class="dim small">Nothing logged yet.</div>';
+
+  return `
+    <h2>Quick log</h2>
+    <div class="grid">
+      <button data-xp="15" data-note="Workout 45–60 min">Workout +15</button>
+      <button data-xp="5"  data-note="Reading 30 min">Reading +5</button>
+      <button data-xp="10" data-note="Business deep work 1 hr">Business +10</button>
+      <button data-xp="10" data-note="Coding 1 hr">Coding +10</button>
+      <button data-xp="20" data-note="Book finished">Book +20</button>
+      <button data-xp="50" data-note="PR / benchmark hit">PR +50</button>
+      <button data-xp="100" data-note="Business milestone">Milestone +100</button>
+      <button data-xp="100" data-note="Weekly quest">Weekly +100</button>
+    </div>
+
+    <h2>Adjustment</h2>
+    <div class="card">
+      <div class="row" style="gap:8px">
+        <input type="number" id="adj" placeholder="±XP">
+        <input type="text" id="adjnote" placeholder="reason">
+        <button class="sm" id="adjgo">Add</button>
+      </div>
+      <div class="small dim" style="margin-top:10px">
+        Corrections are logged as negative XP. Nothing is deleted — the arithmetic stays visible.
+      </div>
+    </div>
+
+    <h2>History</h2>
+    <div class="card">${rows}</div>`;
+}
+
+function viewMore(){
+  return `
+    <h2>Benchmarks passed</h2>
+    <div class="card">${
+      state.benchmarks.length
+        ? state.benchmarks.map(b => `<div class="logrow"><span>${esc(b)}</span><span class="xp">+50</span></div>`).join('')
+        : '<div class="dim small">None recorded. Use the Test button on a stat.</div>'
+    }</div>
+
+    <h2>Data</h2>
+    <div class="card">
+      <button class="primary" id="export" style="width:100%;margin-bottom:8px">Export backup</button>
+      <button id="import" style="width:100%;margin-bottom:8px">Import backup</button>
+      <button class="ghost" id="reset" style="width:100%;color:var(--danger)">Reset everything</button>
+      <div class="small dim" style="margin-top:12px">
+        Your data lives in this browser only. Export before clearing browser data or switching devices.
+      </div>
+    </div>
+
+    <h2>Rules</h2>
+    <div class="card small dim">
+      <p>XP for level n = 50 × n × (n−1). Skill XP for level L = 10 × L.</p>
+      <p>Stats move only on a tested benchmark. A stat with no date is a claim, not a fact.</p>
+      <p>No XP for plans, lists or feelings. Log the same day. Never inflate.</p>
+    </div>`;
+}
+
+/* ─────────────────────────────────────────
+   EVENTS
+   ───────────────────────────────────────── */
+
+function bind(){
+  document.querySelectorAll('[data-quest]').forEach(el =>
+    el.onclick = () => toggleQuest(+el.dataset.quest));
+
+  document.querySelectorAll('[data-xp]').forEach(el =>
+    el.onclick = () => {
+      addXP(+el.dataset.xp, el.dataset.note);
+      save();
+    });
+
+  document.querySelectorAll('[data-log]').forEach(btn =>
+    btn.onclick = () => {
+      const id = btn.dataset.log;
+      const input = document.querySelector(`[data-mins="${id}"]`);
+      const mins = parseInt(input.value, 10);
+      if (!mins || mins <= 0) return;
+      const skill = state.skills.find(s => s.id === id);
+      const xp = Math.round(mins / 6);
+      if (xp <= 0) return;
+      const leveled = addSkillXP(skill, xp);
+      addXP(xp, `${skill.name} ${mins} min`);
+      if (leveled) addXP(0, `${skill.name} reached Lv ${skill.level}`);
+      input.value = '';
+      save();
+    });
+
+  document.querySelectorAll('[data-toggle]').forEach(btn =>
+    btn.onclick = () => {
+      const skill = state.skills.find(s => s.id === btn.dataset.toggle);
+      const activeCount = state.skills.filter(s => s.active).length;
+      if (!skill.active && activeCount >= 4){
+        alert('Four skills are already active. Queue one first.');
+        return;
+      }
+      skill.active = !skill.active;
+      save();
+    });
+
+  document.querySelectorAll('[data-stat]').forEach(btn =>
+    btn.onclick = () => {
+      const k = btn.dataset.stat;
+      const v = prompt(`New ${k} value (only after a passed benchmark):`, state.stats[k]);
+      if (v === null) return;
+      const n = parseInt(v, 10);
+      if (isNaN(n) || n < 1 || n > 100) return;
+      state.stats[k] = n;
+      state.statDates[k] = today();
+      state.benchmarks.unshift(`${k} ${n} — ${today()}`);
+      addXP(50, `Benchmark passed: ${k} ${n}`);
+      save();
+    });
+
+  document.querySelectorAll('[data-main]').forEach(btn =>
+    btn.onclick = () => {
+      const i = +btn.dataset.main;
+      if (!confirm(`Complete: ${state.mainQuests[i]}?`)) return;
+      addXP(500, `Main quest: ${state.mainQuests[i]}`);
+      state.mainQuests.splice(i, 1);
+      save();
+    });
+
+  const adjgo = document.getElementById('adjgo');
+  if (adjgo) adjgo.onclick = () => {
+    const xp = parseInt(document.getElementById('adj').value, 10);
+    const note = document.getElementById('adjnote').value || 'Adjustment';
+    if (!xp) return;
+    addXP(xp, note);
+    save();
+  };
+
+  const exp = document.getElementById('export');
+  if (exp) exp.onclick = () => {
+    const blob = new Blob([JSON.stringify(state, null, 2)], {type:'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `system-backup-${today()}.json`;
+    a.click();
+  };
+
+  const imp = document.getElementById('import');
+  if (imp) imp.onclick = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/json';
+    input.onchange = e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try{
+          state = Object.assign(DEFAULT_STATE(), JSON.parse(reader.result));
+          save();
+        }catch(err){ alert('That file could not be read.'); }
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  };
+
+  const rst = document.getElementById('reset');
+  if (rst) rst.onclick = () => {
+    if (!confirm('Delete all progress? Export first.')) return;
+    if (!confirm('Really? This cannot be undone.')) return;
+    localStorage.removeItem(KEY);
+    state = DEFAULT_STATE();
+    save();
+  };
+}
+
+document.querySelectorAll('nav button').forEach(b =>
+  b.onclick = () => { tab = b.dataset.tab; render(); });
+
+render();
+</script>
+</body>
+</html>

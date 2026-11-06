@@ -386,6 +386,25 @@ function daysSinceDate(dateStr){
   return Math.floor((Date.now() - d.getTime()) / (1000*60*60*24));
 }
 
+function smartSkillName(sug, detail){
+  if (!detail) return sug.label || 'New skill';
+  const generic = ['not decided yet','not sure yet','other','new'];
+  if (generic.includes(String(detail).toLowerCase().trim())){
+    const map = {
+      business: 'Business development',
+      writing: 'Book writing',
+      language: 'New language',
+      engineering: 'Engineering',
+      instrument: 'Instrument',
+      fitness: 'Fitness',
+      coding: 'Coding',
+      reading: 'Reading'
+    };
+    return map[sug.id] || sug.label || 'Skill';
+  }
+  return detail;
+}
+
 /* ═════ STATE ═════ */
 const KEY = 'the-system-v2';
 const DEFAULT_STATS = { STR: 5, AGI: 5, VIT: 5, INT: 5, PER: 1 };
@@ -506,6 +525,9 @@ function showLevelUp(level){
   el.onclick = dismiss;
   document.body.appendChild(el);
   requestAnimationFrame(() => el.classList.add('show'));
+  setTimeout(dismiss, 2800);
+}
+
 function showRankUp(rank, level){
   const el = document.createElement('div');
   el.className = 'levelup-overlay rankup';
@@ -866,26 +888,8 @@ async function callAI(prompt, apiKey, baseUrl, model){
 }
 
 /* ═════ SKILL CREATION ═════ */
-  function smartSkillName(sug, detail){
-  if (!detail) return sug.label || 'New skill';
-  const generic = ['not decided yet','not sure yet','other','new'];
-  if (generic.includes(String(detail).toLowerCase().trim())){
-    const map = {
-      business: 'Business development',
-      writing: 'Book writing',
-      language: 'New language',
-      engineering: 'Engineering',
-      instrument: 'Instrument',
-      fitness: 'Fitness',
-      coding: 'Coding',
-      reading: 'Reading'
-    };
-    return map[sug.id] || sug.label || 'Skill';
-  }
-  return detail;
-}
 function makeSkillFromTemplate(sug, detail){
-   const subtype = sug.subtype || 'custom';
+  const subtype = sug.subtype || 'custom';
   const name = smartSkillName(sug, detail);
   const isWorkoutType = subtype === 'fitness' && ['Calisthenics','Weightlifting','Mixed fitness'].includes(detail);
 
@@ -1046,7 +1050,7 @@ function renderOnboarding(){
         const [sugId, opt] = el.dataset.obadd.split('|');
         const sug = SKILL_SUGGESTIONS.find(s => s.id === sugId);
         if (!sug) return;
-        if (onboardDraft.skills.some(s => s.name.toLowerCase() === opt.toLowerCase())){
+        if (onboardDraft.skills.some(s => s.name.toLowerCase() === smartSkillName(sug, opt).toLowerCase())){
           return alert('That skill is already added.');
         }
         onboardDraft.skills.push(makeSkillFromTemplate(sug, opt));
@@ -1074,6 +1078,8 @@ function renderOnboarding(){
         state.timeBudget = onboardDraft.timeBudget;
         state.skills = [];
         state.onboarded = true;
+        state.lastCelebratedLevel = levelFromXP(state.totalXP);
+        state.lastCelebratedRank = rankOf(state.lastCelebratedLevel);
         save(); tab = 'status';
         return;
       }
@@ -1205,7 +1211,6 @@ function renderProgressionStep(){
       if (Object.keys(ans).length > 0) applyProgression(skill, ans);
     });
 
-    // Recaclulate fitness plans with the final timeBudget
     state.skills = onboardDraft.skills;
     state.skills.forEach(s => {
       if (s.type === 'workout' && s.subtype === 'fitness' && s.plan){
@@ -1216,6 +1221,7 @@ function renderProgressionStep(){
 
     state.onboarded = true;
     state.lastCelebratedLevel = levelFromXP(state.totalXP);
+    state.lastCelebratedRank = rankOf(state.lastCelebratedLevel);
     save(); tab = 'status';
   };
 }
@@ -1552,7 +1558,6 @@ function openModal(html){
     </div>`;
 }
 
-/* ═════ SHARE PROGRESS ═════ */
 function shareProgress(){
   const w = 800, h = 1000;
   const canvas = document.createElement('canvas');
@@ -1572,7 +1577,6 @@ function shareProgress(){
   ctx.textBaseline = 'top';
   ctx.textAlign = 'left';
 
-  // Header
   ctx.fillStyle = accent;
   ctx.font = font(600, 16);
   ctx.fillText('THE SYSTEM', 60, 60);
@@ -1582,16 +1586,13 @@ function shareProgress(){
   ctx.fillText(today(), w - 60, 60);
   ctx.textAlign = 'left';
 
-  // Name
   ctx.fillStyle = txt;
   ctx.font = font(600, 30);
   ctx.fillText(state.name || 'Player', 60, 90);
 
-  // Divider
   ctx.fillStyle = line;
   ctx.fillRect(60, 145, w - 120, 1);
 
-  // Big three
   const lvl = levelFromXP(state.totalXP);
   const rank = rankOf(lvl);
 
@@ -1611,14 +1612,11 @@ function shareProgress(){
 
   ctx.fillStyle = dim;
   ctx.font = font(500, 14);
-  const streakWidth = ctx.measureText(String(state.streak)).width;
   ctx.fillText('days', 500 + ctx.measureText(String(state.streak)).width + (String(state.streak).length * 2), 245);
 
-  // Divider
   ctx.fillStyle = line;
   ctx.fillRect(60, 300, w - 120, 1);
 
-  // Stats
   ctx.fillStyle = dim;
   ctx.font = font(500, 12);
   ctx.fillText('STATS', 60, 325);
@@ -1642,11 +1640,9 @@ function shareProgress(){
     ctx.textAlign = 'left';
   });
 
-  // Divider
   ctx.fillStyle = line;
   ctx.fillRect(60, 600, w - 120, 1);
 
-  // Skills
   ctx.fillStyle = dim;
   ctx.font = font(500, 12);
   ctx.fillText('ACTIVE SKILLS', 60, 625);
@@ -1664,7 +1660,6 @@ function shareProgress(){
     ctx.textAlign = 'left';
   });
 
-  // Footer
   ctx.fillStyle = dim;
   ctx.font = font(500, 12);
   ctx.fillText('Honest logging. No inflated numbers.', 60, h - 60);

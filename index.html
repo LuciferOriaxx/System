@@ -118,6 +118,42 @@ details>summary:active{background:#16202e}
 .levelup-card .label{font-size:12px;letter-spacing:.3em;color:rgba(255,255,255,.85);text-transform:uppercase}
 .levelup-card .big{font-size:72px;font-weight:800;color:#fff;line-height:1;margin:12px 0;font-family:ui-monospace,monospace}
 .levelup-card .rank{font-size:16px;color:rgba(255,255,255,.9);font-weight:600;letter-spacing:.2em;text-transform:uppercase}
+.levelup-card.rankup-card{
+  background:linear-gradient(135deg,#ffc857 0%,#ff8f3f 100%);
+  padding:50px 70px;
+}
+.levelup-overlay.show.rankup .levelup-card{
+  animation:rankGlow 2s ease-in-out infinite;
+}
+.levelup-card.rankup-card .label{
+  color:rgba(0,0,0,.65);
+  font-weight:700;
+  letter-spacing:.35em;
+  font-size:13px;
+}
+.levelup-card.rankup-card .big.rank-big{
+  font-size:170px;
+  color:#fff;
+  line-height:.85;
+  text-shadow:0 6px 30px rgba(0,0,0,.3);
+  margin:20px 0;
+}
+.levelup-card.rankup-card .rank{
+  color:rgba(0,0,0,.7);
+  font-weight:700;
+  font-size:15px;
+  letter-spacing:.2em;
+}
+@keyframes rankGlow{
+  0%,100%{box-shadow:0 20px 100px rgba(255,200,87,.55), 0 0 200px rgba(255,140,63,.3)}
+  50%{box-shadow:0 20px 130px rgba(255,200,87,.85), 0 0 260px rgba(255,140,63,.55)}
+}
+.tag.on.rank-E{background:#1d2836;color:var(--dim)}
+.tag.on.rank-D{background:rgba(61,220,151,.15);color:var(--ok)}
+.tag.on.rank-C{background:rgba(77,166,255,.2);color:var(--accent)}
+.tag.on.rank-B{background:rgba(160,110,255,.2);color:#a06eff}
+.tag.on.rank-A{background:rgba(255,200,87,.2);color:var(--gold)}
+.tag.on.rank-S{background:linear-gradient(135deg,rgba(255,92,92,.25),rgba(255,200,87,.25));color:#ff8f3f}
 </style>
 </head>
 <body>
@@ -363,6 +399,7 @@ function defaultState(){
     quests: {}, log: [], benchmarks: [], titles: [],
     equipment: [], timeBudget: 30,
     lastCelebratedLevel: 1,
+    lastCelebratedRank: 'E',
     settings: { apiKey: '', apiBase: 'https://api.openai.com/v1', apiModel: 'gpt-4o-mini' }
   };
 }
@@ -389,6 +426,22 @@ function migrateSkill(s){
   if (!s.ladderPreticked) s.ladderPreticked = [...s.ladderDone];
   if (s.workoutsSinceAttempt === undefined) s.workoutsSinceAttempt = 0;
   if (s.cardioEnabled === undefined) s.cardioEnabled = true;
+
+  // Fix skills accidentally named after generic status options
+  if (s.name){
+    const n = s.name.trim().toLowerCase();
+    const map = {
+      'not decided yet': 'Business development',
+      'not sure yet': 'Book writing',
+      'other': s.subtype === 'business' ? 'Business development' :
+               s.subtype === 'writing' ? 'Book writing' :
+               s.subtype === 'language' ? 'New language' :
+               s.subtype === 'engineering' ? 'Engineering' :
+               s.subtype === 'instrument' ? 'Instrument' : 'Skill'
+    };
+    if (map[n]) s.name = map[n];
+  }
+
   return s;
 }
 
@@ -404,6 +457,9 @@ function load(){
     const curLvl = levelFromXP(parsed.totalXP || 0);
     if (!parsed.lastCelebratedLevel || parsed.lastCelebratedLevel < curLvl){
       parsed.lastCelebratedLevel = curLvl;
+    }
+    if (!parsed.lastCelebratedRank || parsed.lastCelebratedRank !== rankOf(parsed.lastCelebratedLevel)){
+      parsed.lastCelebratedRank = rankOf(parsed.lastCelebratedLevel);
     }
     return parsed;
   } catch(e){ return defaultState(); }
@@ -421,8 +477,14 @@ function addXP(amount, note, id, date){
   if (amount > 0){
     const lvl = levelFromXP(state.totalXP);
     if (lvl > state.lastCelebratedLevel){
+      const oldRank = state.lastCelebratedRank || rankOf(state.lastCelebratedLevel);
+      const newRank = rankOf(lvl);
       state.lastCelebratedLevel = lvl;
-      setTimeout(() => showLevelUp(lvl), 120);
+      state.lastCelebratedRank = newRank;
+      setTimeout(() => {
+        if (newRank !== oldRank) showRankUp(newRank, lvl);
+        else showLevelUp(lvl);
+      }, 120);
     }
   }
   return entry.id;
@@ -444,7 +506,23 @@ function showLevelUp(level){
   el.onclick = dismiss;
   document.body.appendChild(el);
   requestAnimationFrame(() => el.classList.add('show'));
-  setTimeout(dismiss, 2800);
+function showRankUp(rank, level){
+  const el = document.createElement('div');
+  el.className = 'levelup-overlay rankup';
+  el.innerHTML = `
+    <div class="levelup-card rankup-card">
+      <div class="label">Rank Up</div>
+      <div class="big rank-big">${rank}</div>
+      <div class="rank">Level ${level}</div>
+    </div>`;
+  const dismiss = () => {
+    el.classList.remove('show');
+    setTimeout(() => el.remove(), 500);
+  };
+  el.onclick = dismiss;
+  document.body.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('show'));
+  setTimeout(dismiss, 3500);
 }
 
 /* ═════ LADDER TICK/UNTICK ═════ */
@@ -465,15 +543,27 @@ function tickMilestone(skill, i){
     state.log.unshift({ id: ref.logId, date: today(), xp: ref.xp, note: ref.note });
     const lvl = levelFromXP(state.totalXP);
     if (lvl > state.lastCelebratedLevel){
+      const oldRank = state.lastCelebratedRank || rankOf(state.lastCelebratedLevel);
+      const newRank = rankOf(lvl);
       state.lastCelebratedLevel = lvl;
-      setTimeout(() => showLevelUp(lvl), 120);
+      state.lastCelebratedRank = newRank;
+      setTimeout(() => {
+        if (newRank !== oldRank) showRankUp(newRank, lvl);
+        else showLevelUp(lvl);
+      }, 120);
     }
   } else {
     const note = `${skill.name}: ${skill.ladder[i]}`;
     const logId = addXP(20, note);
-    addSkillXP(skill, 20);
+    const oldSkillRank = rankOf(skill.level);
+    const skillLeveled = addSkillXP(skill, 20);
     skill.ladderEarned.push(i);
     skill.ladderXpLogs[i] = { logId, xp: 20, note };
+    if (skillLeveled){
+      const newSkillRank = rankOf(skill.level);
+      if (newSkillRank !== oldSkillRank) addXP(0, `${skill.name} — Rank ${newSkillRank}`);
+      else addXP(0, `${skill.name} reached Lv ${skill.level}`);
+    }
   }
 }
 
@@ -725,8 +815,13 @@ function toggleQuest(quest){
     state.quests[t][quest.id] = true;
     addXP(quest.xp, quest.text);
     if (skill){
+      const oldSkillRank = rankOf(skill.level);
       const leveled = addSkillXP(skill, quest.xp);
-      if (leveled) addXP(0, `${skill.name} reached Lv ${skill.level}`);
+      if (leveled){
+        const newSkillRank = rankOf(skill.level);
+        if (newSkillRank !== oldSkillRank) addXP(0, `${skill.name} — Rank ${newSkillRank}`);
+        else addXP(0, `${skill.name} reached Lv ${skill.level}`);
+      }
       if (quest.kind === 'workout'){
         skill.workoutsSinceAttempt = (skill.workoutsSinceAttempt || 0) + 1;
       }
@@ -771,9 +866,27 @@ async function callAI(prompt, apiKey, baseUrl, model){
 }
 
 /* ═════ SKILL CREATION ═════ */
+  function smartSkillName(sug, detail){
+  if (!detail) return sug.label || 'New skill';
+  const generic = ['not decided yet','not sure yet','other','new'];
+  if (generic.includes(String(detail).toLowerCase().trim())){
+    const map = {
+      business: 'Business development',
+      writing: 'Book writing',
+      language: 'New language',
+      engineering: 'Engineering',
+      instrument: 'Instrument',
+      fitness: 'Fitness',
+      coding: 'Coding',
+      reading: 'Reading'
+    };
+    return map[sug.id] || sug.label || 'Skill';
+  }
+  return detail;
+}
 function makeSkillFromTemplate(sug, detail){
-  const subtype = sug.subtype || 'custom';
-  const name = detail || sug.label || 'New skill';
+   const subtype = sug.subtype || 'custom';
+  const name = smartSkillName(sug, detail);
   const isWorkoutType = subtype === 'fitness' && ['Calisthenics','Weightlifting','Mixed fitness'].includes(detail);
 
   const skill = {
@@ -1281,7 +1394,7 @@ function viewSkills(){
         <div class="row between">
           <div class="row" style="gap:8px;flex:1;min-width:0">
             <h3 style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(s.name)}</h3>
-            <span class="tag ${s.active ? 'on' : ''}">${s.active ? rankOf(s.level) : 'paused'}</span>
+            <span class="tag ${s.active ? 'on rank-'+rankOf(s.level) : ''}">${s.active ? rankOf(s.level) : 'paused'}</span>
           </div>
           <span class="mono small dim" style="white-space:nowrap">Lv ${s.level}</span>
         </div>
@@ -2208,6 +2321,7 @@ function importBackup(){
         if (!state.equipment) state.equipment = [];
         if (!state.timeBudget) state.timeBudget = 30;
         state.lastCelebratedLevel = levelFromXP(state.totalXP || 0);
+        state.lastCelebratedRank = rankOf(state.lastCelebratedLevel);
         save();
       } catch(e){ alert('Could not read that file.'); }
     };

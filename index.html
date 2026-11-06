@@ -74,6 +74,7 @@ hr{border:none;border-top:1px solid var(--line);margin:14px 0}
 .notice{background:rgba(77,166,255,.08);border:1px solid rgba(77,166,255,.25);
   border-radius:8px;padding:12px;font-size:13px;margin-bottom:16px}
 .notice.ok{background:rgba(61,220,151,.08);border-color:rgba(61,220,151,.25)}
+.notice.warn{background:rgba(255,200,87,.08);border-color:rgba(255,200,87,.25)}
 .hide{display:none}
 details{background:var(--panel);border:1px solid var(--line);border-radius:10px;
   margin-bottom:12px;overflow:hidden}
@@ -95,6 +96,28 @@ details>summary:active{background:#16202e}
 .tier-row.current .tier-val{color:var(--accent);font-weight:700}
 .tier-desc{flex:1;font-size:13px;line-height:1.4}
 .prog-section{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:12px}
+.day-picker{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.day-picker button{min-height:38px;padding:6px 4px;font-size:13px}
+.week-strip{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:12px}
+.week-cell{text-align:center}
+.week-day{font-size:10px;color:var(--dim);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px}
+.week-box{height:36px;border-radius:6px;background:#0a0e14;border:1px solid var(--line);
+  display:flex;align-items:center;justify-content:center;
+  font-family:ui-monospace,monospace;font-size:13px;color:var(--dim)}
+.week-box.filled{background:rgba(77,166,255,.15);border-color:rgba(77,166,255,.5);color:var(--accent);font-weight:600}
+.stat-label-stale{color:var(--gold)}
+.levelup-overlay{position:fixed;inset:0;background:rgba(10,14,20,.92);z-index:200;
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;transition:opacity .35s ease;cursor:pointer}
+.levelup-overlay.show{opacity:1}
+.levelup-card{background:linear-gradient(135deg,#4da6ff 0%,#8a63f2 100%);
+  border-radius:20px;padding:40px 60px;text-align:center;
+  transform:scale(.85);transition:transform .4s cubic-bezier(.2,.8,.2,1.3);
+  box-shadow:0 20px 80px rgba(77,166,255,.4)}
+.levelup-overlay.show .levelup-card{transform:scale(1)}
+.levelup-card .label{font-size:12px;letter-spacing:.3em;color:rgba(255,255,255,.85);text-transform:uppercase}
+.levelup-card .big{font-size:72px;font-weight:800;color:#fff;line-height:1;margin:12px 0;font-family:ui-monospace,monospace}
+.levelup-card .rank{font-size:16px;color:rgba(255,255,255,.9);font-weight:600;letter-spacing:.2em;text-transform:uppercase}
 </style>
 </head>
 <body>
@@ -132,81 +155,122 @@ function addSkillXP(skill, amount){
 const BENCHMARKS = {
   STR: {
     label: 'Strength',
-    note: 'Bodyweight. A chair, table or wall counts — nothing else is needed. Stop each test when form breaks. Tiers 60+ assume a pullup bar, but 8 pullups can be swapped for 30 inverted rows under a sturdy table.',
+    note: 'Bodyweight. A chair, table or wall counts. Stop each test when form breaks.',
     tiers: [
-      [5,   '5 pushups · 15 squats · 20s plank'],
-      [10,  '15 pushups · 25 squats · 45s plank · 5 chair dips'],
-      [20,  '25 pushups · 40 squats · 1 min plank · 10 chair dips · wall handstand 10s'],
-      [30,  '35 pushups · 50 squats · 90s plank · 15 chair dips · wall handstand 30s'],
-      [40,  '45 pushups · 60 squats · 2 min plank · 20 floor dips · floor L-sit 10s'],
-      [50,  '50 pushups · 3 min plank · 25 dips · L-sit 20s · free handstand 10s'],
-      [60,  '60 pushups · 8 pullups (or 30 table rows) · handstand 30s'],
-      [70,  '3 muscle-ups · one-arm pushup · tuck front lever 10s'],
-      [80,  '5 muscle-ups · front lever 10s · handstand 60s'],
-      [90,  'One-arm pullup · full front lever · planche lean'],
-      [100, 'One-arm pullup ×3 · full planche']
+      [5,'5 pushups · 15 squats · 20s plank'],
+      [10,'15 pushups · 25 squats · 45s plank · 5 chair dips'],
+      [20,'25 pushups · 40 squats · 1 min plank · 10 chair dips · wall handstand 10s'],
+      [30,'35 pushups · 50 squats · 90s plank · 15 chair dips · wall handstand 30s'],
+      [40,'45 pushups · 60 squats · 2 min plank · 20 floor dips · floor L-sit 10s'],
+      [50,'50 pushups · 3 min plank · 25 dips · L-sit 20s · free handstand 10s'],
+      [60,'60 pushups · 8 pullups (or 30 table rows) · handstand 30s'],
+      [70,'3 muscle-ups · one-arm pushup · tuck front lever 10s'],
+      [80,'5 muscle-ups · front lever 10s · handstand 60s'],
+      [90,'One-arm pullup · full front lever · planche lean'],
+      [100,'One-arm pullup ×3 · full planche']
     ]
   },
   AGI: {
     label: 'Agility',
-    note: 'Mobility, flexibility, balance. No equipment. Never bounce into a stretch — stop before pain.',
+    note: 'Mobility, flexibility, balance. No equipment. Never bounce into a stretch.',
     tiers: [
-      [5,  'Touch knees · 10 comfortable-depth squats'],
-      [10, 'Touch toes with straight legs · squat below parallel'],
-      [20, 'Palms to floor · deep squat 2 min · 10s single-leg balance each side'],
-      [30, 'Full squat heels down · 30s single-leg balance each side · sit-and-reach past toes'],
-      [40, 'Bridge · front splits halfway'],
-      [50, 'Full bridge · full front splits · 60s single-leg balance'],
-      [60, 'Side splits progression · handstand 10s'],
-      [70, 'Full side splits · handstand 30s']
+      [5,'Touch knees · 10 comfortable-depth squats'],
+      [10,'Touch toes with straight legs · squat below parallel'],
+      [20,'Palms to floor · deep squat 2 min · 10s single-leg balance each side'],
+      [30,'Full squat heels down · 30s single-leg balance each side · sit-and-reach past toes'],
+      [40,'Bridge · front splits halfway'],
+      [50,'Full bridge · full front splits · 60s single-leg balance'],
+      [60,'Side splits progression · handstand 10s'],
+      [70,'Full side splits · handstand 30s']
     ]
   },
   VIT: {
     label: 'Vitality',
-    note: 'Endurance with bodyweight. A chair and something heavy (filled water jugs, a bag of books) is enough. No running or walking required.',
+    note: 'Endurance with bodyweight. Indoor only. Cardio quests train this — bench tests confirm it.',
     tiers: [
-      [5,  '20 squats unbroken · 30s wall sit'],
-      [10, '30 squats unbroken · 45s wall sit · 45s plank'],
-      [15, '50 squats unbroken · 60s wall sit · 1 min plank · 20 chair step-ups'],
-      [20, '75 squats unbroken · 90s wall sit · 90s plank · 30 chair step-ups'],
-      [30, '100 squats unbroken · 2 min wall sit · 2 min plank · 50 step-ups · 1 min loaded hold'],
-      [40, '150 squats unbroken · 3 min wall sit · 3 min plank · 2 min loaded hold'],
-      [50, '200 squats unbroken · 4 min wall sit · 4 min plank'],
-      [60, '300 squats in a session · 5 min wall sit'],
-      [70, '400 squats · 6 min wall sit'],
-      [80, 'Exceptional bodyweight endurance']
+      [5,'20 squats unbroken · 30s wall sit'],
+      [10,'30 squats unbroken · 45s wall sit · 45s plank'],
+      [15,'50 squats unbroken · 60s wall sit · 1 min plank · 20 chair step-ups'],
+      [20,'75 squats unbroken · 90s wall sit · 90s plank · 30 chair step-ups'],
+      [30,'100 squats unbroken · 2 min wall sit · 2 min plank · 50 step-ups · 1 min loaded hold'],
+      [40,'150 squats unbroken · 3 min wall sit · 3 min plank · 2 min loaded hold'],
+      [50,'200 squats unbroken · 4 min wall sit · 4 min plank'],
+      [60,'300 squats in a session · 5 min wall sit'],
+      [70,'400 squats · 6 min wall sit'],
+      [80,'Exceptional bodyweight endurance']
     ]
   },
   INT: {
     label: 'Intelligence',
-    note: 'Books with notes, courses, applied learning. Scored on the last 12 months only.',
+    note: 'Books with notes, courses, applied learning. Last 12 months only.',
     tiers: [
-      [5,  '1 book finished · keeping a journal'],
-      [10, '6 books/year with notes'],
-      [20, '12 books/year · apply 1 idea per book · 1 course done'],
-      [30, '18 books/year · 2 courses · built something with the knowledge'],
-      [40, '24 books/year · taught a concept publicly'],
-      [50, '30+ books/year · original synthesis · language B1'],
-      [60, 'Language B2 · publishing regularly'],
-      [70, 'Recognised competence · language C1']
+      [5,'1 book finished · keeping a journal'],
+      [10,'6 books/year with notes'],
+      [20,'12 books/year · apply 1 idea per book · 1 course done'],
+      [30,'18 books/year · 2 courses · built something with the knowledge'],
+      [40,'24 books/year · taught a concept publicly'],
+      [50,'30+ books/year · original synthesis · language B1'],
+      [60,'Language B2 · publishing regularly'],
+      [70,'Recognised competence · language C1']
     ]
   },
   PER: {
     label: 'Perception',
-    note: 'Focus and attention. Three valid routes — pick one and stick to it: meditation, written reflection, or undistracted reading.',
+    note: 'Three routes — pick one: meditation, written reflection, or undistracted reading.',
     tiers: [
-      [1,  'Floor — no practice'],
-      [5,  '5 min meditation OR 10 min written reflection OR 15 min undistracted reading'],
-      [10, '10 min meditation OR 15 min reflection OR 25-min block, phone elsewhere'],
-      [20, '20 min practice OR two 25-min blocks'],
-      [30, '45 min uninterrupted deep work · 15 min practice'],
-      [40, '90-min deep work block · 3 days no doom-scrolling'],
-      [50, '2h deep work daily · 30 min practice · 3 recorded observations/day'],
-      [60, '3h deep work · 45 min practice'],
-      [70, '4h+ sustained focus']
+      [1,'Floor — no practice'],
+      [5,'5 min meditation OR 10 min written reflection OR 15 min undistracted reading'],
+      [10,'10 min meditation OR 15 min reflection OR 25-min block, phone elsewhere'],
+      [20,'20 min practice OR two 25-min blocks'],
+      [30,'45 min uninterrupted deep work · 15 min practice'],
+      [40,'90-min deep work block · 3 days no doom-scrolling'],
+      [50,'2h deep work daily · 30 min practice · 3 recorded observations/day'],
+      [60,'3h deep work · 45 min practice'],
+      [70,'4h+ sustained focus']
     ]
   }
 };
+
+function strToMaxes(tier){
+  const map = {
+    5:   { pushups: 5,  pullups: 0, dips: 0, squats: 15, plank: 20 },
+    10:  { pushups: 15, pullups: 0, dips: 5, squats: 25, plank: 45 },
+    20:  { pushups: 25, pullups: 0, dips: 10, squats: 40, plank: 60 },
+    30:  { pushups: 35, pullups: 0, dips: 15, squats: 50, plank: 90 },
+    40:  { pushups: 45, pullups: 4, dips: 20, squats: 60, plank: 120 },
+    50:  { pushups: 50, pullups: 6, dips: 25, squats: 80, plank: 180 },
+    60:  { pushups: 60, pullups: 8, dips: 30, squats: 100, plank: 240 }
+  };
+  return map[tier] || map[5];
+}
+
+function deriveExercisesFromStats(){
+  const str = state.stats.STR || 5;
+  const budget = state.timeBudget || 30;
+  const hasBar = (state.equipment || []).includes('pullup_bar');
+  const hasDipBars = (state.equipment || []).includes('dip_bars');
+  const maxes = strToMaxes(str);
+
+  const reps = max => Math.max(2, Math.round(max * 0.6));
+  let sets, maxExercises;
+  if (budget <= 15){ sets = 2; maxExercises = 3; }
+  else if (budget <= 30){ sets = 3; maxExercises = 4; }
+  else if (budget <= 45){ sets = 3; maxExercises = 5; }
+  else { sets = 4; maxExercises = 6; }
+
+  const all = [];
+  all.push({ name: 'Pushups', sets, reps: reps(maxes.pushups), unit: 'reps' });
+  all.push({ name: 'Squats',  sets, reps: reps(maxes.squats),  unit: 'reps' });
+  all.push({ name: 'Plank',   sets, reps: Math.round(maxes.plank * 0.7), unit: 'sec' });
+  if (maxes.dips > 0)
+    all.push({ name: hasDipBars ? 'Dips' : 'Chair dips', sets, reps: reps(maxes.dips), unit: 'reps' });
+  if (hasBar && maxes.pullups > 0)
+    all.push({ name: 'Pullups', sets, reps: Math.max(2, Math.round(maxes.pullups * 0.6)), unit: 'reps' });
+  if (str >= 20)
+    all.push({ name: 'Wall handstand', sets, reps: str >= 40 ? 45 : 20, unit: 'sec' });
+
+  return all.slice(0, maxExercises);
+}
 
 /* ═════ EQUIPMENT ═════ */
 const EQUIPMENT_OPTIONS = [
@@ -219,7 +283,7 @@ const EQUIPMENT_OPTIONS = [
   { id: 'rings', label: 'Gymnastic rings' },
   { id: 'bench', label: 'Weight bench' },
   { id: 'jump_rope', label: 'Jump rope' },
-  { id: 'cardio_machine', label: 'Cardio machine (bike/treadmill)' },
+  { id: 'cardio_machine', label: 'Cardio machine' },
   { id: 'mat', label: 'Exercise mat' },
   { id: 'chair', label: 'Sturdy chair' },
   { id: 'table', label: 'Sturdy table' }
@@ -249,9 +313,9 @@ const LADDER_PRESETS = {
   reading: ['1 book finished this month', '6 books/year with notes', '12 books/year with applied ideas', '18 books/year, one project built from them', '24 books/year', '30+ books/year — original synthesis'],
   writing: ['Premise + outline', 'First 1,000 words', 'First chapter', '10k words', '30k words — Act 1 complete', 'Full first draft', 'Beta readers engaged', 'Edited draft', 'Submission or self-pub ready', 'Published — reviews, sales'],
   fitness: ['Complete first full workout', '1 week of consistent workouts', '4 weeks consistent', 'First PR (new max in any lift/movement)', 'Noticeable strength gain', '8 weeks consistent — habit locked', 'Complete a full program', 'Hit intermediate benchmarks (see STR)', 'Hit advanced benchmarks', 'Maintain consistency for 1 year'],
-  engineering: ['Branch chosen', 'Maths and mechanics refreshed', 'CAD refresher done', '3 portfolio drawings or models', 'Professional body membership (EngTech route)', 'Portfolio project complete', '5 applications submitted', 'First interview', 'First role or contract', 'Professional registration'],
+  engineering: ['Branch chosen', 'Maths and mechanics refreshed', 'CAD refresher done', '3 portfolio drawings or models', 'Professional body membership', 'Portfolio project complete', '5 applications submitted', 'First interview', 'First role or contract', 'Professional registration'],
   art: ['Foundational technique studied', 'First 30 drawings/sketches done', 'One coherent series (10 pieces)', 'Public sharing begun', 'First commission or sale', 'Recognisable style', 'Local exhibition or feature', 'Consistent body of work'],
-  instrument: ['First chord or scale learned', '15 min practice daily for a week', 'Play a simple song end-to-end', 'Basic scales in 2 keys', 'Barre chords or equivalent technique', 'Play 5 songs by memory', 'Play with another musician', 'First performance (any setting)', 'Compose or improvise', 'Comfortable across keys and styles'],
+  instrument: ['First chord or scale learned', '15 min practice daily for a week', 'Play a simple song end-to-end', 'Basic scales in 2 keys', 'Barre chords or equivalent technique', 'Play 5 songs by memory', 'Play with another musician', 'First performance', 'Compose or improvise', 'Comfortable across keys and styles'],
   mind: ['Started daily practice', '1 week consistent', '4 weeks consistent', '30 min uninterrupted session', 'Noticeable focus change in daily life', '45 min session or equivalent', '3 months consistent', 'Practice becomes automatic'],
   publicspeaking: ['First 3-min speech recorded on phone', 'Studied one speaking framework', 'Presented to 1 person', 'Presented to 5 people', 'Presented to 20 people', 'Joined a local speaking club', 'First formal speech', 'First paid or invited talk'],
   cooking: ['First meal cooked from scratch', '10 recipes learned by heart', 'Cook a full meal for 4 people', 'Knife skills practiced', 'One consistent cuisine learned', 'Confident with any ingredient given', 'First dish you would serve a chef', 'Cookbook or blog started']
@@ -269,23 +333,36 @@ function yesterday(){
   const d = new Date(); d.setDate(d.getDate() - 1);
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 }
+function dateOffset(n){
+  const d = new Date(); d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
 function dayName(n){ return ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][n]; }
+function dayShort(n){ return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][n]; }
 function esc(s){
   return String(s ?? '').replace(/[&<>"']/g, c =>
     ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function daysSinceDate(dateStr){
+  if (!dateStr) return null;
+  const d = new Date(dateStr + 'T00:00:00');
+  if (isNaN(d.getTime())) return null;
+  return Math.floor((Date.now() - d.getTime()) / (1000*60*60*24));
 }
 
 /* ═════ STATE ═════ */
 const KEY = 'the-system-v2';
 const DEFAULT_STATS = { STR: 5, AGI: 5, VIT: 5, INT: 5, PER: 1 };
+let logDate = today();
 
 function defaultState(){
   return {
-    v: 4, onboarded: false, name: '', totalXP: 0,
+    v: 6, onboarded: false, name: '', totalXP: 0,
     stats: { ...DEFAULT_STATS }, statDates: {},
     skills: [], streak: 0, lastComplete: null,
     quests: {}, log: [], benchmarks: [], titles: [],
-    equipment: [],
+    equipment: [], timeBudget: 30,
+    lastCelebratedLevel: 1,
     settings: { apiKey: '', apiBase: 'https://api.openai.com/v1', apiModel: 'gpt-4o-mini' }
   };
 }
@@ -307,7 +384,11 @@ function migrateSkill(s){
     s.ladderDone = [];
   }
   if (!s.ladderDone) s.ladderDone = [];
-  if (!s.ladderEarned) s.ladderEarned = [...s.ladderDone]; // migration: prior ticks paid XP
+  if (!s.ladderEarned) s.ladderEarned = [];
+  if (!s.ladderXpLogs) s.ladderXpLogs = {};
+  if (!s.ladderPreticked) s.ladderPreticked = [...s.ladderDone];
+  if (s.workoutsSinceAttempt === undefined) s.workoutsSinceAttempt = 0;
+  if (s.cardioEnabled === undefined) s.cardioEnabled = true;
   return s;
 }
 
@@ -319,6 +400,11 @@ function load(){
     const parsed = Object.assign(defaultState(), JSON.parse(raw));
     if (parsed.skills) parsed.skills = parsed.skills.map(migrateSkill);
     if (!parsed.equipment) parsed.equipment = [];
+    if (!parsed.timeBudget) parsed.timeBudget = 30;
+    const curLvl = levelFromXP(parsed.totalXP || 0);
+    if (!parsed.lastCelebratedLevel || parsed.lastCelebratedLevel < curLvl){
+      parsed.lastCelebratedLevel = curLvl;
+    }
     return parsed;
   } catch(e){ return defaultState(); }
 }
@@ -327,100 +413,164 @@ function save(){
   render();
 }
 
-function addXP(amount, note){
+function addXP(amount, note, id, date){
+  const entry = { id: id || newId(), date: date || today(), xp: amount, note };
   state.totalXP += amount;
-  state.log.unshift({ date: today(), xp: amount, note });
+  state.log.unshift(entry);
   state.log = state.log.slice(0, 500);
+  if (amount > 0){
+    const lvl = levelFromXP(state.totalXP);
+    if (lvl > state.lastCelebratedLevel){
+      state.lastCelebratedLevel = lvl;
+      setTimeout(() => showLevelUp(lvl), 120);
+    }
+  }
+  return entry.id;
 }
 
-/* ═════ PROGRESSION QUESTIONS ═════ */
+function showLevelUp(level){
+  const el = document.createElement('div');
+  el.className = 'levelup-overlay';
+  el.innerHTML = `
+    <div class="levelup-card">
+      <div class="label">Level up</div>
+      <div class="big">Lv ${level}</div>
+      <div class="rank">Rank ${rankOf(level)}</div>
+    </div>`;
+  const dismiss = () => {
+    el.classList.remove('show');
+    setTimeout(() => el.remove(), 400);
+  };
+  el.onclick = dismiss;
+  document.body.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('show'));
+  setTimeout(dismiss, 2800);
+}
+
+/* ═════ LADDER TICK/UNTICK ═════ */
+function tickMilestone(skill, i){
+  skill.ladderDone = skill.ladderDone || [];
+  skill.ladderEarned = skill.ladderEarned || [];
+  skill.ladderXpLogs = skill.ladderXpLogs || {};
+  skill.ladderPreticked = skill.ladderPreticked || [];
+
+  if (skill.ladderDone.includes(i)) return;
+  skill.ladderDone.push(i);
+  if (skill.ladderPreticked.includes(i)) return;
+
+  const ref = skill.ladderXpLogs[i];
+  if (ref){
+    state.totalXP += ref.xp;
+    skill.xp += ref.xp;
+    state.log.unshift({ id: ref.logId, date: today(), xp: ref.xp, note: ref.note });
+    const lvl = levelFromXP(state.totalXP);
+    if (lvl > state.lastCelebratedLevel){
+      state.lastCelebratedLevel = lvl;
+      setTimeout(() => showLevelUp(lvl), 120);
+    }
+  } else {
+    const note = `${skill.name}: ${skill.ladder[i]}`;
+    const logId = addXP(20, note);
+    addSkillXP(skill, 20);
+    skill.ladderEarned.push(i);
+    skill.ladderXpLogs[i] = { logId, xp: 20, note };
+  }
+}
+
+function untickMilestone(skill, i){
+  skill.ladderDone = (skill.ladderDone || []).filter(x => x !== i);
+  const ref = skill.ladderXpLogs && skill.ladderXpLogs[i];
+  if (ref){
+    state.totalXP -= ref.xp;
+    state.log = state.log.filter(e => e.id !== ref.logId);
+    skill.xp = Math.max(0, skill.xp - ref.xp);
+  }
+}
+
+/* ═════ PROGRESSION ═════ */
 function progressionFor(skill){
   const sub = skill.subtype || 'custom';
   const detail = skill.detail || skill.name || '';
 
   if (sub === 'fitness') return [
-    { id: 'level', label: 'Where are you now?', options: [
-      { value: 'beginner',     label: 'Beginner — new or returning', planLevel: 'beginner', preTick: [] },
-      { value: 'intermediate', label: 'Intermediate — training for months', planLevel: 'intermediate', preTick: [0,1,2,3] },
-      { value: 'advanced',     label: 'Advanced — years of consistent training', planLevel: 'advanced', preTick: [0,1,2,3,4,5,6] }
-    ]},
-    { id: 'equipment', label: 'What equipment do you have?', type: 'equipment' }
+    { id: 'equipment', label: 'Equipment you have', type: 'equipment' },
+    { id: 'workoutDays', label: 'Which days will you train?', type: 'days', multi: true, default: [1,3,5] },
+    { id: 'attemptDay', label: 'Attempt day (test your max)', type: 'days', multi: false, default: 0 }
   ];
 
   if (sub === 'language') return [
     { id: 'level', label: `Current level in ${detail}`, options: [
       { value: 'A0', label: 'Never studied', preTick: [] },
-      { value: 'A1', label: 'A1 — 500 words, basic phrases', preTick: [0] },
+      { value: 'A1', label: 'A1 — 500 words', preTick: [0] },
       { value: 'A2', label: 'A2 — simple conversations', preTick: [0,1] },
-      { value: 'B1', label: 'B1 — comfortable everyday conversation', preTick: [0,1,2] },
+      { value: 'B1', label: 'B1 — comfortable everyday', preTick: [0,1,2] },
       { value: 'B2', label: 'B2 — fluent discussion', preTick: [0,1,2,3] },
-      { value: 'C1', label: 'C1 — professional fluency', preTick: [0,1,2,3,4] }
+      { value: 'C1', label: 'C1 — professional', preTick: [0,1,2,3,4] }
     ]}
   ];
 
   if (sub === 'business') return [
     { id: 'stage', label: 'Where are you now?', options: [
-      { value: 'not_decided', label: "I haven't decided what business to start", preTick: [] },
-      { value: 'idea',        label: 'I have an idea or niche', preTick: [0] },
+      { value: 'not_decided', label: "Haven't decided", preTick: [] },
+      { value: 'idea',        label: 'I have an idea', preTick: [0] },
       { value: 'researching', label: 'Doing customer research', preTick: [0,1] },
-      { value: 'registered',  label: 'Registered, bank open, domain secured', preTick: [0,1,2,3] },
-      { value: 'mvp',         label: 'MVP or site is live', preTick: [0,1,2,3,4] },
-      { value: 'first_customer', label: 'I have paying customers', preTick: [0,1,2,3,4,5,6] }
+      { value: 'registered',  label: 'Registered, bank, domain', preTick: [0,1,2,3] },
+      { value: 'mvp',         label: 'MVP live', preTick: [0,1,2,3,4] },
+      { value: 'first_customer', label: 'Have paying customers', preTick: [0,1,2,3,4,5,6] }
     ]},
     { id: 'type', label: 'What kind of business?', onlyIf: a => a.stage && a.stage !== 'not_decided', options: [
-      { value: 'Freelancing',    label: 'Freelancing / consulting' },
-      { value: 'E-commerce',     label: 'E-commerce / physical product' },
-      { value: 'SaaS',           label: 'Software / app' },
-      { value: 'Local service',  label: 'Local service' },
-      { value: 'Content',        label: 'Content / creator' },
-      { value: 'Other',          label: 'Something else' }
+      { value: 'Freelancing',   label: 'Freelancing / consulting' },
+      { value: 'E-commerce',    label: 'E-commerce' },
+      { value: 'SaaS',          label: 'Software / app' },
+      { value: 'Local service', label: 'Local service' },
+      { value: 'Content',       label: 'Content / creator' },
+      { value: 'Other',         label: 'Something else' }
     ]}
   ];
 
   if (sub === 'coding') return [
     { id: 'level', label: 'Where are you now?', options: [
-      { value: 'never',     label: "I've never coded", preTick: [] },
-      { value: 'basics',    label: 'I know some basics (HTML, basic JS)', preTick: [0,2] },
-      { value: 'pages',     label: 'I can build simple pages', preTick: [0,1,2] },
-      { value: 'projects',  label: 'I can build projects with help', preTick: [0,1,2,3,5] },
-      { value: 'confident', label: 'I can build full apps without help', preTick: [0,1,2,3,4,5,6] }
+      { value: 'never',     label: "Never coded", preTick: [] },
+      { value: 'basics',    label: 'Some basics', preTick: [0,2] },
+      { value: 'pages',     label: 'Can build simple pages', preTick: [0,1,2] },
+      { value: 'projects',  label: 'Build with help', preTick: [0,1,2,3,5] },
+      { value: 'confident', label: 'Build full apps', preTick: [0,1,2,3,4,5,6] }
     ]}
   ];
 
   if (sub === 'reading') return [
-    { id: 'count', label: 'How many books have you finished in the last 12 months?', options: [
+    { id: 'count', label: 'Books finished in last 12 months', options: [
       { value: '0',    label: '0', preTick: [] },
       { value: '1-3',  label: '1–3', preTick: [0] },
       { value: '4-6',  label: '4–6', preTick: [0,1] },
       { value: '7-11', label: '7–11', preTick: [0,1,2] },
-      { value: '12+',  label: '12 or more', preTick: [0,1,2] }
+      { value: '12+',  label: '12+', preTick: [0,1,2] }
     ]}
   ];
 
   if (sub === 'writing') return [
-    { id: 'stage', label: 'Where are you in the project?', options: [
-      { value: 'idea',        label: 'Idea only', preTick: [] },
-      { value: 'outline',     label: 'I have an outline', preTick: [0] },
-      { value: 'first_words', label: 'I have some words written', preTick: [0,1] },
-      { value: 'first_chapter', label: 'First chapter done', preTick: [0,1,2] },
-      { value: 'mid_draft',   label: 'Drafting, 10k+ words', preTick: [0,1,2,3] },
-      { value: 'draft_done',  label: 'First draft complete', preTick: [0,1,2,3,4,5] },
-      { value: 'editing',     label: 'Editing', preTick: [0,1,2,3,4,5,6] },
-      { value: 'published',   label: 'Published', preTick: [0,1,2,3,4,5,6,7,8,9] }
+    { id: 'stage', label: 'Where are you?', options: [
+      { value: 'idea',          label: 'Idea only', preTick: [] },
+      { value: 'outline',       label: 'Outline', preTick: [0] },
+      { value: 'first_words',   label: 'Some words', preTick: [0,1] },
+      { value: 'first_chapter', label: 'First chapter', preTick: [0,1,2] },
+      { value: 'mid_draft',     label: '10k+ words', preTick: [0,1,2,3] },
+      { value: 'draft_done',    label: 'Draft complete', preTick: [0,1,2,3,4,5] },
+      { value: 'editing',       label: 'Editing', preTick: [0,1,2,3,4,5,6] },
+      { value: 'published',     label: 'Published', preTick: [0,1,2,3,4,5,6,7,8,9] }
     ]}
   ];
 
   if (sub === 'engineering') return [
-    { id: 'stage', label: 'Where are you now?', options: [
-      { value: 'start',      label: 'Starting from scratch', preTick: [] },
-      { value: 'refreshing', label: 'Refreshing basics', preTick: [0,1] },
-      { value: 'portfolio',  label: 'I have or am building a portfolio', preTick: [0,1,2,3] },
-      { value: 'applying',   label: 'Applying for roles', preTick: [0,1,2,3,4,5,6] },
-      { value: 'working',    label: 'Working in the field', preTick: [0,1,2,3,4,5,6,7,8] }
+    { id: 'stage', label: 'Where are you?', options: [
+      { value: 'start',      label: 'Starting fresh', preTick: [] },
+      { value: 'refreshing', label: 'Refreshing', preTick: [0,1] },
+      { value: 'portfolio',  label: 'Building portfolio', preTick: [0,1,2,3] },
+      { value: 'applying',   label: 'Applying', preTick: [0,1,2,3,4,5,6] },
+      { value: 'working',    label: 'Working in field', preTick: [0,1,2,3,4,5,6,7,8] }
     ]}
   ];
 
-  // default / custom
   return [
     { id: 'level', label: 'Where are you now?', options: [
       { value: 'beginner',     label: 'Complete beginner', preTick: [] },
@@ -431,15 +581,13 @@ function progressionFor(skill){
   ];
 }
 
-/* ═════ APPLY PROGRESSION TO SKILL ═════ */
 function applyProgression(skill, answers){
   const questions = progressionFor(skill);
   let statusParts = [];
   let preTick = null;
-  let planLevel = null;
 
   questions.forEach(q => {
-    if (q.type === 'equipment') return;
+    if (q.type === 'equipment' || q.type === 'days') return;
     if (q.onlyIf && !q.onlyIf(answers)) return;
     const val = answers[q.id];
     if (!val) return;
@@ -447,52 +595,32 @@ function applyProgression(skill, answers){
     if (!opt) return;
     statusParts.push(opt.label);
     if (opt.preTick) preTick = opt.preTick;
-    if (opt.planLevel) planLevel = opt.planLevel;
   });
 
   skill.status = statusParts.join(' — ') || skill.status || '';
 
-  if (preTick){
-    skill.ladderDone = [...preTick];
-    skill.ladderEarned = [...preTick];
+  if (skill.subtype === 'fitness' && skill.type === 'workout'){
+    skill.plan = skill.plan || {};
+    skill.plan.workoutDays = answers.workoutDays || [1,3,5];
+    skill.plan.attemptDay = (typeof answers.attemptDay === 'number') ? answers.attemptDay : 0;
+    skill.plan.exercises = deriveExercisesFromStats();
+    skill.plan.calibratedTo = { STR: state.stats.STR, equipment: [...(state.equipment||[])] };
   }
 
   if (answers.type) skill.detail = answers.type;
 
-  if (skill.type === 'workout' && planLevel) applyFitnessPlan(skill, planLevel);
+  if (preTick){
+    skill.ladderDone = [...preTick];
+    skill.ladderPreticked = [...preTick];
+    skill.ladderEarned = [];
+    skill.ladderXpLogs = {};
+  }
 
-  // regenerate default quests based on new status
   if (skill.type === 'standard'){
     skill.quests = defaultQuestsForSkill(skill);
   }
 }
 
-function applyFitnessPlan(skill, level){
-  const hasBar = (state.equipment || []).includes('pullup_bar');
-  const hasDipBars = (state.equipment || []).includes('dip_bars');
-  const pullName = hasBar ? 'Pullups' : 'Table rows';
-  const dipName = hasDipBars ? 'Dips' : 'Chair dips';
-
-  const base = {
-    beginner:     { pushups: 10, squats: 15, dips: 8,  crunches: 15, plank: 30, pulls: 6 },
-    intermediate: { pushups: 20, squats: 25, dips: 12, crunches: 20, plank: 45, pulls: 8 },
-    advanced:     { pushups: 30, squats: 35, dips: 15, crunches: 25, plank: 60, pulls: 10 }
-  }[level] || { pushups: 15, squats: 20, dips: 10, crunches: 20, plank: 40, pulls: 8 };
-
-  const exercises = [
-    { name: 'Pushups',  sets: 4, reps: base.pushups,  unit: 'reps' },
-    { name: 'Squats',   sets: 4, reps: base.squats,   unit: 'reps' },
-    { name: dipName,    sets: 4, reps: base.dips,     unit: 'reps' },
-    { name: 'Crunches', sets: 4, reps: base.crunches, unit: 'reps' },
-    { name: 'Plank',    sets: 4, reps: base.plank,    unit: 'sec'  }
-  ];
-  if (hasBar || level !== 'beginner'){
-    exercises.push({ name: pullName, sets: 4, reps: base.pulls, unit: 'reps' });
-  }
-  skill.plan = { exercises, workoutDays: [1, 3, 5], attemptDay: 0 };
-}
-
-/* ═════ DEFAULT QUESTS PER SKILL ═════ */
 function defaultQuestsForSkill(skill){
   const sub = skill.subtype || 'custom';
   const status = (skill.status || '').toLowerCase();
@@ -513,7 +641,7 @@ function defaultQuestsForSkill(skill){
   if (sub === 'business'){
     if (/not decided|idea/i.test(status)) return [
       { id: newId(), text: '15 min market research', xp: 3 },
-      { id: newId(), text: '1 business task (writing, reading, contacting)', xp: 5 }
+      { id: newId(), text: '1 business task', xp: 5 }
     ];
     return [
       { id: newId(), text: '1 customer or client conversation', xp: 5 },
@@ -533,24 +661,18 @@ function defaultQuestsForSkill(skill){
   if (sub === 'reading'){
     return [
       { id: newId(), text: 'Read 30 min, phone away', xp: 5 },
-      { id: newId(), text: '3 sentences of notes on what you read', xp: 2 }
+      { id: newId(), text: '3 sentences of notes', xp: 2 }
     ];
   }
   if (sub === 'writing'){
-    if (/idea|outline/i.test(status)) return [
-      { id: newId(), text: 'Write 200 words of premise / outline', xp: 3 }
-    ];
-    if (/first_words|first_chapter|mid_draft/i.test(status)) return [
-      { id: newId(), text: 'Write 500 words', xp: 5 }
-    ];
-    if (/draft_done|editing|published/i.test(status)) return [
-      { id: newId(), text: '30 min editing or marketing', xp: 5 }
-    ];
+    if (/idea|outline/i.test(status)) return [{ id: newId(), text: 'Write 200 words of premise', xp: 3 }];
+    if (/first_words|first_chapter|mid_draft/i.test(status)) return [{ id: newId(), text: 'Write 500 words', xp: 5 }];
+    if (/draft_done|editing|published/i.test(status)) return [{ id: newId(), text: '30 min editing or marketing', xp: 5 }];
     return [{ id: newId(), text: 'Write 300 words', xp: 5 }];
   }
   if (sub === 'engineering'){
     return [
-      { id: newId(), text: '30 min technical study or practice', xp: 5 },
+      { id: newId(), text: '30 min technical study', xp: 5 },
       { id: newId(), text: '1 portfolio step', xp: 3 }
     ];
   }
@@ -574,6 +696,9 @@ function questsForToday(){
         const summary = plan.exercises.map(e => `${e.sets}×${e.reps} ${e.name}`).join(' · ');
         list.push({ id: `${skill.id}:workout`, skillId: skill.id, kind: 'workout',
           text: `${skill.name}: ${summary}`, xp: 15 });
+      } else if (skill.subtype === 'fitness' && skill.cardioEnabled !== false){
+        list.push({ id: `${skill.id}:cardio`, skillId: skill.id, kind: 'cardio',
+          text: `${skill.name} cardio (VIT): 20 min brisk walk, cycle, or housework`, xp: 8 });
       }
     } else if (skill.quests){
       skill.quests.forEach(q => list.push({
@@ -589,15 +714,22 @@ function isQuestDone(qid){
 function toggleQuest(quest){
   const t = today();
   state.quests[t] = state.quests[t] || {};
+  const skill = state.skills.find(s => s.id === quest.skillId);
+
   if (state.quests[t][quest.id]){
     delete state.quests[t][quest.id];
+    if (quest.kind === 'workout' && skill){
+      skill.workoutsSinceAttempt = Math.max(0, (skill.workoutsSinceAttempt || 0) - 1);
+    }
   } else {
     state.quests[t][quest.id] = true;
     addXP(quest.xp, quest.text);
-    const skill = state.skills.find(s => s.id === quest.skillId);
     if (skill){
       const leveled = addSkillXP(skill, quest.xp);
       if (leveled) addXP(0, `${skill.name} reached Lv ${skill.level}`);
+      if (quest.kind === 'workout'){
+        skill.workoutsSinceAttempt = (skill.workoutsSinceAttempt || 0) + 1;
+      }
     }
     updateStreak();
   }
@@ -615,23 +747,15 @@ function updateStreak(){
 
 /* ═════ AI ═════ */
 function buildQuestAIPrompt(skillName, level){
-  return `Generate 6 concrete daily practice quests for someone learning "${skillName}" at level ${level}/50. Each quest must be specific, self-contained, 20–60 min, doable at home.
-
-Return ONLY a valid JSON array of 6 strings. No markdown, no preamble.
-
-Example: ["Quest 1","Quest 2","Quest 3","Quest 4","Quest 5","Quest 6"]`;
+  return `Generate 6 concrete daily practice quests for someone learning "${skillName}" at level ${level}/50. Specific, 20–60 min, doable at home. Return ONLY a JSON array of 6 strings.`;
 }
 function buildLadderAIPrompt(skill){
   let context = '';
   if (skill.subtype === 'business' && skill.detail && /not decided/i.test(skill.detail)){
-    context = `\n\nThe person hasn't chosen what business to start. First suggest 3 concrete business ideas that fit someone with 5–10 hrs/week and no capital. Then pick the one most likely to succeed and produce the 8–10 milestones for that business.`;
+    context = `\n\nThe person hasn't chosen what business to start. First suggest 3 concrete ideas that fit 5–10 hrs/week and no capital. Then pick the most promising and produce 8–10 milestones for that business.`;
   }
   const status = skill.status ? `\nCurrent status: ${skill.status}` : '';
-  return `Generate a progression ladder of 8–10 concrete milestones for someone learning "${skill.name}"${skill.detail && skill.detail !== skill.name ? ` (specifically: ${skill.detail})` : ''}.${status}${context}
-
-Each milestone must be specific, testable, and build on the previous one. Return ONLY a JSON array of milestone strings.
-
-Example: ["Milestone 1","Milestone 2","Milestone 3"]`;
+  return `Generate 8–10 concrete progression milestones for someone learning "${skill.name}"${skill.detail && skill.detail !== skill.name ? ` (specifically: ${skill.detail})` : ''}.${status}${context}\n\nEach specific, testable, building on the previous. Return ONLY a JSON array of strings.`;
 }
 async function callAI(prompt, apiKey, baseUrl, model){
   const res = await fetch(`${baseUrl}/chat/completions`, {
@@ -656,18 +780,15 @@ function makeSkillFromTemplate(sug, detail){
     id: newId(), name, subtype, detail: detail || '', status: '',
     active: true, level: 1, xp: 0,
     ladder: defaultLadderFor(subtype), ladderDone: [], ladderEarned: [],
+    ladderXpLogs: {}, ladderPreticked: [],
+    workoutsSinceAttempt: 0, cardioEnabled: true,
     type: isWorkoutType ? 'workout' : 'standard'
   };
   if (isWorkoutType){
     skill.plan = {
-      exercises: [
-        { name: 'Pushups', sets: 4, reps: 15, unit: 'reps' },
-        { name: 'Squats', sets: 4, reps: 20, unit: 'reps' },
-        { name: 'Chair dips', sets: 4, reps: 10, unit: 'reps' },
-        { name: 'Crunches', sets: 4, reps: 20, unit: 'reps' },
-        { name: 'Plank', sets: 4, reps: 45, unit: 'sec' }
-      ],
-      workoutDays: [1, 3, 5], attemptDay: 0
+      exercises: deriveExercisesFromStats(),
+      workoutDays: [1, 3, 5], attemptDay: 0,
+      calibratedTo: { STR: state.stats.STR, equipment: [...(state.equipment||[])] }
     };
   } else {
     skill.quests = defaultQuestsForSkill(skill);
@@ -681,6 +802,7 @@ let onboardStep = 1;
 const onboardDraft = {
   name: '',
   stats: { ...DEFAULT_STATS },
+  timeBudget: 30,
   skills: [],
   progression: {}
 };
@@ -714,7 +836,7 @@ function renderOnboarding(){
   if (onboardStep === 2){
     app.innerHTML = `
       <h1 style="margin-top:24px">Starting stats</h1>
-      <p class="dim" style="margin-top:12px">You don't guess a number — you pick the highest tier you can <b>pass today</b>. Between two tiers, take the lower.</p>
+      <p class="dim" style="margin-top:12px">Pick the highest tier you can <b>pass today</b>. Between two tiers, take the lower.</p>
       <div class="card" style="margin-top:16px">
         ${['STR','AGI','VIT','INT','PER'].map(k => {
           const b = BENCHMARKS[k];
@@ -732,6 +854,18 @@ function renderOnboarding(){
             </div>`;
         }).join('')}
       </div>
+      <div class="card">
+        <div class="field">
+          <label>Daily time budget</label>
+          <select data-obtb>
+            <option value="15" ${onboardDraft.timeBudget===15?'selected':''}>15 min — quick, one focused thing</option>
+            <option value="30" ${onboardDraft.timeBudget===30?'selected':''}>30 min — a solid daily practice</option>
+            <option value="45" ${onboardDraft.timeBudget===45?'selected':''}>45 min — a full workout or deep session</option>
+            <option value="60" ${onboardDraft.timeBudget===60?'selected':''}>60+ min — intense, multiple activities</option>
+          </select>
+          <div class="hint">Affects how many exercises and quests you get by default.</div>
+        </div>
+      </div>
       <div class="row" style="gap:8px">
         <button class="ghost" id="ob-back" style="flex:1">Back</button>
         <button class="primary" id="ob-next" style="flex:2">Continue</button>
@@ -746,6 +880,9 @@ function renderOnboarding(){
         document.getElementById(`ob-hint-${k}`).textContent = desc;
       };
     });
+    document.querySelector('[data-obtb]').onchange = e => {
+      onboardDraft.timeBudget = parseInt(e.target.value, 10);
+    };
     document.getElementById('ob-back').onclick = () => { onboardStep = 1; render(); };
     document.getElementById('ob-next').onclick = () => { onboardStep = 3; render(); };
     return;
@@ -754,8 +891,7 @@ function renderOnboarding(){
   if (onboardStep === 3){
     app.innerHTML = `
       <h1 style="margin-top:24px">Your skills</h1>
-      <p class="dim" style="margin-top:12px">Pick what you want to level. Nothing forced — tap a category to see specific options.</p>
-
+      <p class="dim" style="margin-top:12px">Pick what you want to level. Nothing forced.</p>
       ${onboardDraft.skills.length ? `
         <h2>Selected (${onboardDraft.skills.length})</h2>
         <div class="card">
@@ -767,7 +903,6 @@ function renderOnboarding(){
           `).join('')}
         </div>
       ` : ''}
-
       <h2>Add a skill</h2>
       <div>
         ${SKILL_SUGGESTIONS.map(sug => `
@@ -788,7 +923,6 @@ function renderOnboarding(){
           </div>
         </details>
       </div>
-
       <div class="row" style="gap:8px;margin-top:16px">
         <button class="ghost" id="ob-back" style="flex:1">Back</button>
         <button class="primary" id="ob-next" style="flex:2">${onboardDraft.skills.length ? 'Continue' : 'Skip for now'}</button>
@@ -822,9 +956,9 @@ function renderOnboarding(){
     document.getElementById('ob-back').onclick = () => { onboardStep = 2; render(); };
     document.getElementById('ob-next').onclick = () => {
       if (onboardDraft.skills.length === 0){
-        // skip progression if no skills
         state.name = onboardDraft.name;
         state.stats = { ...onboardDraft.stats };
+        state.timeBudget = onboardDraft.timeBudget;
         state.skills = [];
         state.onboarded = true;
         save(); tab = 'status';
@@ -836,21 +970,16 @@ function renderOnboarding(){
     return;
   }
 
-  if (onboardStep === 4){
-    // progression questions for each skill
-    renderProgressionStep();
-    return;
-  }
+  if (onboardStep === 4) renderProgressionStep();
 }
 
 function renderProgressionStep(){
   const app = document.getElementById('app');
   const skills = onboardDraft.skills;
 
-  const body = skills.map((skill, idx) => {
+  const body = skills.map((skill) => {
     const questions = progressionFor(skill);
     const ans = onboardDraft.progression[skill.id] || {};
-    const hasEquip = questions.some(q => q.type === 'equipment');
 
     return `
       <div class="prog-section">
@@ -867,6 +996,19 @@ function renderProgressionStep(){
                       <span>${esc(eq.label)}</span>
                     </label>
                   `).join('')}
+                </div>
+              </div>`;
+          }
+          if (q.type === 'days'){
+            const current = ans[q.id] !== undefined ? ans[q.id] : q.default;
+            return `
+              <div class="field">
+                <label>${esc(q.label)}</label>
+                <div class="day-picker">
+                  ${[0,1,2,3,4,5,6].map(d => {
+                    const on = q.multi ? current.includes(d) : current === d;
+                    return `<button type="button" class="${on?'primary':'ghost'}" data-obday="${skill.id}|${q.id}|${d}|${q.multi?'multi':'single'}">${dayShort(d)}</button>`;
+                  }).join('')}
                 </div>
               </div>`;
           }
@@ -889,10 +1031,8 @@ function renderProgressionStep(){
 
   app.innerHTML = `
     <h1 style="margin-top:24px">Progression check</h1>
-    <p class="dim" style="margin-top:12px">A few questions per skill so we can build the right ladders and quests. Skip any you're unsure about — you can update this later.</p>
-
+    <p class="dim" style="margin-top:12px">A few questions per skill. For fitness, exercises and reps are derived from your STR stat and equipment.</p>
     ${body}
-
     <div class="row" style="gap:8px;margin-top:16px">
       <button class="ghost" id="ob-back" style="flex:1">Back</button>
       <button class="primary" id="ob-next" style="flex:2">Start the System</button>
@@ -904,7 +1044,25 @@ function renderProgressionStep(){
       const [skillId, qid] = sel.dataset.obq.split('|');
       onboardDraft.progression[skillId] = onboardDraft.progression[skillId] || {};
       onboardDraft.progression[skillId][qid] = sel.value;
-      render(); // re-render in case of conditional question
+      render();
+    };
+  });
+  document.querySelectorAll('[data-obday]').forEach(btn => {
+    btn.onclick = () => {
+      const [skillId, qid, dStr, mode] = btn.dataset.obday.split('|');
+      const d = parseInt(dStr, 10);
+      onboardDraft.progression[skillId] = onboardDraft.progression[skillId] || {};
+      const cur = onboardDraft.progression[skillId][qid];
+      if (mode === 'multi'){
+        const q = progressionFor(skills.find(s => s.id === skillId)).find(x => x.id === qid);
+        const arr = Array.isArray(cur) ? [...cur] : [...(q.default || [])];
+        const idx = arr.indexOf(d);
+        if (idx >= 0) arr.splice(idx, 1); else arr.push(d);
+        onboardDraft.progression[skillId][qid] = arr;
+      } else {
+        onboardDraft.progression[skillId][qid] = d;
+      }
+      render();
     };
   });
   document.querySelectorAll('[data-obeq]').forEach(el => {
@@ -919,15 +1077,32 @@ function renderProgressionStep(){
 
   document.getElementById('ob-back').onclick = () => { onboardStep = 3; render(); };
   document.getElementById('ob-next').onclick = () => {
-    // apply progression to each skill
-    onboardDraft.skills.forEach(skill => {
-      const ans = onboardDraft.progression[skill.id] || {};
-      if (Object.keys(ans).length > 0) applyProgression(skill, ans);
-    });
     state.name = onboardDraft.name;
     state.stats = { ...onboardDraft.stats };
+    state.timeBudget = onboardDraft.timeBudget;
+
+    onboardDraft.skills.forEach(skill => {
+      const ans = onboardDraft.progression[skill.id] || {};
+      if (skill.subtype === 'fitness' && skill.type === 'workout'){
+        const questions = progressionFor(skill);
+        questions.forEach(q => {
+          if (q.type === 'days' && ans[q.id] === undefined) ans[q.id] = q.default;
+        });
+      }
+      if (Object.keys(ans).length > 0) applyProgression(skill, ans);
+    });
+
+    // Recaclulate fitness plans with the final timeBudget
     state.skills = onboardDraft.skills;
+    state.skills.forEach(s => {
+      if (s.type === 'workout' && s.subtype === 'fitness' && s.plan){
+        s.plan.exercises = deriveExercisesFromStats();
+        s.plan.calibratedTo = { STR: state.stats.STR, equipment: [...(state.equipment||[])] };
+      }
+    });
+
     state.onboarded = true;
+    state.lastCelebratedLevel = levelFromXP(state.totalXP);
     save(); tab = 'status';
   };
 }
@@ -964,16 +1139,45 @@ function xpBar(){
     </div>`;
 }
 
+function last7Days(){
+  const arr = [];
+  for (let i = 6; i >= 0; i--){
+    const key = dateOffset(-i);
+    const d = new Date(key + 'T00:00:00');
+    const q = state.quests[key] || {};
+    const logForDate = state.log.filter(e => e.date === key && e.xp > 0);
+    const count = Math.max(Object.keys(q).length, logForDate.length);
+    arr.push({ key, day: dayShort(d.getDay()), count, isToday: i === 0 });
+  }
+  return arr;
+}
+
 function viewStatus(){
   const lvl = levelFromXP(state.totalXP);
-  const stats = ['STR','AGI','VIT','INT','PER'].map(k => `
-    <div class="stat">
-      <div>
-        <div class="small">${k}</div>
-        <div class="small dim mono">${state.statDates[k] || 'untested'}</div>
-      </div>
-      <div class="mono" style="font-size:19px;font-weight:600">${state.stats[k]}</div>
-    </div>`).join('');
+  const days = last7Days();
+  const weekHtml = days.map(d => `
+    <div class="week-cell">
+      <div class="week-day">${d.day.slice(0,1)}</div>
+      <div class="week-box ${d.count > 0 ? 'filled' : ''}">${d.count > 0 ? d.count : ''}</div>
+    </div>
+  `).join('');
+
+  const stats = ['STR','AGI','VIT','INT','PER'].map(k => {
+    const date = state.statDates[k];
+    const days = daysSinceDate(date);
+    const isStale = days === null || days > 30;
+    const label = days === null ? 'untested'
+      : days === 0 ? 'today'
+      : `${days}d ago`;
+    return `
+      <div class="stat">
+        <div>
+          <div class="small">${k}</div>
+          <div class="small mono ${isStale ? 'stat-label-stale' : 'dim'}">${label}</div>
+        </div>
+        <div class="mono" style="font-size:19px;font-weight:600">${state.stats[k]}</div>
+      </div>`;
+  }).join('');
 
   const active = state.skills.filter(s => s.active);
   const skillList = active.length
@@ -985,8 +1189,11 @@ function viewStatus(){
     : '<div class="dim small">No active skills.</div>';
 
   return `
-    <h1>The System</h1>
-    <div class="card" style="margin-top:16px">
+    <div class="row between" style="margin-bottom:16px">
+      <h1>The System</h1>
+      <button class="sm ghost" id="share-btn">Share ↗</button>
+    </div>
+    <div class="card">
       <div class="row between">
         <div>
           <div class="dim small mono">${esc(state.name || 'PLAYER')}</div>
@@ -999,9 +1206,12 @@ function viewStatus(){
       </div>
       ${xpBar()}
     </div>
-    <div class="card row between">
-      <span class="dim small">STREAK</span>
-      <span class="mono" style="font-size:20px">${state.streak} <span class="dim small">days</span></span>
+    <div class="card">
+      <div class="row between">
+        <span class="dim small">STREAK</span>
+        <span class="mono" style="font-size:20px">${state.streak} <span class="dim small">days</span></span>
+      </div>
+      <div class="week-strip">${weekHtml}</div>
     </div>
     <h2>Stats</h2>
     <div class="card">${stats}
@@ -1014,7 +1224,21 @@ function viewStatus(){
 
 function viewQuests(){
   const list = questsForToday();
+  const day = new Date().getDay();
   const doneCount = list.filter(q => isQuestDone(q.id)).length;
+
+  const nudges = state.skills.filter(s =>
+    s.active && s.type === 'workout' && s.subtype === 'fitness'
+    && s.plan && s.plan.attemptDay !== day
+    && (s.workoutsSinceAttempt || 0) >= 4
+  );
+  const nudgeHtml = nudges.map(s => `
+    <div class="notice warn">
+      <b>${esc(s.name)}</b>: ${s.workoutsSinceAttempt} workouts since last attempt. Ready to test?
+      <button class="sm primary" data-nudge-attempt="${s.id}" style="width:100%;margin-top:8px">Test my max now</button>
+    </div>
+  `).join('');
+
   const items = list.length ? list.map(q => {
     const done = isQuestDone(q.id);
     return `
@@ -1022,12 +1246,14 @@ function viewQuests(){
         <div class="chk ${done ? 'done' : ''}">${done ? '✓' : ''}</div>
         <div style="flex:1;${done ? 'opacity:.5' : ''}">
           <div style="${done ? 'text-decoration:line-through' : ''}">${esc(q.text)}</div>
-          <div class="small dim mono">+${q.xp} XP</div>
+          <div class="small dim mono">+${q.xp} XP${q.kind === 'cardio' ? ' · VIT training' : ''}${q.kind === 'attempt' ? ' · test your max' : ''}</div>
         </div>
       </div>`;
   }).join('') : '<div class="dim small" style="padding:12px 0">No quests today. Add or activate a skill in Skills.</div>';
+
   return `
-    <h2>Today · ${dayName(new Date().getDay())} ${today().slice(5)}</h2>
+    <h2>Today · ${dayName(day)} ${today().slice(5)}</h2>
+    ${nudgeHtml}
     <div class="card">${items}</div>
     <div class="card row between">
       <span class="small dim">${doneCount} / ${list.length} done</span>
@@ -1046,6 +1272,10 @@ function viewSkills(){
     const ladderInfo = s.ladder && s.ladder.length
       ? `${(s.ladderDone || []).length}/${s.ladder.length} milestones`
       : '';
+    let recalibrate = '';
+    if (s.type === 'workout' && s.subtype === 'fitness' && s.plan && s.plan.calibratedTo){
+      if (state.stats.STR !== s.plan.calibratedTo.STR) recalibrate = ' · <span style="color:var(--gold)">recalibrate available</span>';
+    }
     return `
       <div class="card" data-skill-card="${s.id}" style="cursor:pointer">
         <div class="row between">
@@ -1056,7 +1286,7 @@ function viewSkills(){
           <span class="mono small dim" style="white-space:nowrap">Lv ${s.level}</span>
         </div>
         <div class="bar"><i style="width:${pct}%"></i></div>
-        <div class="small dim" style="margin-top:8px">${esc(detail)}${ladderInfo ? ` · ${ladderInfo}` : ''}</div>
+        <div class="small dim" style="margin-top:8px">${esc(detail)}${ladderInfo ? ` · ${ladderInfo}` : ''}${recalibrate}</div>
         ${s.status ? `<div class="small dim" style="margin-top:4px">Status: ${esc(s.status)}</div>` : ''}
       </div>`;
   }).join('');
@@ -1071,8 +1301,8 @@ function viewBench(){
   return `
     <h1>Benchmarks</h1>
     <div class="card" style="margin-top:16px">
-      <p class="small">Each stat is scored 1–100. Every tier is a concrete test you pass or fail in a single session. Nothing requires equipment beyond a chair, table, or wall.</p>
-      <p class="small dim" style="margin-top:8px">Tap a tier to log a test. <b style="color:var(--txt)">Higher</b> than current → stat rises, +50 XP. <b style="color:var(--txt)">Current</b> → refreshes the date, no XP. <b style="color:var(--txt)">Lower</b> → demotes, no XP.</p>
+      <p class="small">Each stat is scored 1–100. Every tier is a concrete test you pass or fail in a single session.</p>
+      <p class="small dim" style="margin-top:8px">Tap a tier to log a test. <b style="color:var(--txt)">Higher</b> → stat rises, +50 XP. <b style="color:var(--txt)">Current</b> → refreshes date. <b style="color:var(--txt)">Lower</b> → demotes.</p>
     </div>
     ${['STR','AGI','VIT','INT','PER'].map(renderBenchCard).join('')}
   `;
@@ -1081,7 +1311,8 @@ function renderBenchCard(k){
   const b = BENCHMARKS[k];
   const cur = state.stats[k];
   const curTier = b.tiers.reduce((a, t) => t[0] <= cur && t[0] > a ? t[0] : a, 0);
-  const date = state.statDates[k] || 'untested';
+  const days = daysSinceDate(state.statDates[k]);
+  const date = state.statDates[k] ? (days === 0 ? 'today' : `${days}d ago`) : 'untested';
   const rows = b.tiers.map(([v, desc]) => {
     const isCur = v === curTier;
     const isBelow = v < curTier;
@@ -1113,6 +1344,11 @@ function viewLog(){
         </div>`).join('')
     : '<div class="dim small">Nothing logged yet.</div>';
   return `
+    <h2>Log date</h2>
+    <div class="card">
+      <input type="date" id="log-date" value="${logDate}" max="${today()}">
+      <div class="small dim" style="margin-top:8px">Applies to quick logs and adjustments below.</div>
+    </div>
     <h2>Quick log</h2>
     <div class="grid">
       <button data-xp="15" data-note="Workout">Workout +15</button>
@@ -1143,11 +1379,20 @@ function viewMore(){
         <label>Name</label>
         <input id="profile-name" value="${esc(state.name)}" maxlength="40">
       </div>
-      <button class="sm" id="profile-save">Save name</button>
+      <div class="field">
+        <label>Daily time budget</label>
+        <select id="profile-budget">
+          <option value="15" ${state.timeBudget===15?'selected':''}>15 min</option>
+          <option value="30" ${state.timeBudget===30?'selected':''}>30 min</option>
+          <option value="45" ${state.timeBudget===45?'selected':''}>45 min</option>
+          <option value="60" ${state.timeBudget===60?'selected':''}>60+ min</option>
+        </select>
+      </div>
+      <button class="sm" id="profile-save">Save</button>
     </div>
     <h2>Equipment</h2>
     <div class="card">
-      <p class="small dim" style="margin-bottom:12px">Optional. Used to suggest exercises and help AI write plans that fit what you have.</p>
+      <p class="small dim" style="margin-bottom:12px">Used to calibrate fitness workout plans.</p>
       ${EQUIPMENT_OPTIONS.map(eq => `
         <label style="display:flex;align-items:center;gap:10px;padding:8px 0;cursor:pointer">
           <input type="checkbox" data-eq="${eq.id}" ${(state.equipment||[]).includes(eq.id)?'checked':''}>
@@ -1158,16 +1403,13 @@ function viewMore(){
     <h2>AI settings</h2>
     <div class="card">
       <div class="notice">Used only when you tap "Generate with AI". Key stays on this device.</div>
-      <div class="field">
-        <label>API key</label>
+      <div class="field"><label>API key</label>
         <input id="ai-key" type="password" value="${esc(state.settings.apiKey)}" placeholder="sk-...">
       </div>
-      <div class="field">
-        <label>Base URL</label>
+      <div class="field"><label>Base URL</label>
         <input id="ai-base" value="${esc(state.settings.apiBase)}">
       </div>
-      <div class="field">
-        <label>Model</label>
+      <div class="field"><label>Model</label>
         <input id="ai-model" value="${esc(state.settings.apiModel)}">
       </div>
       <button class="sm primary" id="ai-save">Save AI settings</button>
@@ -1197,6 +1439,139 @@ function openModal(html){
     </div>`;
 }
 
+/* ═════ SHARE PROGRESS ═════ */
+function shareProgress(){
+  const w = 800, h = 1000;
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d');
+
+  const bg = '#0a0e14', panel = '#111823', line = '#1d2836';
+  const txt = '#c8d4e4', dim = '#6b7c93', accent = '#4da6ff';
+  const font = (weight, size, mono=false) =>
+    `${weight} ${size}px ${mono ? 'ui-monospace, "SF Mono", Menlo, monospace' : '-apple-system, system-ui, sans-serif'}`;
+
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, w, h);
+  ctx.strokeStyle = line;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(20, 20, w-40, h-40);
+  ctx.textBaseline = 'top';
+  ctx.textAlign = 'left';
+
+  // Header
+  ctx.fillStyle = accent;
+  ctx.font = font(600, 16);
+  ctx.fillText('THE SYSTEM', 60, 60);
+  ctx.fillStyle = dim;
+  ctx.font = font(500, 13, true);
+  ctx.textAlign = 'right';
+  ctx.fillText(today(), w - 60, 60);
+  ctx.textAlign = 'left';
+
+  // Name
+  ctx.fillStyle = txt;
+  ctx.font = font(600, 30);
+  ctx.fillText(state.name || 'Player', 60, 90);
+
+  // Divider
+  ctx.fillStyle = line;
+  ctx.fillRect(60, 145, w - 120, 1);
+
+  // Big three
+  const lvl = levelFromXP(state.totalXP);
+  const rank = rankOf(lvl);
+
+  ctx.fillStyle = dim;
+  ctx.font = font(500, 12);
+  ctx.fillText('LEVEL', 60, 175);
+  ctx.fillText('RANK', 280, 175);
+  ctx.fillText('STREAK', 500, 175);
+
+  ctx.fillStyle = txt;
+  ctx.font = font(700, 64, true);
+  ctx.fillText(String(lvl), 60, 195);
+  ctx.fillStyle = accent;
+  ctx.fillText(rank, 280, 195);
+  ctx.fillStyle = txt;
+  ctx.fillText(String(state.streak), 500, 195);
+
+  ctx.fillStyle = dim;
+  ctx.font = font(500, 14);
+  const streakWidth = ctx.measureText(String(state.streak)).width;
+  ctx.fillText('days', 500 + ctx.measureText(String(state.streak)).width + (String(state.streak).length * 2), 245);
+
+  // Divider
+  ctx.fillStyle = line;
+  ctx.fillRect(60, 300, w - 120, 1);
+
+  // Stats
+  ctx.fillStyle = dim;
+  ctx.font = font(500, 12);
+  ctx.fillText('STATS', 60, 325);
+
+  ['STR','AGI','VIT','INT','PER'].forEach((k, i) => {
+    const y = 360 + i * 45;
+    ctx.fillStyle = dim;
+    ctx.font = font(500, 14);
+    ctx.fillText(k, 60, y + 2);
+
+    const barX = 140, barW = 500, barH = 8;
+    ctx.fillStyle = '#0a0e14';
+    ctx.fillRect(barX, y + 5, barW, barH);
+    ctx.fillStyle = accent;
+    ctx.fillRect(barX, y + 5, barW * (state.stats[k] / 100), barH);
+
+    ctx.fillStyle = txt;
+    ctx.font = font(600, 18, true);
+    ctx.textAlign = 'right';
+    ctx.fillText(String(state.stats[k]), w - 60, y);
+    ctx.textAlign = 'left';
+  });
+
+  // Divider
+  ctx.fillStyle = line;
+  ctx.fillRect(60, 600, w - 120, 1);
+
+  // Skills
+  ctx.fillStyle = dim;
+  ctx.font = font(500, 12);
+  ctx.fillText('ACTIVE SKILLS', 60, 625);
+
+  const active = state.skills.filter(s => s.active);
+  active.slice(0, 5).forEach((s, i) => {
+    const y = 660 + i * 40;
+    ctx.fillStyle = txt;
+    ctx.font = font(500, 16);
+    ctx.fillText(s.name, 60, y);
+    ctx.fillStyle = dim;
+    ctx.font = font(500, 14, true);
+    ctx.textAlign = 'right';
+    ctx.fillText(`${rankOf(s.level)} · Lv ${s.level}`, w - 60, y);
+    ctx.textAlign = 'left';
+  });
+
+  // Footer
+  ctx.fillStyle = dim;
+  ctx.font = font(500, 12);
+  ctx.fillText('Honest logging. No inflated numbers.', 60, h - 60);
+
+  canvas.toBlob(blob => {
+    const url = URL.createObjectURL(blob);
+    openModal(`
+      <h2>Progress card</h2>
+      <img src="${url}" style="width:100%;border-radius:8px;border:1px solid var(--line);display:block">
+      <p class="small dim" style="margin-top:12px">Long-press the image to save it to photos. Or tap download.</p>
+      <a href="${url}" download="the-system-${today()}.png"
+         style="display:block;text-align:center;text-decoration:none;padding:12px;border-radius:8px;font-weight:600;color:#06121f;background:var(--accent);margin-top:12px">
+        Download
+      </a>
+      <button class="ghost" style="width:100%;margin-top:8px" onclick="closeModal()">Close</button>
+    `);
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  }, 'image/png');
+}
+
 function openSkillDetail(skillId){
   const skill = state.skills.find(s => s.id === skillId);
   if (!skill) return;
@@ -1214,10 +1589,15 @@ function openSkillDetail(skillId){
           <div class="tier-val">${isDone ? '✓' : (isNext ? '›' : '·')}</div>
           <div class="tier-desc">${esc(m)}</div>
         </div>`;
-    }).join('') : '<div class="dim small" style="padding:12px">No ladder set. Regenerate with AI or edit to add milestones.</div>';
+    }).join('') : '<div class="dim small" style="padding:12px">No ladder set.</div>';
 
     const status = skill.status ? esc(skill.status) : '<span class="dim">Not set</span>';
     const isBusinessUndecided = skill.subtype === 'business' && /not decided/i.test(skill.detail || '');
+
+    let needsRecalibrate = false;
+    if (skill.type === 'workout' && skill.plan && skill.plan.calibratedTo){
+      needsRecalibrate = state.stats.STR !== skill.plan.calibratedTo.STR;
+    }
 
     openModal(`
       <div class="row between" style="margin-bottom:16px">
@@ -1225,16 +1605,26 @@ function openSkillDetail(skillId){
         <button class="sm ghost" id="sd-close">×</button>
       </div>
 
+      ${needsRecalibrate ? `
+        <div class="notice warn">
+          <b>Your STR has changed since this plan was built.</b>
+          <button class="sm primary" id="sd-recalibrate" style="width:100%;margin-top:8px">Recalculate from stats</button>
+        </div>
+      ` : ''}
+
       <div class="card">
         <div class="row between">
           <span class="dim small">STATUS</span>
           <button class="sm ghost" id="sd-progress">Update</button>
         </div>
         <div style="margin-top:6px">${status}</div>
+        ${skill.type === 'workout' && skill.subtype === 'fitness' ? `
+          <div class="small dim" style="margin-top:8px">Workouts since attempt: ${skill.workoutsSinceAttempt || 0}</div>
+        ` : ''}
       </div>
 
       ${isBusinessUndecided ? `
-        <div class="notice"><b>You haven't decided on your business yet.</b> Tap <b>Regenerate with AI</b> below — it will suggest three ideas and build the ladder for the most promising one.</div>
+        <div class="notice"><b>You haven't decided on your business yet.</b> Tap <b>Regenerate</b> — the AI will suggest 3 ideas and build the ladder for the most promising one.</div>
       ` : ''}
 
       <div class="row between" style="margin:16px 0 8px">
@@ -1266,26 +1656,22 @@ function openSkillDetail(skillId){
     };
     document.getElementById('sd-edit').onclick = () => { closeModal(); openSkillEditor(skill.id); };
     document.getElementById('sd-del').onclick = () => {
-      if (!confirm(`Delete "${skill.name}"? This cannot be undone.`)) return;
+      if (!confirm(`Delete "${skill.name}"?`)) return;
       state.skills = state.skills.filter(s => s.id !== skill.id);
       save(); closeModal();
+    };
+    const rec = document.getElementById('sd-recalibrate');
+    if (rec) rec.onclick = () => {
+      skill.plan.exercises = deriveExercisesFromStats();
+      skill.plan.calibratedTo = { STR: state.stats.STR, equipment: [...(state.equipment||[])] };
+      delete skill.plan.userEdited;
+      save(); renderDetail();
     };
     document.querySelectorAll('[data-ladder]').forEach(el => {
       el.onclick = () => {
         const i = +el.dataset.ladder;
-        skill.ladderDone = skill.ladderDone || [];
-        skill.ladderEarned = skill.ladderEarned || [];
-        const at = skill.ladderDone.indexOf(i);
-        if (at >= 0){
-          skill.ladderDone.splice(at, 1);
-        } else {
-          skill.ladderDone.push(i);
-          if (!skill.ladderEarned.includes(i)){
-            skill.ladderEarned.push(i);
-            addXP(20, `${skill.name}: ${skill.ladder[i]}`);
-            addSkillXP(skill, 20);
-          }
-        }
+        if (skill.ladderDone && skill.ladderDone.includes(i)) untickMilestone(skill, i);
+        else tickMilestone(skill, i);
         save(); renderDetail();
       };
     });
@@ -1294,21 +1680,22 @@ function openSkillDetail(skillId){
   renderDetail();
 }
 
-/* — PROGRESSION MODAL — */
 function openProgressionModal(skill, back){
   const questions = progressionFor(skill);
   const answers = {};
-  // prefill from current status if possible
   questions.forEach(q => {
-    if (q.type === 'equipment' || q.onlyIf) return;
+    if (q.type === 'equipment' || q.type === 'days' || q.onlyIf) return;
     const match = q.options.find(o => o.label === skill.status || skill.status?.startsWith(o.label));
     if (match) answers[q.id] = match.value;
   });
+  if (skill.type === 'workout' && skill.plan){
+    answers.workoutDays = [...(skill.plan.workoutDays || [1,3,5])];
+    answers.attemptDay = skill.plan.attemptDay || 0;
+  }
 
   function renderProg(){
     openModal(`
       <h2>${esc(skill.name)} — progression</h2>
-      <p class="small dim">Answering these updates the ladder pre-ticks and adjusts your daily quests.</p>
       ${questions.map(q => {
         if (q.type === 'equipment'){
           return `
@@ -1321,6 +1708,19 @@ function openProgressionModal(skill, back){
                     <span>${esc(eq.label)}</span>
                   </label>
                 `).join('')}
+              </div>
+            </div>`;
+        }
+        if (q.type === 'days'){
+          const current = answers[q.id] !== undefined ? answers[q.id] : q.default;
+          return `
+            <div class="field">
+              <label>${esc(q.label)}</label>
+              <div class="day-picker">
+                ${[0,1,2,3,4,5,6].map(d => {
+                  const on = q.multi ? current.includes(d) : current === d;
+                  return `<button type="button" class="${on?'primary':'ghost'}" data-pday="${q.id}|${d}|${q.multi?'multi':'single'}">${dayShort(d)}</button>`;
+                }).join('')}
               </div>
             </div>`;
         }
@@ -1343,9 +1743,22 @@ function openProgressionModal(skill, back){
       </div>
     `);
     document.querySelectorAll('[data-pq]').forEach(sel => {
-      sel.onchange = () => {
-        answers[sel.dataset.pq] = sel.value;
-        renderProg(); // re-render for conditional
+      sel.onchange = () => { answers[sel.dataset.pq] = sel.value; renderProg(); };
+    });
+    document.querySelectorAll('[data-pday]').forEach(btn => {
+      btn.onclick = () => {
+        const [qid, dStr, mode] = btn.dataset.pday.split('|');
+        const d = parseInt(dStr, 10);
+        const q = questions.find(x => x.id === qid);
+        if (mode === 'multi'){
+          const arr = Array.isArray(answers[qid]) ? [...answers[qid]] : [...(q.default || [])];
+          const idx = arr.indexOf(d);
+          if (idx >= 0) arr.splice(idx, 1); else arr.push(d);
+          answers[qid] = arr;
+        } else {
+          answers[qid] = d;
+        }
+        renderProg();
       };
     });
     document.querySelectorAll('[data-peq]').forEach(el => {
@@ -1366,7 +1779,6 @@ function openProgressionModal(skill, back){
   renderProg();
 }
 
-/* — LADDER AI — */
 function openLadderAI(skill, back){
   const prompt = buildLadderAIPrompt(skill);
   const key = state.settings.apiKey;
@@ -1382,10 +1794,9 @@ function openLadderAI(skill, back){
       <button class="sm" id="la-copy" style="margin-top:8px">Copy prompt</button>
     </div>
     ${key ? `<button class="primary" id="la-run" style="width:100%">Generate via API (${esc(model)})</button>
-             <div id="la-status" class="small dim" style="margin-top:8px;text-align:center"></div>`
-          : `<div class="small dim" style="margin-bottom:12px">No API key saved. Use manual route.</div>`}
+             <div id="la-status" class="small dim" style="margin-top:8px;text-align:center"></div>` : ''}
     <div class="field" style="margin-top:16px">
-      <label>Result (JSON array, or one per line)</label>
+      <label>Result</label>
       <textarea id="la-result" rows="6" placeholder='["Milestone 1","Milestone 2",...]'></textarea>
     </div>
     <div class="row" style="gap:8px">
@@ -1408,7 +1819,7 @@ function openLadderAI(skill, back){
     try {
       const arr = await callAI(prompt, key, base, model);
       document.getElementById('la-result').value = JSON.stringify(arr, null, 2);
-      status.textContent = `Got ${arr.length} milestones. Review, then tap Replace.`;
+      status.textContent = `Got ${arr.length} milestones.`;
     } catch(e){ status.textContent = 'Failed: ' + e.message; status.style.color = 'var(--danger)'; }
   };
   document.getElementById('la-save').onclick = () => {
@@ -1422,21 +1833,25 @@ function openLadderAI(skill, back){
     if (!Array.isArray(arr) || !arr.length) return alert('No milestones found.');
     skill.ladder = arr.map(String);
     skill.ladderDone = []; skill.ladderEarned = [];
+    skill.ladderXpLogs = {}; skill.ladderPreticked = [];
     save(); closeModal(); back();
   };
 }
 
-/* — SKILL EDITOR — */
 function openSkillEditor(skillId){
   const skill = skillId ? state.skills.find(s => s.id === skillId) : null;
   const isNew = !skill;
   const draft = skill ? JSON.parse(JSON.stringify(skill)) : makeSkillFromTemplate({ subtype: 'custom', label: 'New skill' }, 'New skill');
   draft.ladderDone = draft.ladderDone || [];
   draft.ladderEarned = draft.ladderEarned || [];
+  draft.ladderXpLogs = draft.ladderXpLogs || {};
+  draft.ladderPreticked = draft.ladderPreticked || [];
   renderEditor();
 
   function renderEditor(){
     const isWorkout = draft.type === 'workout';
+    const showCardio = isWorkout && draft.subtype === 'fitness';
+
     const questSection = isWorkout ? `
       <div class="field">
         <label>Exercises</label>
@@ -1454,20 +1869,28 @@ function openSkillEditor(skillId){
       </div>
       <div class="field">
         <label>Workout days</label>
-        <div class="grid" style="grid-template-columns:repeat(4,1fr)">
-          ${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((d, i) => `
-            <button class="sm ${draft.plan.workoutDays.includes(i) ? 'primary' : 'ghost'}" data-wday="${i}">${d}</button>
+        <div class="day-picker">
+          ${[0,1,2,3,4,5,6].map(d => `
+            <button type="button" class="${draft.plan.workoutDays.includes(d)?'primary':'ghost'}" data-wday="${d}">${dayShort(d)}</button>
           `).join('')}
         </div>
       </div>
       <div class="field">
         <label>Attempt day</label>
-        <div class="grid" style="grid-template-columns:repeat(4,1fr)">
-          ${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((d, i) => `
-            <button class="sm ${draft.plan.attemptDay === i ? 'primary' : 'ghost'}" data-aday="${i}">${d}</button>
+        <div class="day-picker">
+          ${[0,1,2,3,4,5,6].map(d => `
+            <button type="button" class="${draft.plan.attemptDay === d?'primary':'ghost'}" data-aday="${d}">${dayShort(d)}</button>
           `).join('')}
         </div>
       </div>
+      ${showCardio ? `
+        <div class="field">
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+            <input type="checkbox" id="sk-cardio" ${draft.cardioEnabled !== false ? 'checked' : ''}>
+            <span style="text-transform:none;letter-spacing:0;color:var(--txt);font-size:13px">Add a cardio quest on rest days (VIT training)</span>
+          </label>
+        </div>
+      ` : ''}
     ` : `
       <div class="field">
         <label>Daily quests</label>
@@ -1493,7 +1916,7 @@ function openSkillEditor(skillId){
       </div>
       <div class="field">
         <label>Status</label>
-        <input id="sk-status" value="${esc(draft.status || '')}" placeholder="e.g. Complete beginner, or A1">
+        <input id="sk-status" value="${esc(draft.status || '')}" placeholder="e.g. Complete beginner">
       </div>
       <div class="field">
         <label>Type</label>
@@ -1522,23 +1945,23 @@ function openSkillEditor(skillId){
       if (draft.type === 'workout') return;
       draft.type = 'workout';
       draft.plan = {
-        exercises: [
-          { name: 'Pushups', sets: 4, reps: 15, unit: 'reps' },
-          { name: 'Squats', sets: 4, reps: 20, unit: 'reps' },
-          { name: 'Chair dips', sets: 4, reps: 10, unit: 'reps' },
-          { name: 'Crunches', sets: 4, reps: 20, unit: 'reps' },
-          { name: 'Plank', sets: 4, reps: 45, unit: 'sec' }
-        ],
-        workoutDays: [1,3,5], attemptDay: 0
+        exercises: deriveExercisesFromStats(),
+        workoutDays: [1,3,5], attemptDay: 0,
+        calibratedTo: { STR: state.stats.STR, equipment: [...(state.equipment||[])] }
       };
       delete draft.quests; renderEditor();
     };
     document.getElementById('save').onclick = () => {
       if (!draft.name.trim()) return alert('Name required.');
+      const cardioEl = document.getElementById('sk-cardio');
+      if (cardioEl) draft.cardioEnabled = cardioEl.checked;
+
       if (isNew){
         draft.id = newId();
         draft.level = 1; draft.xp = 0; draft.active = true;
         if (!draft.ladder) draft.ladder = defaultLadderFor(draft.subtype || 'custom');
+        if (draft.workoutsSinceAttempt === undefined) draft.workoutsSinceAttempt = 0;
+        if (draft.cardioEnabled === undefined) draft.cardioEnabled = true;
         state.skills.push(draft);
       } else {
         const i = state.skills.findIndex(s => s.id === draft.id);
@@ -1563,15 +1986,18 @@ function openSkillEditor(skillId){
       document.getElementById('gen-ai').onclick = () => openAIGenerator(draft, renderEditor);
     } else {
       document.getElementById('add-ex').onclick = () => {
-        draft.plan.exercises.push({ name: '', sets: 3, reps: 10, unit: 'reps' }); renderEditor();
+        draft.plan.exercises.push({ name: '', sets: 3, reps: 10, unit: 'reps' });
+        draft.plan.userEdited = true;
+        renderEditor();
       };
       document.querySelectorAll('[data-remove-ex]').forEach(b => {
-        b.onclick = () => { draft.plan.exercises.splice(+b.dataset.removeEx, 1); renderEditor(); };
+        b.onclick = () => { draft.plan.exercises.splice(+b.dataset.removeEx, 1); draft.plan.userEdited = true; renderEditor(); };
       });
       document.querySelectorAll('[data-ex]').forEach(el => {
         el.oninput = () => {
           const i = +el.dataset.ex, k = el.dataset.key;
           draft.plan.exercises[i][k] = (k === 'sets' || k === 'reps') ? parseInt(el.value, 10) || 1 : el.value;
+          draft.plan.userEdited = true;
         };
       });
       document.querySelectorAll('[data-wday]').forEach(b => {
@@ -1602,7 +2028,7 @@ function openAIGenerator(draft, back){
       <textarea id="ai-prompt" rows="6" readonly>${esc(prompt)}</textarea>
       <button class="sm" id="copy-prompt" style="margin-top:8px">Copy prompt</button>
     </div>
-    ${key ? `<button class="primary" id="ai-run" style="width:100%">Generate via API (${esc(model)})</button>
+    ${key ? `<button class="primary" id="ai-run" style="width:100%">Generate via API</button>
              <div id="ai-status" class="small dim" style="margin-top:8px;text-align:center"></div>` : ''}
     <div class="field" style="margin-top:16px">
       <label>Result</label>
@@ -1628,7 +2054,7 @@ function openAIGenerator(draft, back){
     try {
       const arr = await callAI(prompt, key, base, model);
       document.getElementById('ai-result').value = JSON.stringify(arr, null, 2);
-      status.textContent = `Got ${arr.length} quests. Review, then tap Add.`;
+      status.textContent = `Got ${arr.length} quests.`;
     } catch(e){ status.textContent = 'Failed: ' + e.message; status.style.color = 'var(--danger)'; }
   };
   document.getElementById('ai-add').onclick = () => {
@@ -1651,7 +2077,7 @@ function openAttemptDay(skillId){
 
   openModal(`
     <h2>${esc(skill.name)} — Attempt day</h2>
-    <p class="small dim">Enter your max for each exercise. Next week's working sets become ~65% of max.</p>
+    <p class="small dim">Enter your max for each exercise. Next week's working sets become ~60% of max.</p>
     ${skill.plan.exercises.map((e, i) => `
       <div class="field">
         <label>${esc(e.name)} · current ${e.sets}×${e.reps}${e.unit === 'sec' ? 's' : ''}</label>
@@ -1669,9 +2095,14 @@ function openAttemptDay(skillId){
     skill.plan.exercises.forEach((e, i) => {
       const input = document.querySelector(`[data-max="${i}"]`);
       const max = parseInt(input.value, 10);
-      if (!isNaN(max) && max > 0){ e.reps = Math.max(1, Math.round(max * 0.65)); changed = true; }
+      if (!isNaN(max) && max > 0){
+        e.reps = Math.max(2, Math.round(max * 0.6));
+        changed = true;
+      }
     });
     if (changed){
+      skill.plan.userEdited = true;
+      skill.workoutsSinceAttempt = 0;
       const qid = `${skill.id}:attempt`;
       const t = today();
       state.quests[t] = state.quests[t] || {};
@@ -1688,7 +2119,6 @@ function openAttemptDay(skillId){
   };
 }
 
-/* — SKILL PICKER — */
 function openSkillPicker(onCreated){
   let selected = null;
 
@@ -1696,7 +2126,6 @@ function openSkillPicker(onCreated){
     if (!selected){
       openModal(`
         <h2>Add a skill</h2>
-        <p class="small dim">Pick a category, then a specific skill.</p>
         <div style="margin-top:12px">
           ${SKILL_SUGGESTIONS.map(sug => `
             <div class="skill-row" data-pick-cat="${sug.id}">
@@ -1777,6 +2206,8 @@ function importBackup(){
         state = Object.assign(defaultState(), JSON.parse(reader.result));
         if (state.skills) state.skills = state.skills.map(migrateSkill);
         if (!state.equipment) state.equipment = [];
+        if (!state.timeBudget) state.timeBudget = 30;
+        state.lastCelebratedLevel = levelFromXP(state.totalXP || 0);
         save();
       } catch(e){ alert('Could not read that file.'); }
     };
@@ -1812,6 +2243,9 @@ function bind(){
       toggleQuest(quest);
     };
   });
+  document.querySelectorAll('[data-nudge-attempt]').forEach(el => {
+    el.onclick = () => openAttemptDay(el.dataset.nudgeAttempt);
+  });
   document.querySelectorAll('[data-tier]').forEach(el => {
     el.onclick = () => {
       const [stat, vStr] = el.dataset.tier.split(':');
@@ -1840,8 +2274,14 @@ function bind(){
     };
   });
   document.querySelectorAll('[data-xp]').forEach(el => {
-    el.onclick = () => { addXP(+el.dataset.xp, el.dataset.note); save(); };
+    el.onclick = () => {
+      addXP(+el.dataset.xp, el.dataset.note, null, logDate);
+      save();
+    };
   });
+  const logDateInput = document.getElementById('log-date');
+  if (logDateInput) logDateInput.onchange = () => { logDate = logDateInput.value || today(); };
+
   const addSkill = document.getElementById('add-skill');
   if (addSkill) addSkill.onclick = () => {
     openSkillPicker(skill => { state.skills.push(skill); save(); });
@@ -1851,11 +2291,14 @@ function bind(){
     const xp = parseInt(document.getElementById('adj').value, 10);
     const note = document.getElementById('adjnote').value || 'Adjustment';
     if (!xp) return;
-    addXP(xp, note); save();
+    addXP(xp, note, null, logDate); save();
   };
   const pSave = document.getElementById('profile-save');
   if (pSave) pSave.onclick = () => {
-    state.name = document.getElementById('profile-name').value.trim(); save();
+    state.name = document.getElementById('profile-name').value.trim();
+    const b = document.getElementById('profile-budget').value;
+    state.timeBudget = parseInt(b, 10) || 30;
+    save();
   };
   document.querySelectorAll('[data-eq]').forEach(el => {
     el.onchange = () => {
@@ -1893,10 +2336,13 @@ function bind(){
     onboardStep = 1;
     onboardDraft.name = '';
     onboardDraft.stats = { ...DEFAULT_STATS };
+    onboardDraft.timeBudget = 30;
     onboardDraft.skills = [];
     onboardDraft.progression = {};
     save();
   };
+  const shareBtn = document.getElementById('share-btn');
+  if (shareBtn) shareBtn.onclick = shareProgress;
 }
 
 document.querySelectorAll('#nav button').forEach(b => {

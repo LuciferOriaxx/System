@@ -6,11 +6,8 @@
 <meta name="theme-color" content="#0a0e14">
 <title>The System</title>
 <style>
-:root{
-  --bg:#0a0e14;--panel:#111823;--line:#1d2836;
-  --txt:#c8d4e4;--dim:#6b7c93;--accent:#4da6ff;
-  --gold:#ffc857;--danger:#ff5c5c;--ok:#3ddc97;
-}
+:root{--bg:#0a0e14;--panel:#111823;--line:#1d2836;--txt:#c8d4e4;--dim:#6b7c93;
+  --accent:#4da6ff;--gold:#ffc857;--danger:#ff5c5c;--ok:#3ddc97}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{margin:0;background:var(--bg);color:var(--txt);
   font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
@@ -41,7 +38,6 @@ textarea{resize:vertical;min-height:80px}
 .small{font-size:12px}
 .tag{font-size:11px;letter-spacing:.1em;padding:3px 8px;border-radius:4px;background:#1d2836;color:var(--dim)}
 .tag.on{background:rgba(77,166,255,.15);color:var(--accent)}
-.tag.warn{background:rgba(255,92,92,.15);color:var(--danger)}
 .quest{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
 .quest:last-child{border-bottom:none}
 .chk{width:24px;height:24px;border:2px solid var(--line);border-radius:6px;flex:0 0 auto;
@@ -49,11 +45,10 @@ textarea{resize:vertical;min-height:80px}
 .chk.done{background:var(--accent);border-color:var(--accent);color:#06121f}
 .stat{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)}
 .stat:last-child{border-bottom:none}
-.stat b{font-family:ui-monospace,monospace;font-size:19px}
 nav{position:fixed;bottom:0;left:0;right:0;background:#0d131c;border-top:1px solid var(--line);
   display:flex;padding-bottom:env(safe-area-inset-bottom);z-index:50}
-nav button{flex:1;background:none;border:none;border-radius:0;padding:14px 4px;min-height:60px;
-  font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}
+nav button{flex:1;background:none;border:none;border-radius:0;padding:14px 2px;min-height:60px;
+  font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);font-weight:600}
 nav button.active{color:var(--accent)}
 .logrow{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--line);font-size:13px}
 .logrow:last-child{border-bottom:none}
@@ -63,12 +58,11 @@ hr{border:none;border-top:1px solid var(--line);margin:14px 0}
 .field{margin-bottom:14px}
 .field label{display:block;font-size:12px;color:var(--dim);margin-bottom:6px;
   text-transform:uppercase;letter-spacing:.1em}
-.field .hint{font-size:12px;color:var(--dim);margin-top:4px}
+.field .hint{font-size:12px;color:var(--dim);margin-top:6px;line-height:1.4}
 .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100;
   display:flex;align-items:flex-end;justify-content:center}
 .modal{background:var(--panel);border-radius:16px 16px 0 0;width:100%;max-width:640px;
-  max-height:92vh;overflow-y:auto;padding:20px;
-  padding-bottom:calc(20px + env(safe-area-inset-bottom))}
+  max-height:92vh;overflow-y:auto;padding:20px;padding-bottom:calc(20px + env(safe-area-inset-bottom))}
 .modal h2{margin-top:0;margin-bottom:16px}
 .skill-row{display:flex;justify-content:space-between;align-items:center;
   padding:12px 0;border-bottom:1px solid var(--line)}
@@ -76,12 +70,28 @@ hr{border:none;border-top:1px solid var(--line);margin:14px 0}
 .exercise-row{display:grid;grid-template-columns:1fr 60px 70px 30px;gap:8px;
   align-items:center;margin-bottom:8px}
 .exercise-row input{min-height:38px;padding:6px 8px;font-size:14px}
-.step{opacity:.4}
-.step.active{opacity:1}
 .notice{background:rgba(77,166,255,.08);border:1px solid rgba(77,166,255,.25);
-  border-radius:8px;padding:12px;font-size:13px;color:var(--txt);margin-bottom:16px}
-.notice.warn{background:rgba(255,92,92,.08);border-color:rgba(255,92,92,.25)}
+  border-radius:8px;padding:12px;font-size:13px;margin-bottom:16px}
 .hide{display:none}
+details{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+  margin-bottom:12px;overflow:hidden}
+details>summary{list-style:none;cursor:pointer;padding:14px;
+  display:flex;justify-content:space-between;align-items:center;gap:10px;font-weight:600}
+details>summary::-webkit-details-marker{display:none}
+details>summary::after{content:'+';color:var(--dim);font-size:18px;font-weight:400}
+details[open]>summary::after{content:'−'}
+details>summary:active{background:#16202e}
+.tier-list{padding:0 6px 8px;border-top:1px solid var(--line)}
+.tier-row{display:flex;align-items:flex-start;gap:10px;padding:9px 8px;
+  border-bottom:1px solid var(--line);cursor:pointer;border-radius:6px}
+.tier-row:last-child{border-bottom:none}
+.tier-row:active{background:#1d2836}
+.tier-row.current{background:rgba(77,166,255,.08)}
+.tier-row.below{opacity:.55}
+.tier-val{width:36px;text-align:right;font-family:ui-monospace,monospace;
+  font-weight:600;font-size:14px;color:var(--dim);flex:0 0 auto;padding-top:1px}
+.tier-row.current .tier-val{color:var(--accent);font-weight:700}
+.tier-desc{flex:1;font-size:13px;line-height:1.4}
 </style>
 </head>
 <body>
@@ -93,14 +103,15 @@ hr{border:none;border-top:1px solid var(--line);margin:14px 0}
   <button data-tab="status" class="active">Status</button>
   <button data-tab="quests">Quests</button>
   <button data-tab="skills">Skills</button>
+  <button data-tab="bench">Bench</button>
   <button data-tab="log">Log</button>
   <button data-tab="more">More</button>
 </nav>
 
 <script>
-/* ════════════════════════════════════════════
+/* ═══════════════════════════════════════════
    RULES — the maths
-   ════════════════════════════════════════════ */
+   ═══════════════════════════════════════════ */
 const xpForLevel = n => 50 * n * (n - 1);
 function levelFromXP(xp){ let n = 1; while (xpForLevel(n+1) <= xp) n++; return n; }
 const skillXpForLevel = L => 10 * L;
@@ -119,9 +130,93 @@ function addSkillXP(skill, amount){
   return leveled;
 }
 
-/* ════════════════════════════════════════════
-   DEFAULT SKILL TEMPLATES
-   ════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════
+   BENCHMARKS — the stat definitions
+   Format: [tier value, description]
+   ═══════════════════════════════════════════ */
+const BENCHMARKS = {
+  STR: {
+    label: 'Strength',
+    note: 'Pushups, pullups, dips, planks, handstands, L-sits. Test all in one session — stop each exercise when form breaks. That number is your tier.',
+    tiers: [
+      [5,   '5 pushups · 20 squats · 20s plank'],
+      [10,  '15 pushups · 3 assisted or 1 pullup · 30s plank'],
+      [20,  '25 pushups · 5 pullups · 10 dips · 1 min plank'],
+      [25,  '30 pushups · 10 pullups · 15 dips · wall handstand 20s'],
+      [30,  '35 pushups · 8 pullups · 15 dips · wall handstand 30s'],
+      [40,  '45 pushups · 12 pullups · 20 dips · L-sit 10s · pistol squat'],
+      [50,  '50 pushups · 15 pullups · 25 dips · L-sit 20s · free handstand 10s'],
+      [60,  '60 pushups · 20 pullups · 1 muscle-up · handstand 30s'],
+      [70,  '3 muscle-ups · 25 pullups · one-arm pushup · tuck front lever 10s'],
+      [80,  '5 muscle-ups · front lever 10s · handstand 60s'],
+      [90,  'One-arm pullup · full front lever · planche lean'],
+      [100, 'One-arm pullup ×3 · full planche']
+    ]
+  },
+  AGI: {
+    label: 'Agility',
+    note: 'Mobility, flexibility, balance. Test at the start of a session, not after training. Never bounce into a stretch — stop before pain.',
+    tiers: [
+      [5,  'Touch knees · 10 comfortable-depth squats'],
+      [10, 'Touch toes · squat below parallel'],
+      [20, 'Palms to floor · deep squat 2 min · 10s single-leg balance'],
+      [30, 'Full squat heels down · sit-and-reach +5 cm · 30s single-leg balance each side'],
+      [40, 'Bridge · front splits halfway'],
+      [50, 'Full bridge · full front splits · 60s single-leg balance'],
+      [60, 'Side splits progression · handstand 10s'],
+      [70, 'Full side splits · handstand 30s']
+    ]
+  },
+  VIT: {
+    label: 'Vitality',
+    note: 'Indoor only. Squat endurance, loaded carries, wall sits. All tests with your own kit — a 20 kg dumbbell and a 19 kg barbell. No running, no walking.',
+    tiers: [
+      [5,  '20 squats unbroken · 30s wall sit · sleep 6h'],
+      [10, '30 squats unbroken · 45s wall sit · 2L water · sleep 7h'],
+      [15, '50 squats unbroken · 60s wall sit · 20 kg carry 40 m/side · 10 × 19 kg RDL'],
+      [20, '75 squats unbroken · 90s wall sit · 20 kg carry 50 m/side · 20 × 19 kg RDL'],
+      [30, '100 squats unbroken · 2 min wall sit · 20 kg carry 75 m/side · 30 RDL · 20 goblet squats'],
+      [40, '150 squats unbroken · 3 min wall sit · 20 kg carry 100 m/side · 50 RDL · 30 goblet · 8h sleep'],
+      [50, '200 squats unbroken · 4 min wall sit · 20 kg carry 150 m/side · 100 RDL · 40 goblet'],
+      [60, '300 squats in a session · 5 min wall sit · 20 kg carry 200 m/side · 60 goblet'],
+      [70, '400 squats · 6 min wall sit'],
+      [80, 'Exceptional loaded capacity']
+    ]
+  },
+  INT: {
+    label: 'Intelligence',
+    note: 'Books with notes, courses, applied learning. Scored on the last 12 months only — prior qualifications count as capability, not current practice.',
+    tiers: [
+      [5,  '1 book finished · keeping a journal'],
+      [10, '6 books/year with notes'],
+      [20, '12 books/year · apply 1 idea per book · 1 course done'],
+      [30, '18 books/year · 2 courses · built something with the knowledge'],
+      [40, '24 books/year · taught a concept publicly'],
+      [50, '30+ books/year · original synthesis · Spanish B1'],
+      [60, 'Spanish B2 · publishing regularly'],
+      [70, 'Recognised competence · Spanish C1']
+    ]
+  },
+  PER: {
+    label: 'Perception',
+    note: 'Focus and attention. Three valid routes — pick one and stick to it: meditation, written reflection (pen and paper, one subject), or undistracted reading (phone in another room).',
+    tiers: [
+      [1,  'Floor — no practice'],
+      [5,  '5 min meditation OR 10 min written reflection OR 15 min undistracted reading · no phone first hour'],
+      [10, '10 min meditation OR 15 min reflection OR one 25-min block, phone in another room'],
+      [20, '20 min practice OR two 25-min blocks'],
+      [30, '45 min uninterrupted deep work · 15 min practice'],
+      [40, '90-min deep work block · 3 days no doom-scrolling'],
+      [50, '2h deep work daily · 30 min practice · 3 recorded observations/day'],
+      [60, '3h deep work · 45 min practice'],
+      [70, '4h+ sustained focus']
+    ]
+  }
+};
+
+/* ═══════════════════════════════════════════
+   SKILL TEMPLATES
+   ═══════════════════════════════════════════ */
 const newId = () => 'x' + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
 
 function makeWorkoutSkill(name, plan){
@@ -144,7 +239,7 @@ function makeWorkoutSkill(name, plan){
 function makeStandardSkill(name, quests){
   return {
     id: newId(), name, active: true, level: 1, xp: 0, type: 'standard',
-    quests: (quests || [{ id: newId(), text: `${name} — 20 min focused practice`, xp: 5 }])
+    quests: (quests || [{ text: `${name} — 20 min focused practice`, xp: 5 }])
       .map(q => ({ id: newId(), text: q.text || q, xp: q.xp || 5 }))
   };
 }
@@ -159,51 +254,38 @@ const PRESETS = [
   { id: 'engineering',  label: 'Engineering',   make: () => makeStandardSkill('Engineering', [{ text: '1 hr engineering study', xp: 10 }]) }
 ];
 
-/* ════════════════════════════════════════════
+/* ═══════════════════════════════════════════
    STATE
-   ════════════════════════════════════════════ */
+   ═══════════════════════════════════════════ */
 const KEY = 'the-system-v2';
+const DEFAULT_STATS = { STR: 5, AGI: 5, VIT: 5, INT: 5, PER: 1 };
 
 function defaultState(){
   return {
-    v: 2,
-    onboarded: false,
-    name: '',
-    totalXP: 0,
-    stats: { STR: 10, AGI: 5, VIT: 10, INT: 5, PER: 5 },
-    statDates: {},
-    skills: [],
-    streak: 0,
-    lastComplete: null,
-    quests: {},
-    log: [],
-    benchmarks: [],
-    titles: [],
+    v: 2, onboarded: false, name: '', totalXP: 0,
+    stats: { ...DEFAULT_STATS }, statDates: {},
+    skills: [], streak: 0, lastComplete: null,
+    quests: {}, log: [], benchmarks: [], titles: [],
     settings: { apiKey: '', apiBase: 'https://api.openai.com/v1', apiModel: 'gpt-4o-mini' }
   };
 }
 
 let state = load();
-
 function load(){
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) {
-      // migration: if v1 exists, start fresh (old app had different shape)
-      return defaultState();
-    }
+    if (!raw) return defaultState();
     return Object.assign(defaultState(), JSON.parse(raw));
   } catch(e){ return defaultState(); }
 }
-
 function save(){
   localStorage.setItem(KEY, JSON.stringify(state));
   render();
 }
 
-/* ════════════════════════════════════════════
+/* ═══════════════════════════════════════════
    HELPERS
-   ════════════════════════════════════════════ */
+   ═══════════════════════════════════════════ */
 const pad = n => String(n).padStart(2, '0');
 function today(){
   const d = new Date();
@@ -220,16 +302,15 @@ function esc(s){
   return String(s ?? '').replace(/[&<>"']/g, c =>
     ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
-
 function addXP(amount, note){
   state.totalXP += amount;
   state.log.unshift({ date: today(), xp: amount, note });
   state.log = state.log.slice(0, 500);
 }
 
-/* ════════════════════════════════════════════
+/* ═══════════════════════════════════════════
    QUESTS
-   ════════════════════════════════════════════ */
+   ═══════════════════════════════════════════ */
 function questsForToday(){
   const day = new Date().getDay();
   const list = [];
@@ -247,26 +328,21 @@ function questsForToday(){
           .map(e => `${e.sets}×${e.reps} ${e.name}`).join(' · ');
         list.push({
           id: `${skill.id}:workout`, skillId: skill.id, kind: 'workout',
-          text: `${skill.name}: ${summary}`,
-          xp: 15
+          text: `${skill.name}: ${summary}`, xp: 15
         });
       }
     } else {
       skill.quests.forEach(q => {
-        list.push({
-          id: `${skill.id}:${q.id}`, skillId: skill.id, kind: 'standard',
-          text: q.text, xp: q.xp
-        });
+        list.push({ id: `${skill.id}:${q.id}`, skillId: skill.id, kind: 'standard',
+          text: q.text, xp: q.xp });
       });
     }
   });
   return list;
 }
-
 function isQuestDone(qid){
   return !!(state.quests[today()] && state.quests[today()][qid]);
 }
-
 function toggleQuest(quest){
   const t = today();
   state.quests[t] = state.quests[t] || {};
@@ -284,7 +360,6 @@ function toggleQuest(quest){
   }
   save();
 }
-
 function updateStreak(){
   const t = today();
   const q = state.quests[t] || {};
@@ -292,14 +367,12 @@ function updateStreak(){
   if (state.lastComplete === t) return;
   state.streak = (state.lastComplete === yesterday()) ? state.streak + 1 : 1;
   state.lastComplete = t;
-  if (state.streak % 7 === 0){
-    addXP(50, `7-day streak bonus (day ${state.streak})`);
-  }
+  if (state.streak % 7 === 0) addXP(50, `7-day streak (day ${state.streak})`);
 }
 
-/* ════════════════════════════════════════════
-   AI QUEST GENERATION
-   ════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════
+   AI GENERATION
+   ═══════════════════════════════════════════ */
 function buildAIPrompt(skillName, level){
   return `Generate 6 concrete daily practice quests for someone learning "${skillName}" at level ${level}/50 (beginner to intermediate). Each quest must be a specific, self-contained 20–60 minute activity a person can do at home, without a coach. They should build on each other over a week.
 
@@ -308,19 +381,11 @@ Return ONLY a valid JSON array of 6 strings. No markdown fences, no explanation,
 Example format:
 ["Quest 1 text","Quest 2 text","Quest 3 text","Quest 4 text","Quest 5 text","Quest 6 text"]`;
 }
-
 async function callAI(prompt, apiKey, baseUrl, model){
   const res = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
-      model: model,
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.8
-    })
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+    body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], temperature: 0.8 })
   });
   if (!res.ok){
     const body = await res.text().catch(() => '');
@@ -332,14 +397,14 @@ async function callAI(prompt, apiKey, baseUrl, model){
   return JSON.parse(cleaned);
 }
 
-/* ════════════════════════════════════════════
-   RENDER — ONBOARDING
-   ════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════
+   ONBOARDING
+   ═══════════════════════════════════════════ */
 let tab = 'status';
 let onboardStep = 1;
 const onboardDraft = {
   name: '',
-  stats: { STR: 10, AGI: 5, VIT: 10, INT: 5, PER: 5 },
+  stats: { ...DEFAULT_STATS },
   selected: new Set(['calisthenics','reading','business','coding'])
 };
 
@@ -366,41 +431,43 @@ function renderOnboarding(){
       onboardDraft.name = v;
       onboardStep = 2; render();
     };
-    document.getElementById('ob-import').onclick = (e) => {
-      e.preventDefault(); importBackup();
-    };
+    document.getElementById('ob-import').onclick = (e) => { e.preventDefault(); importBackup(); };
     return;
   }
 
   if (onboardStep === 2){
-    const labels = {
-      STR: 'Strength — pushups, pullups, dips',
-      AGI: 'Agility — mobility, flexibility, balance',
-      VIT: 'Vitality — endurance, carrying, recovery',
-      INT: 'Intelligence — books, learning, study',
-      PER: 'Perception — focus, attention, deep work'
-    };
     app.innerHTML = `
       <h1 style="margin-top:24px">Starting stats</h1>
-      <p class="dim" style="margin-top:12px">Score each 1–100. Be honest — you can test properly later. Between two tiers, take the lower.</p>
+      <p class="dim" style="margin-top:12px">You don't guess a number — you pick the highest tier you can <b>pass today</b>. Each tier is a set of concrete tests. Between two tiers, take the lower. Starting low costs nothing.</p>
       <div class="card" style="margin-top:16px">
-        ${['STR','AGI','VIT','INT','PER'].map(k => `
-          <div class="field">
-            <label>${k}</label>
-            <input type="number" min="1" max="100" data-stat="${k}" value="${onboardDraft.stats[k]}">
-            <div class="hint">${labels[k]}</div>
-          </div>
-        `).join('')}
+        ${['STR','AGI','VIT','INT','PER'].map(k => {
+          const b = BENCHMARKS[k];
+          const cur = onboardDraft.stats[k];
+          const curDesc = (b.tiers.find(t => t[0] === cur) || b.tiers[0])[1];
+          return `
+            <div class="field">
+              <label>${k} · ${b.label}</label>
+              <select data-obstat="${k}">
+                ${b.tiers.map(([v, desc]) =>
+                  `<option value="${v}" ${v===cur?'selected':''}>${v} — ${esc(desc)}</option>`
+                ).join('')}
+              </select>
+              <div class="hint" id="ob-hint-${k}">${esc(curDesc)}</div>
+            </div>`;
+        }).join('')}
       </div>
       <div class="row" style="gap:8px">
         <button class="ghost" id="ob-back" style="flex:1">Back</button>
         <button class="primary" id="ob-next" style="flex:2">Continue</button>
       </div>
     `;
-    document.querySelectorAll('[data-stat]').forEach(el => {
-      el.oninput = () => {
-        const v = parseInt(el.value, 10);
-        if (v >= 1 && v <= 100) onboardDraft.stats[el.dataset.stat] = v;
+    document.querySelectorAll('[data-obstat]').forEach(sel => {
+      sel.onchange = () => {
+        const k = sel.dataset.obstat;
+        onboardDraft.stats[k] = parseInt(sel.value, 10);
+        const b = BENCHMARKS[k];
+        const desc = (b.tiers.find(t => t[0] === onboardDraft.stats[k]) || b.tiers[0])[1];
+        document.getElementById(`ob-hint-${k}`).textContent = desc;
       };
     });
     document.getElementById('ob-back').onclick = () => { onboardStep = 1; render(); };
@@ -443,7 +510,6 @@ function renderOnboarding(){
     document.getElementById('ob-back').onclick = () => { onboardStep = 2; render(); };
     document.getElementById('ob-next').onclick = () => {
       const custom = document.getElementById('ob-custom').value.trim();
-
       state.name = onboardDraft.name;
       state.stats = { ...onboardDraft.stats };
       state.skills = [];
@@ -451,9 +517,7 @@ function renderOnboarding(){
         if (onboardDraft.selected.has(p.id)) state.skills.push(p.make());
       });
       if (custom) state.skills.push(makeStandardSkill(custom));
-      if (state.skills.length === 0){
-        if (!confirm('No skills selected. Start with none anyway?')) return;
-      }
+      if (state.skills.length === 0 && !confirm('No skills selected. Start with none anyway?')) return;
       state.onboarded = true;
       save();
       tab = 'status';
@@ -462,9 +526,9 @@ function renderOnboarding(){
   }
 }
 
-/* ════════════════════════════════════════════
-   RENDER — MAIN APP
-   ════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════
+   MAIN RENDER
+   ═══════════════════════════════════════════ */
 function render(){
   if (!state.onboarded){ renderOnboarding(); return; }
   document.getElementById('nav').classList.remove('hide');
@@ -475,11 +539,13 @@ function render(){
   if (tab === 'status')  app.innerHTML = viewStatus();
   if (tab === 'quests')  app.innerHTML = viewQuests();
   if (tab === 'skills')  app.innerHTML = viewSkills();
+  if (tab === 'bench')   app.innerHTML = viewBench();
   if (tab === 'log')     app.innerHTML = viewLog();
   if (tab === 'more')    app.innerHTML = viewMore();
 
   bind();
 }
+function navTo(t){ tab = t; render(); window.scrollTo(0, 0); }
 
 function xpBar(){
   const lvl = levelFromXP(state.totalXP);
@@ -499,13 +565,10 @@ function viewStatus(){
   const stats = ['STR','AGI','VIT','INT','PER'].map(k => `
     <div class="stat">
       <div>
-        <div class="small dim">${k}</div>
+        <div class="small">${k}</div>
         <div class="small dim mono">${state.statDates[k] || 'untested'}</div>
       </div>
-      <div class="row" style="gap:14px">
-        <b>${state.stats[k]}</b>
-        <button class="sm ghost" data-stat="${k}">Test</button>
-      </div>
+      <div class="mono" style="font-size:19px;font-weight:600">${state.stats[k]}</div>
     </div>`).join('');
 
   const active = state.skills.filter(s => s.active);
@@ -539,7 +602,9 @@ function viewStatus(){
     </div>
 
     <h2>Stats</h2>
-    <div class="card">${stats}</div>
+    <div class="card">${stats}
+      <button class="ghost sm" data-nav="bench" style="width:100%;margin-top:12px">View benchmarks & test →</button>
+    </div>
 
     <h2>Active skills</h2>
     <div class="card">${skillList}</div>
@@ -548,9 +613,7 @@ function viewStatus(){
 
 function viewQuests(){
   const list = questsForToday();
-  const t = today();
   const doneCount = list.filter(q => isQuestDone(q.id)).length;
-
   const items = list.length ? list.map(q => {
     const done = isQuestDone(q.id);
     return `
@@ -561,10 +624,10 @@ function viewQuests(){
           <div class="small dim mono">+${q.xp} XP</div>
         </div>
       </div>`;
-  }).join('') : '<div class="dim small" style="padding:12px 0">No quests today. Add or activate a skill in the Skills tab.</div>';
+  }).join('') : '<div class="dim small" style="padding:12px 0">No quests today. Add or activate a skill in Skills.</div>';
 
   return `
-    <h2>Today · ${dayName(new Date().getDay())} ${t.slice(5)}</h2>
+    <h2>Today · ${dayName(new Date().getDay())} ${today().slice(5)}</h2>
     <div class="card">${items}</div>
     <div class="card row between">
       <span class="small dim">${doneCount} / ${list.length} done</span>
@@ -577,8 +640,7 @@ function viewSkills(){
   const rows = state.skills.map(s => {
     const need = skillXpForLevel(s.level);
     const pct = s.level >= 50 ? 100 : (s.xp / need) * 100;
-    const isWorkout = s.type === 'workout';
-    const detail = isWorkout
+    const detail = s.type === 'workout'
       ? `${s.plan.exercises.length} exercises · ${s.plan.workoutDays.length} workout days/week`
       : `${s.quests.length} quest${s.quests.length === 1 ? '' : 's'}`;
     return `
@@ -605,6 +667,47 @@ function viewSkills(){
     ${rows || '<div class="card dim small">No skills yet.</div>'}
     <button class="primary" id="add-skill" style="width:100%;margin-top:12px">+ Add skill</button>
   `;
+}
+
+function viewBench(){
+  return `
+    <h1>Benchmarks</h1>
+    <div class="card" style="margin-top:16px">
+      <p class="small">Each stat is scored 1–100. The number isn't guessed — every tier is a set of concrete tests you pass or fail in a single session.</p>
+      <p class="small dim" style="margin-top:8px">Tap a tier to log a test. <b style="color:var(--txt)">Higher</b> than current → stat rises, +50 XP. <b style="color:var(--txt)">Current</b> → refreshes the date, no XP. <b style="color:var(--txt)">Lower</b> → demotes, no XP. Honest calibration is the whole point.</p>
+      <p class="small dim" style="margin-top:8px">Test every 2–4 weeks. A stat with no date is a claim, not a fact.</p>
+    </div>
+    ${['STR','AGI','VIT','INT','PER'].map(renderBenchCard).join('')}
+  `;
+}
+
+function renderBenchCard(k){
+  const b = BENCHMARKS[k];
+  const cur = state.stats[k];
+  const curTier = b.tiers.reduce((a, t) => t[0] <= cur && t[0] > a ? t[0] : a, 0);
+  const date = state.statDates[k] || 'untested';
+
+  const rows = b.tiers.map(([v, desc]) => {
+    const isCur = v === curTier;
+    const isBelow = v < curTier;
+    return `
+      <div class="tier-row ${isCur?'current':''} ${isBelow?'below':''}" data-tier="${k}:${v}">
+        <div class="tier-val">${v}</div>
+        <div class="tier-desc">${esc(desc)}</div>
+      </div>`;
+  }).join('');
+
+  return `
+    <details>
+      <summary>
+        <span>${k} · ${b.label}</span>
+        <span class="small mono dim" style="font-weight:400;white-space:nowrap">${cur} · ${date}</span>
+      </summary>
+      <div class="tier-list">
+        <div class="small dim" style="padding:10px 8px">${b.note}</div>
+        ${rows}
+      </div>
+    </details>`;
 }
 
 function viewLog(){
@@ -634,9 +737,7 @@ function viewLog(){
         <input type="text" id="adjnote" placeholder="reason">
         <button class="sm" id="adjgo">Add</button>
       </div>
-      <div class="small dim" style="margin-top:10px">
-        Corrections are logged as negative XP. History is preserved.
-      </div>
+      <div class="small dim" style="margin-top:10px">Corrections are logged as negative XP. History is preserved.</div>
     </div>
 
     <h2>History</h2>
@@ -657,17 +758,15 @@ function viewMore(){
 
     <h2>AI settings</h2>
     <div class="card">
-      <div class="notice">
-        Used only when you click "Generate with AI" on a skill. The key stays on this device — never sent to anyone except the AI provider you choose. If you don't have a key, use the copy-paste route in the skill editor instead.
-      </div>
+      <div class="notice">Used only when you tap "Generate with AI" on a skill. The key stays on this device — never sent to anyone except the AI provider you choose. If you don't have a key, use the copy-paste route in the skill editor instead.</div>
       <div class="field">
         <label>API key</label>
         <input id="ai-key" type="password" value="${esc(state.settings.apiKey)}" placeholder="sk-...">
       </div>
       <div class="field">
-        <label>Base URL (OpenAI-compatible)</label>
+        <label>Base URL</label>
         <input id="ai-base" value="${esc(state.settings.apiBase)}">
-        <div class="hint">OpenAI: https://api.openai.com/v1 — OpenRouter: https://openrouter.ai/api/v1</div>
+        <div class="hint">OpenAI: https://api.openai.com/v1 · OpenRouter: https://openrouter.ai/api/v1</div>
       </div>
       <div class="field">
         <label>Model</label>
@@ -680,27 +779,24 @@ function viewMore(){
     <div class="card">
       <button class="primary" id="export" style="width:100%;margin-bottom:8px">Export backup</button>
       <button id="import" style="width:100%;margin-bottom:8px">Import backup</button>
-      <button class="ghost" id="startover" style="width:100%;color:var(--danger)">Start over (erase all)</button>
-      <div class="small dim" style="margin-top:12px">
-        Data lives in this browser only. Export weekly — clearing browser data erases it.
-      </div>
+      <button class="ghost danger" id="startover" style="width:100%">Start over (erase all)</button>
+      <div class="small dim" style="margin-top:12px">Data lives in this browser only. Export weekly — clearing browser data erases it.</div>
     </div>
 
     <h2>Rules</h2>
     <div class="card small dim">
       <p>XP for level n = 50 × n × (n−1). Skill XP for level L = 10 × L.</p>
-      <p>Stats move only on a tested benchmark. A stat with no date is a claim, not a fact.</p>
+      <p>Stats move only on a benchmark you pass. A stat with no date is a claim, not a fact.</p>
       <p>No XP for plans, lists or feelings.</p>
-      <p>Streak = consecutive days with at least one quest done. No penalty for missing days — the streak just resets.</p>
+      <p>Streak = consecutive days with at least one quest done. No penalties — the streak just resets.</p>
     </div>
   `;
 }
 
-/* ════════════════════════════════════════════
+/* ═══════════════════════════════════════════
    MODALS
-   ════════════════════════════════════════════ */
+   ═══════════════════════════════════════════ */
 function closeModal(){ document.getElementById('modal').innerHTML = ''; }
-
 function openModal(html){
   document.getElementById('modal').innerHTML = `
     <div class="modal-bg" onclick="if(event.target===this)closeModal()">
@@ -708,17 +804,14 @@ function openModal(html){
     </div>`;
 }
 
-/* — SKILL EDITOR — */
 function openSkillEditor(skillId){
   const skill = skillId ? state.skills.find(s => s.id === skillId) : null;
   const isNew = !skill;
   const draft = skill ? JSON.parse(JSON.stringify(skill)) : makeStandardSkill('New skill');
-
   renderEditor();
 
   function renderEditor(){
     const isWorkout = draft.type === 'workout';
-
     const questSection = isWorkout ? `
       <div class="field">
         <label>Exercises</label>
@@ -789,7 +882,6 @@ function openSkillEditor(skillId){
       </div>
     `);
 
-    // bind
     document.getElementById('cancel').onclick = closeModal;
     document.getElementById('sk-name').oninput = e => { draft.name = e.target.value; };
     document.getElementById('type-std').onclick = () => {
@@ -807,8 +899,7 @@ function openSkillEditor(skillId){
     document.getElementById('save').onclick = () => {
       if (!draft.name.trim()) return alert('Name required.');
       if (isNew){
-        draft.id = newId();
-        draft.level = 1; draft.xp = 0; draft.active = true;
+        draft.id = newId(); draft.level = 1; draft.xp = 0; draft.active = true;
         state.skills.push(draft);
       } else {
         const i = state.skills.findIndex(s => s.id === draft.id);
@@ -823,10 +914,7 @@ function openSkillEditor(skillId){
         renderEditor();
       };
       document.querySelectorAll('[data-remove-q]').forEach(b => {
-        b.onclick = () => {
-          draft.quests.splice(+b.dataset.removeQ, 1);
-          renderEditor();
-        };
+        b.onclick = () => { draft.quests.splice(+b.dataset.removeQ, 1); renderEditor(); };
       });
       document.querySelectorAll('[data-q]').forEach(el => {
         el.oninput = () => {
@@ -841,10 +929,7 @@ function openSkillEditor(skillId){
         renderEditor();
       };
       document.querySelectorAll('[data-remove-ex]').forEach(b => {
-        b.onclick = () => {
-          draft.plan.exercises.splice(+b.dataset.removeEx, 1);
-          renderEditor();
-        };
+        b.onclick = () => { draft.plan.exercises.splice(+b.dataset.removeEx, 1); renderEditor(); };
       });
       document.querySelectorAll('[data-ex]').forEach(el => {
         el.oninput = () => {
@@ -869,7 +954,6 @@ function openSkillEditor(skillId){
   }
 }
 
-/* — AI GENERATOR — */
 function openAIGenerator(draft, back){
   const prompt = buildAIPrompt(draft.name || 'the skill', draft.level || 1);
   const key = state.settings.apiKey;
@@ -878,29 +962,19 @@ function openAIGenerator(draft, back){
 
   openModal(`
     <h2>Generate quests</h2>
-    <div class="notice">
-      <b>Route 1 — API.</b> If you've saved an API key in More → AI settings, tap Generate below.<br><br>
-      <b>Route 2 — manual.</b> Copy the prompt, paste it into ChatGPT or any AI, then paste the JSON array back into the box.
-    </div>
-
+    <div class="notice"><b>Route 1 — API.</b> If you've saved an API key in More → AI settings, tap Generate below.<br><br><b>Route 2 — manual.</b> Copy the prompt, paste it into ChatGPT, then paste the JSON array back into the box.</div>
     <div class="field">
       <label>Prompt</label>
       <textarea id="ai-prompt" rows="6" readonly>${esc(prompt)}</textarea>
       <button class="sm" id="copy-prompt" style="margin-top:8px">Copy prompt</button>
     </div>
-
-    ${key ? `
-      <button class="primary" id="ai-run" style="width:100%">Generate via API (${esc(model)})</button>
-      <div id="ai-status" class="small dim" style="margin-top:8px;text-align:center"></div>
-    ` : `
-      <div class="small dim" style="margin-bottom:12px">No API key saved. Use the manual route, or add a key in More → AI settings.</div>
-    `}
-
+    ${key ? `<button class="primary" id="ai-run" style="width:100%">Generate via API (${esc(model)})</button>
+             <div id="ai-status" class="small dim" style="margin-top:8px;text-align:center"></div>`
+          : `<div class="small dim" style="margin-bottom:12px">No API key saved. Use the manual route, or add a key in More → AI settings.</div>`}
     <div class="field" style="margin-top:16px">
-      <label>Result (one quest per line, or paste the JSON array)</label>
-      <textarea id="ai-result" rows="6" placeholder='["Quest 1","Quest 2",...] or one per line'></textarea>
+      <label>Result (JSON array or one per line)</label>
+      <textarea id="ai-result" rows="6" placeholder='["Quest 1","Quest 2",...]'></textarea>
     </div>
-
     <div class="row" style="gap:8px">
       <button class="ghost" id="ai-cancel" style="flex:1">Cancel</button>
       <button class="primary" id="ai-add" style="flex:2">Add quests</button>
@@ -911,8 +985,9 @@ function openAIGenerator(draft, back){
   document.getElementById('copy-prompt').onclick = () => {
     const el = document.getElementById('ai-prompt');
     el.select(); document.execCommand('copy');
-    document.getElementById('copy-prompt').textContent = 'Copied ✓';
-    setTimeout(() => { document.getElementById('copy-prompt').textContent = 'Copy prompt'; }, 1500);
+    const b = document.getElementById('copy-prompt');
+    b.textContent = 'Copied ✓';
+    setTimeout(() => { b.textContent = 'Copy prompt'; }, 1500);
   };
   const runBtn = document.getElementById('ai-run');
   if (runBtn) runBtn.onclick = async () => {
@@ -928,32 +1003,26 @@ function openAIGenerator(draft, back){
     }
   };
   document.getElementById('ai-add').onclick = () => {
-    let text = document.getElementById('ai-result').value.trim();
+    const text = document.getElementById('ai-result').value.trim();
     if (!text) return alert('Paste or generate quests first.');
     let arr;
     try {
-      if (text.startsWith('[')) arr = JSON.parse(text);
-      else arr = text.split('\n').map(l => l.trim()).filter(Boolean);
-    } catch(e){
-      return alert('Could not parse. Use a JSON array, or one quest per line.');
-    }
-    if (!Array.isArray(arr) || arr.length === 0) return alert('No quests found.');
-    arr.forEach(q => {
-      draft.quests.push({ id: newId(), text: String(q), xp: 5 });
-    });
-    closeModal();
-    back();
+      arr = text.startsWith('[') ? JSON.parse(text)
+        : text.split('\n').map(l => l.trim()).filter(Boolean);
+    } catch(e){ return alert('Could not parse. Use a JSON array, or one quest per line.'); }
+    if (!Array.isArray(arr) || !arr.length) return alert('No quests found.');
+    arr.forEach(q => draft.quests.push({ id: newId(), text: String(q), xp: 5 }));
+    closeModal(); back();
   };
 }
 
-/* — ATTEMPT DAY — */
 function openAttemptDay(skillId){
   const skill = state.skills.find(s => s.id === skillId);
   if (!skill || skill.type !== 'workout') return;
 
   openModal(`
     <h2>${esc(skill.name)} — Attempt day</h2>
-    <p class="small dim">Enter your max for each exercise. Next week's working sets will become ~65% of your max. You can edit the plan afterwards.</p>
+    <p class="small dim">Enter your max for each exercise. Next week's working sets become ~65% of your max. You can edit the plan afterwards.</p>
     ${skill.plan.exercises.map((e, i) => `
       <div class="field">
         <label>${esc(e.name)} · current ${e.sets}×${e.reps}${e.unit === 'sec' ? 's' : ''}</label>
@@ -973,13 +1042,11 @@ function openAttemptDay(skillId){
       const input = document.querySelector(`[data-max="${i}"]`);
       const max = parseInt(input.value, 10);
       if (!isNaN(max) && max > 0){
-        const suggested = Math.max(1, Math.round(max * 0.65));
-        e.reps = suggested;
+        e.reps = Math.max(1, Math.round(max * 0.65));
         changed = true;
       }
     });
     if (changed){
-      // mark attempt quest done and award XP
       const qid = `${skill.id}:attempt`;
       const t = today();
       state.quests[t] = state.quests[t] || {};
@@ -996,7 +1063,6 @@ function openAttemptDay(skillId){
   };
 }
 
-/* — PROFILE / SETTINGS / BACKUP — */
 function importBackup(){
   const input = document.createElement('input');
   input.type = 'file'; input.accept = 'application/json';
@@ -1014,25 +1080,26 @@ function importBackup(){
   input.click();
 }
 
-/* ════════════════════════════════════════════
-   EVENT BINDING
-   ════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════
+   BIND
+   ═══════════════════════════════════════════ */
 function bind(){
+  document.querySelectorAll('[data-nav]').forEach(el => {
+    el.onclick = () => navTo(el.dataset.nav);
+  });
+
   document.querySelectorAll('[data-quest]').forEach(el => {
     el.onclick = () => {
       const qid = el.dataset.quest;
       const list = questsForToday();
       const quest = list.find(q => q.id === qid);
       if (!quest) return;
-      // attempt quests open a modal
       if (quest.kind === 'attempt'){
-        if (isQuestDone(qid)) {
-          // allow un-ticking? treat as confirmation of removal
+        if (isQuestDone(qid)){
           if (confirm('This attempt is already logged. Undo it?')){
             const t = today();
             if (state.quests[t] && state.quests[t][qid]){
-              delete state.quests[t][qid];
-              save();
+              delete state.quests[t][qid]; save();
             }
           }
           return;
@@ -1044,42 +1111,53 @@ function bind(){
     };
   });
 
+  document.querySelectorAll('[data-tier]').forEach(el => {
+    el.onclick = () => {
+      const [stat, vStr] = el.dataset.tier.split(':');
+      const v = parseInt(vStr, 10);
+      const cur = state.stats[stat];
+      const desc = BENCHMARKS[stat].tiers.find(t => t[0] === v)?.[1] || '';
+      if (v === cur){
+        if (confirm(`Re-test ${stat} at ${v} today?\n\n${desc}\n\nNo XP — the stat is unchanged.`)){
+          state.statDates[stat] = today(); save();
+        }
+      } else if (v > cur){
+        if (confirm(`Pass ${stat} tier ${v}?\n\n${desc}\n\n${stat}: ${cur} → ${v}. +50 XP.`)){
+          state.stats[stat] = v;
+          state.statDates[stat] = today();
+          state.benchmarks.unshift(`${stat} ${v} — ${today()}`);
+          addXP(50, `Benchmark: ${stat} ${v}`);
+          save();
+        }
+      } else {
+        if (confirm(`Demote ${stat} to tier ${v}?\n\n${desc}\n\nThe stat moves down. This is honest calibration — no XP.`)){
+          state.stats[stat] = v;
+          state.statDates[stat] = today();
+          save();
+        }
+      }
+    };
+  });
+
   document.querySelectorAll('[data-xp]').forEach(el => {
     el.onclick = () => { addXP(+el.dataset.xp, el.dataset.note); save(); };
   });
 
-  document.querySelectorAll('[data-stat]').forEach(b => {
-    b.onclick = () => {
-      const k = b.dataset.stat;
-      const v = prompt(`New ${k} value (only after passing a benchmark):`, state.stats[k]);
-      if (v === null) return;
-      const n = parseInt(v, 10);
-      if (isNaN(n) || n < 1 || n > 100) return;
-      state.stats[k] = n;
-      state.statDates[k] = today();
-      state.benchmarks.unshift(`${k} ${n} — ${today()}`);
-      addXP(50, `Benchmark: ${k} ${n}`);
-      save();
-    };
-  });
-
   const addSkill = document.getElementById('add-skill');
   if (addSkill) addSkill.onclick = () => openSkillEditor();
-
   document.querySelectorAll('[data-edit]').forEach(b => {
     b.onclick = () => openSkillEditor(b.dataset.edit);
   });
   document.querySelectorAll('[data-toggle]').forEach(b => {
     b.onclick = () => {
-      const skill = state.skills.find(s => s.id === b.dataset.toggle);
-      skill.active = !skill.active;
-      save();
+      const s = state.skills.find(s => s.id === b.dataset.toggle);
+      s.active = !s.active; save();
     };
   });
   document.querySelectorAll('[data-delete]').forEach(b => {
     b.onclick = () => {
-      const skill = state.skills.find(s => s.id === b.dataset.delete);
-      if (!confirm(`Delete "${skill.name}"? This cannot be undone.`)) return;
+      const s = state.skills.find(s => s.id === b.dataset.delete);
+      if (!confirm(`Delete "${s.name}"? This cannot be undone.`)) return;
       state.skills = state.skills.filter(s => s.id !== b.dataset.delete);
       save();
     };
@@ -1095,10 +1173,8 @@ function bind(){
 
   const pSave = document.getElementById('profile-save');
   if (pSave) pSave.onclick = () => {
-    state.name = document.getElementById('profile-name').value.trim();
-    save();
+    state.name = document.getElementById('profile-name').value.trim(); save();
   };
-
   const aiSave = document.getElementById('ai-save');
   if (aiSave) aiSave.onclick = () => {
     state.settings.apiKey = document.getElementById('ai-key').value.trim();
@@ -1106,7 +1182,6 @@ function bind(){
     state.settings.apiModel = document.getElementById('ai-model').value.trim() || 'gpt-4o-mini';
     save();
   };
-
   const exp = document.getElementById('export');
   if (exp) exp.onclick = () => {
     const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
@@ -1115,10 +1190,8 @@ function bind(){
     a.download = `system-backup-${today()}.json`;
     a.click();
   };
-
   const imp = document.getElementById('import');
   if (imp) imp.onclick = importBackup;
-
   const startOver = document.getElementById('startover');
   if (startOver) startOver.onclick = () => {
     if (!confirm('Erase everything and start over? Export first if unsure.')) return;
@@ -1127,17 +1200,16 @@ function bind(){
     state = defaultState();
     onboardStep = 1;
     onboardDraft.name = '';
-    onboardDraft.stats = { STR: 10, AGI: 5, VIT: 10, INT: 5, PER: 5 };
+    onboardDraft.stats = { ...DEFAULT_STATS };
     onboardDraft.selected = new Set(['calisthenics','reading','business','coding']);
     save();
   };
 }
 
 document.querySelectorAll('#nav button').forEach(b => {
-  b.onclick = () => { tab = b.dataset.tab; render(); };
+  b.onclick = () => { tab = b.dataset.tab; render(); window.scrollTo(0, 0); };
 });
 
-// start
 render();
 </script>
 </body>

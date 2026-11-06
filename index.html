@@ -7,16 +7,14 @@
 <title>The System</title>
 <style>
 :root{
-  --bg:#0a0e14; --panel:#111823; --line:#1d2836;
-  --txt:#c8d4e4; --dim:#6b7c93; --accent:#4da6ff;
-  --gold:#ffc857; --danger:#ff5c5c;
+  --bg:#0a0e14;--panel:#111823;--line:#1d2836;
+  --txt:#c8d4e4;--dim:#6b7c93;--accent:#4da6ff;
+  --gold:#ffc857;--danger:#ff5c5c;--ok:#3ddc97;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-body{
-  margin:0;background:var(--bg);color:var(--txt);
+body{margin:0;background:var(--bg);color:var(--txt);
   font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-  padding-bottom:76px;
-}
+  padding-bottom:76px}
 .mono{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
 .wrap{max-width:640px;margin:0 auto;padding:16px}
 h1,h2,h3{margin:0;font-weight:600}
@@ -28,56 +26,70 @@ h3{font-size:15px}
 .between{justify-content:space-between}
 .bar{height:6px;background:#0a0e14;border-radius:3px;overflow:hidden;margin-top:8px}
 .bar>i{display:block;height:100%;background:var(--accent);border-radius:3px;transition:width .3s}
-button{
-  font:inherit;color:var(--txt);background:#16202e;border:1px solid var(--line);
-  border-radius:8px;padding:10px 14px;cursor:pointer;min-height:42px;
-}
+button{font:inherit;color:var(--txt);background:#16202e;border:1px solid var(--line);
+  border-radius:8px;padding:10px 14px;cursor:pointer;min-height:42px}
 button:active{background:#1d2836}
 button.primary{background:var(--accent);color:#06121f;border-color:var(--accent);font-weight:600}
 button.ghost{background:transparent}
+button.danger{color:var(--danger)}
 button.sm{padding:6px 10px;min-height:34px;font-size:13px}
-input,select{
-  font:inherit;color:var(--txt);background:#0a0e14;border:1px solid var(--line);
-  border-radius:8px;padding:10px;width:100%;min-height:42px;
-}
+input,select,textarea{font:inherit;color:var(--txt);background:#0a0e14;border:1px solid var(--line);
+  border-radius:8px;padding:10px;width:100%;min-height:42px;font-family:inherit}
+textarea{resize:vertical;min-height:80px}
 .big{font-size:38px;font-weight:700;letter-spacing:-.02em;line-height:1}
 .dim{color:var(--dim)}
 .small{font-size:12px}
 .tag{font-size:11px;letter-spacing:.1em;padding:3px 8px;border-radius:4px;background:#1d2836;color:var(--dim)}
 .tag.on{background:rgba(77,166,255,.15);color:var(--accent)}
+.tag.warn{background:rgba(255,92,92,.15);color:var(--danger)}
 .quest{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
 .quest:last-child{border-bottom:none}
-.chk{width:24px;height:24px;border:2px solid var(--line);border-radius:6px;flex:0 0 auto;display:grid;place-items:center;font-size:14px}
+.chk{width:24px;height:24px;border:2px solid var(--line);border-radius:6px;flex:0 0 auto;
+  display:grid;place-items:center;font-size:14px;cursor:pointer}
 .chk.done{background:var(--accent);border-color:var(--accent);color:#06121f}
 .stat{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)}
 .stat:last-child{border-bottom:none}
 .stat b{font-family:ui-monospace,monospace;font-size:19px}
-nav{
-  position:fixed;bottom:0;left:0;right:0;background:#0d131c;border-top:1px solid var(--line);
-  display:flex;padding-bottom:env(safe-area-inset-bottom);
-}
-nav button{
-  flex:1;background:none;border:none;border-radius:0;padding:14px 4px;min-height:60px;
-  font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);
-}
+nav{position:fixed;bottom:0;left:0;right:0;background:#0d131c;border-top:1px solid var(--line);
+  display:flex;padding-bottom:env(safe-area-inset-bottom);z-index:50}
+nav button{flex:1;background:none;border:none;border-radius:0;padding:14px 4px;min-height:60px;
+  font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}
 nav button.active{color:var(--accent)}
-.hide{display:none}
 .logrow{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--line);font-size:13px}
 .logrow:last-child{border-bottom:none}
 .xp{color:var(--accent);font-family:ui-monospace,monospace}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 hr{border:none;border-top:1px solid var(--line);margin:14px 0}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:12px;color:var(--dim);margin-bottom:6px;
+  text-transform:uppercase;letter-spacing:.1em}
+.field .hint{font-size:12px;color:var(--dim);margin-top:4px}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100;
+  display:flex;align-items:flex-end;justify-content:center}
+.modal{background:var(--panel);border-radius:16px 16px 0 0;width:100%;max-width:640px;
+  max-height:92vh;overflow-y:auto;padding:20px;
+  padding-bottom:calc(20px + env(safe-area-inset-bottom))}
+.modal h2{margin-top:0;margin-bottom:16px}
+.skill-row{display:flex;justify-content:space-between;align-items:center;
+  padding:12px 0;border-bottom:1px solid var(--line)}
+.skill-row:last-child{border-bottom:none}
+.exercise-row{display:grid;grid-template-columns:1fr 60px 70px 30px;gap:8px;
+  align-items:center;margin-bottom:8px}
+.exercise-row input{min-height:38px;padding:6px 8px;font-size:14px}
+.step{opacity:.4}
+.step.active{opacity:1}
+.notice{background:rgba(77,166,255,.08);border:1px solid rgba(77,166,255,.25);
+  border-radius:8px;padding:12px;font-size:13px;color:var(--txt);margin-bottom:16px}
+.notice.warn{background:rgba(255,92,92,.08);border-color:rgba(255,92,92,.25)}
+.hide{display:none}
 </style>
 </head>
 <body>
 
-<div class="wrap">
-  <h1>The System</h1>
-</div>
+<main id="app" class="wrap"></main>
+<div id="modal"></div>
 
-<main class="wrap" id="app"></main>
-
-<nav>
+<nav id="nav" class="hide">
   <button data-tab="status" class="active">Status</button>
   <button data-tab="quests">Quests</button>
   <button data-tab="skills">Skills</button>
@@ -86,22 +98,14 @@ hr{border:none;border-top:1px solid var(--line);margin:14px 0}
 </nav>
 
 <script>
-/* ─────────────────────────────────────────
-   RULES — the maths lives here, once
-   ───────────────────────────────────────── */
-
+/* ════════════════════════════════════════════
+   RULES — the maths
+   ════════════════════════════════════════════ */
 const xpForLevel = n => 50 * n * (n - 1);
-
-function levelFromXP(xp){
-  let n = 1;
-  while (xpForLevel(n + 1) <= xp) n++;
-  return n;
-}
-
-const RANK_TABLE = [[50,'S'],[40,'A'],[30,'B'],[20,'C'],[10,'D'],[1,'E']];
-const rankOf = lvl => RANK_TABLE.find(([min]) => lvl >= min)[1];
-
+function levelFromXP(xp){ let n = 1; while (xpForLevel(n+1) <= xp) n++; return n; }
 const skillXpForLevel = L => 10 * L;
+const RANK_TABLE = [[50,'S'],[40,'A'],[30,'B'],[20,'C'],[10,'D'],[1,'E']];
+const rankOf = lvl => RANK_TABLE.find(([m]) => lvl >= m)[1];
 
 function addSkillXP(skill, amount){
   skill.xp += amount;
@@ -115,63 +119,81 @@ function addSkillXP(skill, amount){
   return leveled;
 }
 
-/* ─────────────────────────────────────────
-   STATE
-   ───────────────────────────────────────── */
+/* ════════════════════════════════════════════
+   DEFAULT SKILL TEMPLATES
+   ════════════════════════════════════════════ */
+const newId = () => 'x' + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
 
-const DAILY_QUESTS = [
-  '25 pushups',
-  '30 squats',
-  '1 min plank',
-  '5 min mobility',
-  'Read 30 min, phone away',
-  '1 business task',
-  '20 min coding',
-  "Log today's XP"
+function makeWorkoutSkill(name, plan){
+  return {
+    id: newId(), name, active: true, level: 1, xp: 0, type: 'workout',
+    plan: plan || {
+      exercises: [
+        { name: 'Pushups',  sets: 4, reps: 25, unit: 'reps' },
+        { name: 'Pullups',  sets: 4, reps: 8,  unit: 'reps' },
+        { name: 'Dips',     sets: 4, reps: 12, unit: 'reps' },
+        { name: 'Crunches', sets: 4, reps: 20, unit: 'reps' },
+        { name: 'Plank',    sets: 4, reps: 45, unit: 'sec'  }
+      ],
+      workoutDays: [1, 3, 5],
+      attemptDay: 0
+    }
+  };
+}
+
+function makeStandardSkill(name, quests){
+  return {
+    id: newId(), name, active: true, level: 1, xp: 0, type: 'standard',
+    quests: (quests || [{ id: newId(), text: `${name} — 20 min focused practice`, xp: 5 }])
+      .map(q => ({ id: newId(), text: q.text || q, xp: q.xp || 5 }))
+  };
+}
+
+const PRESETS = [
+  { id: 'calisthenics', label: 'Calisthenics',  make: () => makeWorkoutSkill('Calisthenics') },
+  { id: 'reading',      label: 'Reading',       make: () => makeStandardSkill('Reading', [{ text: 'Read 30 min, phone away', xp: 5 }]) },
+  { id: 'business',     label: 'Business',      make: () => makeStandardSkill('Business', [{ text: '1 business task', xp: 5 }]) },
+  { id: 'coding',       label: 'Coding',        make: () => makeStandardSkill('Coding', [{ text: '20 min coding', xp: 4 }]) },
+  { id: 'spanish',      label: 'Spanish',       make: () => makeStandardSkill('Spanish', [{ text: '15 min Spanish practice', xp: 3 }]) },
+  { id: 'writing',      label: 'Writing',       make: () => makeStandardSkill('Writing', [{ text: 'Write 300 words', xp: 5 }]) },
+  { id: 'engineering',  label: 'Engineering',   make: () => makeStandardSkill('Engineering', [{ text: '1 hr engineering study', xp: 10 }]) }
 ];
-const MINIMUM_QUESTS = [0, 1, 5]; // pushups, squats, business task
 
-const DEFAULT_STATE = () => ({
-  v: 1,
-  totalXP: 0,
-  stats:   { STR:30, AGI:5, VIT:15, INT:5, PER:1 },
-  statDates:{ STR:'2026-11-04', AGI:'2026-11-04', VIT:'2026-11-04', INT:'2026-11-04', PER:null },
-  skills: [
-    { id:'cali',    name:'Calisthenics', active:true,  level:1, xp:0 },
-    { id:'biz',     name:'Business',     active:true,  level:1, xp:0 },
-    { id:'code',    name:'Coding',       active:true,  level:1, xp:0 },
-    { id:'spanish', name:'Spanish',      active:false, level:1, xp:0 },
-    { id:'writing', name:'Writing',      active:false, level:1, xp:0 },
-    { id:'eng',     name:'Engineering',  active:false, level:1, xp:0 }
-  ],
-  streak: 0,
-  lastComplete: null,
-  questAwarded: [],
-  quests: {},
-  log: [],
-  benchmarks: [],
-  mainQuests: [
-    'AGI 20 — palms to floor',
-    'Site live + 10 profiles + first paid introduction',
-    'Ship one working web app'
-  ],
-  mainDeadline: '2027-02-02',
-  titles: []
-});
+/* ════════════════════════════════════════════
+   STATE
+   ════════════════════════════════════════════ */
+const KEY = 'the-system-v2';
 
-const KEY = 'the-system-v1';
+function defaultState(){
+  return {
+    v: 2,
+    onboarded: false,
+    name: '',
+    totalXP: 0,
+    stats: { STR: 10, AGI: 5, VIT: 10, INT: 5, PER: 5 },
+    statDates: {},
+    skills: [],
+    streak: 0,
+    lastComplete: null,
+    quests: {},
+    log: [],
+    benchmarks: [],
+    titles: [],
+    settings: { apiKey: '', apiBase: 'https://api.openai.com/v1', apiModel: 'gpt-4o-mini' }
+  };
+}
 
 let state = load();
 
 function load(){
-  try{
+  try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return DEFAULT_STATE();
-    const parsed = JSON.parse(raw);
-    return Object.assign(DEFAULT_STATE(), parsed);
-  }catch(e){
-    return DEFAULT_STATE();
-  }
+    if (!raw) {
+      // migration: if v1 exists, start fresh (old app had different shape)
+      return defaultState();
+    }
+    return Object.assign(defaultState(), JSON.parse(raw));
+  } catch(e){ return defaultState(); }
 }
 
 function save(){
@@ -179,84 +201,275 @@ function save(){
   render();
 }
 
-/* ─────────────────────────────────────────
+/* ════════════════════════════════════════════
    HELPERS
-   ───────────────────────────────────────── */
-
-const pad = n => String(n).padStart(2,'0');
-
+   ════════════════════════════════════════════ */
+const pad = n => String(n).padStart(2, '0');
 function today(){
   const d = new Date();
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 }
-
 function yesterday(){
-  const d = new Date();
-  d.setDate(d.getDate() - 1);
+  const d = new Date(); d.setDate(d.getDate() - 1);
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 }
-
+function dayName(n){
+  return ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][n];
+}
 function esc(s){
-  return String(s).replace(/[&<>"']/g, c =>
+  return String(s ?? '').replace(/[&<>"']/g, c =>
     ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
 function addXP(amount, note){
   state.totalXP += amount;
   state.log.unshift({ date: today(), xp: amount, note });
-  state.log = state.log.slice(0, 400);
+  state.log = state.log.slice(0, 500);
 }
 
-/* ─────────────────────────────────────────
-   QUEST / STREAK LOGIC
-   ───────────────────────────────────────── */
-
-function questsToday(){
-  return state.quests[today()] || [];
+/* ════════════════════════════════════════════
+   QUESTS
+   ════════════════════════════════════════════ */
+function questsForToday(){
+  const day = new Date().getDay();
+  const list = [];
+  state.skills.filter(s => s.active).forEach(skill => {
+    if (skill.type === 'workout'){
+      const plan = skill.plan;
+      if (day === plan.attemptDay){
+        list.push({
+          id: `${skill.id}:attempt`, skillId: skill.id, kind: 'attempt',
+          text: `${skill.name} — Attempt day: test your max reps`,
+          xp: 50
+        });
+      } else if (plan.workoutDays.includes(day)){
+        const summary = plan.exercises
+          .map(e => `${e.sets}×${e.reps} ${e.name}`).join(' · ');
+        list.push({
+          id: `${skill.id}:workout`, skillId: skill.id, kind: 'workout',
+          text: `${skill.name}: ${summary}`,
+          xp: 15
+        });
+      }
+    } else {
+      skill.quests.forEach(q => {
+        list.push({
+          id: `${skill.id}:${q.id}`, skillId: skill.id, kind: 'standard',
+          text: q.text, xp: q.xp
+        });
+      });
+    }
+  });
+  return list;
 }
 
-function toggleQuest(i){
+function isQuestDone(qid){
+  return !!(state.quests[today()] && state.quests[today()][qid]);
+}
+
+function toggleQuest(quest){
   const t = today();
-  const list = state.quests[t] || [];
-  const at = list.indexOf(i);
-  if (at >= 0) list.splice(at, 1);
-  else list.push(i);
-  state.quests[t] = list;
-
-  // clear bonus, awarded once per day
-  if (list.length === DAILY_QUESTS.length && !state.questAwarded.includes(t)){
-    state.questAwarded.push(t);
-    addXP(20, 'All daily quests cleared');
+  state.quests[t] = state.quests[t] || {};
+  if (state.quests[t][quest.id]){
+    delete state.quests[t][quest.id];
+  } else {
+    state.quests[t][quest.id] = true;
+    addXP(quest.xp, quest.text);
+    const skill = state.skills.find(s => s.id === quest.skillId);
+    if (skill){
+      const leveled = addSkillXP(skill, quest.xp);
+      if (leveled) addXP(0, `${skill.name} reached Lv ${skill.level}`);
+    }
+    updateStreak();
   }
-
-  updateStreak();
   save();
 }
 
 function updateStreak(){
   const t = today();
-  const q = state.quests[t] || [];
-  const minimumMet = MINIMUM_QUESTS.every(i => q.includes(i));
-  if (!minimumMet) return;
+  const q = state.quests[t] || {};
+  if (Object.keys(q).length === 0) return;
   if (state.lastComplete === t) return;
-
   state.streak = (state.lastComplete === yesterday()) ? state.streak + 1 : 1;
   state.lastComplete = t;
-
   if (state.streak % 7 === 0){
     addXP(50, `7-day streak bonus (day ${state.streak})`);
   }
 }
 
-/* ─────────────────────────────────────────
-   RENDER
-   ───────────────────────────────────────── */
+/* ════════════════════════════════════════════
+   AI QUEST GENERATION
+   ════════════════════════════════════════════ */
+function buildAIPrompt(skillName, level){
+  return `Generate 6 concrete daily practice quests for someone learning "${skillName}" at level ${level}/50 (beginner to intermediate). Each quest must be a specific, self-contained 20–60 minute activity a person can do at home, without a coach. They should build on each other over a week.
 
+Return ONLY a valid JSON array of 6 strings. No markdown fences, no explanation, no preamble.
+
+Example format:
+["Quest 1 text","Quest 2 text","Quest 3 text","Quest 4 text","Quest 5 text","Quest 6 text"]`;
+}
+
+async function callAI(prompt, apiKey, baseUrl, model){
+  const res = await fetch(`${baseUrl}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model: model,
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.8
+    })
+  });
+  if (!res.ok){
+    const body = await res.text().catch(() => '');
+    throw new Error(`API ${res.status}: ${body.slice(0, 120)}`);
+  }
+  const data = await res.json();
+  const text = data.choices[0].message.content.trim();
+  const cleaned = text.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '');
+  return JSON.parse(cleaned);
+}
+
+/* ════════════════════════════════════════════
+   RENDER — ONBOARDING
+   ════════════════════════════════════════════ */
 let tab = 'status';
+let onboardStep = 1;
+const onboardDraft = {
+  name: '',
+  stats: { STR: 10, AGI: 5, VIT: 10, INT: 5, PER: 5 },
+  selected: new Set(['calisthenics','reading','business','coding'])
+};
 
-function render(){
+function renderOnboarding(){
+  document.getElementById('nav').classList.add('hide');
   const app = document.getElementById('app');
-  document.querySelectorAll('nav button').forEach(b =>
+
+  if (onboardStep === 1){
+    app.innerHTML = `
+      <h1 style="margin-top:24px">The System</h1>
+      <p class="dim" style="margin-top:12px">A personal level-up tracker. Every value is yours — stored on this device only, never sent anywhere.</p>
+      <div class="card" style="margin-top:24px">
+        <div class="field">
+          <label>What should I call you?</label>
+          <input id="ob-name" placeholder="Name" value="${esc(onboardDraft.name)}" maxlength="40">
+        </div>
+        <button class="primary" id="ob-next" style="width:100%">Continue</button>
+      </div>
+      <p class="small dim">Already have a backup? <a href="#" id="ob-import" style="color:var(--accent)">Import it instead</a></p>
+    `;
+    document.getElementById('ob-next').onclick = () => {
+      const v = document.getElementById('ob-name').value.trim();
+      if (!v) return alert('Enter a name to continue.');
+      onboardDraft.name = v;
+      onboardStep = 2; render();
+    };
+    document.getElementById('ob-import').onclick = (e) => {
+      e.preventDefault(); importBackup();
+    };
+    return;
+  }
+
+  if (onboardStep === 2){
+    const labels = {
+      STR: 'Strength — pushups, pullups, dips',
+      AGI: 'Agility — mobility, flexibility, balance',
+      VIT: 'Vitality — endurance, carrying, recovery',
+      INT: 'Intelligence — books, learning, study',
+      PER: 'Perception — focus, attention, deep work'
+    };
+    app.innerHTML = `
+      <h1 style="margin-top:24px">Starting stats</h1>
+      <p class="dim" style="margin-top:12px">Score each 1–100. Be honest — you can test properly later. Between two tiers, take the lower.</p>
+      <div class="card" style="margin-top:16px">
+        ${['STR','AGI','VIT','INT','PER'].map(k => `
+          <div class="field">
+            <label>${k}</label>
+            <input type="number" min="1" max="100" data-stat="${k}" value="${onboardDraft.stats[k]}">
+            <div class="hint">${labels[k]}</div>
+          </div>
+        `).join('')}
+      </div>
+      <div class="row" style="gap:8px">
+        <button class="ghost" id="ob-back" style="flex:1">Back</button>
+        <button class="primary" id="ob-next" style="flex:2">Continue</button>
+      </div>
+    `;
+    document.querySelectorAll('[data-stat]').forEach(el => {
+      el.oninput = () => {
+        const v = parseInt(el.value, 10);
+        if (v >= 1 && v <= 100) onboardDraft.stats[el.dataset.stat] = v;
+      };
+    });
+    document.getElementById('ob-back').onclick = () => { onboardStep = 1; render(); };
+    document.getElementById('ob-next').onclick = () => { onboardStep = 3; render(); };
+    return;
+  }
+
+  if (onboardStep === 3){
+    app.innerHTML = `
+      <h1 style="margin-top:24px">Your skills</h1>
+      <p class="dim" style="margin-top:12px">Pick the skills you want to level. You can add, remove, or pause any of these at any time.</p>
+      <div class="card" style="margin-top:16px">
+        ${PRESETS.map(p => `
+          <div class="skill-row">
+            <span>${esc(p.label)}</span>
+            <div class="chk ${onboardDraft.selected.has(p.id) ? 'done' : ''}" data-preset="${p.id}">${onboardDraft.selected.has(p.id) ? '✓' : ''}</div>
+          </div>
+        `).join('')}
+      </div>
+      <div class="card">
+        <div class="field">
+          <label>Add a custom skill</label>
+          <input id="ob-custom" placeholder="e.g. Guitar, Chess, Pottery">
+          <div class="hint">You can generate quests for it later with AI.</div>
+        </div>
+      </div>
+      <div class="row" style="gap:8px">
+        <button class="ghost" id="ob-back" style="flex:1">Back</button>
+        <button class="primary" id="ob-next" style="flex:2">Start</button>
+      </div>
+    `;
+    document.querySelectorAll('[data-preset]').forEach(el => {
+      el.onclick = () => {
+        const id = el.dataset.preset;
+        if (onboardDraft.selected.has(id)) onboardDraft.selected.delete(id);
+        else onboardDraft.selected.add(id);
+        render();
+      };
+    });
+    document.getElementById('ob-back').onclick = () => { onboardStep = 2; render(); };
+    document.getElementById('ob-next').onclick = () => {
+      const custom = document.getElementById('ob-custom').value.trim();
+
+      state.name = onboardDraft.name;
+      state.stats = { ...onboardDraft.stats };
+      state.skills = [];
+      PRESETS.forEach(p => {
+        if (onboardDraft.selected.has(p.id)) state.skills.push(p.make());
+      });
+      if (custom) state.skills.push(makeStandardSkill(custom));
+      if (state.skills.length === 0){
+        if (!confirm('No skills selected. Start with none anyway?')) return;
+      }
+      state.onboarded = true;
+      save();
+      tab = 'status';
+    };
+    return;
+  }
+}
+
+/* ════════════════════════════════════════════
+   RENDER — MAIN APP
+   ════════════════════════════════════════════ */
+function render(){
+  if (!state.onboarded){ renderOnboarding(); return; }
+  document.getElementById('nav').classList.remove('hide');
+  const app = document.getElementById('app');
+  document.querySelectorAll('#nav button').forEach(b =>
     b.classList.toggle('active', b.dataset.tab === tab));
 
   if (tab === 'status')  app.innerHTML = viewStatus();
@@ -283,8 +496,6 @@ function xpBar(){
 
 function viewStatus(){
   const lvl = levelFromXP(state.totalXP);
-  const rank = rankOf(lvl);
-
   const stats = ['STR','AGI','VIT','INT','PER'].map(k => `
     <div class="stat">
       <div>
@@ -297,22 +508,26 @@ function viewStatus(){
       </div>
     </div>`).join('');
 
-  const mains = state.mainQuests.map((q,i) => `
-    <div class="row between" style="padding:8px 0">
-      <span>${esc(q)}</span>
-      <button class="sm primary" data-main="${i}">+500</button>
-    </div>`).join('');
+  const active = state.skills.filter(s => s.active);
+  const skillList = active.length
+    ? active.map(s => `
+        <div class="skill-row">
+          <span>${esc(s.name)}</span>
+          <span class="small mono dim">${rankOf(s.level)} · Lv ${s.level}</span>
+        </div>`).join('')
+    : '<div class="dim small">No active skills.</div>';
 
   return `
-    <div class="card">
+    <h1>The System</h1>
+    <div class="card" style="margin-top:16px">
       <div class="row between">
         <div>
-          <div class="dim small mono">LEVEL</div>
-          <div class="big mono">${lvl}</div>
+          <div class="dim small mono">${esc(state.name || 'PLAYER')}</div>
+          <div class="big mono">Lv ${lvl}</div>
         </div>
         <div style="text-align:right">
           <div class="dim small mono">RANK</div>
-          <div class="big mono" style="color:var(--accent)">${rank}</div>
+          <div class="big mono" style="color:var(--accent)">${rankOf(lvl)}</div>
         </div>
       </div>
       ${xpBar()}
@@ -326,71 +541,70 @@ function viewStatus(){
     <h2>Stats</h2>
     <div class="card">${stats}</div>
 
-    <h2>Main quests · 90 days</h2>
-    <div class="card">${mains}
-      <div class="small dim" style="margin-top:10px">Deadline ${state.mainDeadline}</div>
-    </div>
-
-    <h2>Titles</h2>
-    <div class="card">${
-      state.titles.length
-        ? state.titles.map(t => `<span class="tag on" style="margin:2px">${esc(t)}</span>`).join('')
-        : '<span class="dim small">None yet</span>'
-    }</div>`;
+    <h2>Active skills</h2>
+    <div class="card">${skillList}</div>
+  `;
 }
 
 function viewQuests(){
-  const done = questsToday();
-  const items = DAILY_QUESTS.map((q,i) => `
-    <div class="quest" data-quest="${i}">
-      <div class="chk ${done.includes(i) ? 'done' : ''}">${done.includes(i) ? '✓' : ''}</div>
-      <span style="${done.includes(i) ? 'color:var(--dim);text-decoration:line-through' : ''}">${esc(q)}</span>
-    </div>`).join('');
+  const list = questsForToday();
+  const t = today();
+  const doneCount = list.filter(q => isQuestDone(q.id)).length;
 
-  const cleared = done.length === DAILY_QUESTS.length;
+  const items = list.length ? list.map(q => {
+    const done = isQuestDone(q.id);
+    return `
+      <div class="quest" data-quest="${q.id}">
+        <div class="chk ${done ? 'done' : ''}">${done ? '✓' : ''}</div>
+        <div style="flex:1;${done ? 'opacity:.5' : ''}">
+          <div style="${done ? 'text-decoration:line-through' : ''}">${esc(q.text)}</div>
+          <div class="small dim mono">+${q.xp} XP</div>
+        </div>
+      </div>`;
+  }).join('') : '<div class="dim small" style="padding:12px 0">No quests today. Add or activate a skill in the Skills tab.</div>';
 
   return `
-    <h2>Daily quests · ${today()}</h2>
+    <h2>Today · ${dayName(new Date().getDay())} ${t.slice(5)}</h2>
     <div class="card">${items}</div>
     <div class="card row between">
-      <span class="small dim">${done.length} / ${DAILY_QUESTS.length} cleared</span>
-      <span class="small ${cleared ? 'xp' : 'dim'}">${cleared ? '+20 awarded' : 'clear all for +20'}</span>
+      <span class="small dim">${doneCount} / ${list.length} done</span>
+      <span class="small dim mono">${state.streak} day streak</span>
     </div>
-    <div class="small dim" style="padding:0 4px">
-      Streak counts days where pushups, squats and one business task are all done.
-    </div>`;
+  `;
 }
 
 function viewSkills(){
   const rows = state.skills.map(s => {
     const need = skillXpForLevel(s.level);
     const pct = s.level >= 50 ? 100 : (s.xp / need) * 100;
+    const isWorkout = s.type === 'workout';
+    const detail = isWorkout
+      ? `${s.plan.exercises.length} exercises · ${s.plan.workoutDays.length} workout days/week`
+      : `${s.quests.length} quest${s.quests.length === 1 ? '' : 's'}`;
     return `
       <div class="card">
         <div class="row between">
-          <div class="row" style="gap:8px">
-            <h3>${esc(s.name)}</h3>
-            <span class="tag ${s.active ? 'on' : ''}">${s.active ? rankOf(s.level) : 'queued'}</span>
+          <div class="row" style="gap:8px;flex:1;min-width:0">
+            <h3 style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(s.name)}</h3>
+            <span class="tag ${s.active ? 'on' : ''}">${s.active ? rankOf(s.level) : 'paused'}</span>
           </div>
-          <span class="mono small dim">Lv ${s.level} · ${s.xp}/${need}</span>
+          <span class="mono small dim" style="white-space:nowrap">Lv ${s.level} · ${s.xp}/${need}</span>
         </div>
         <div class="bar"><i style="width:${pct}%"></i></div>
+        <div class="small dim" style="margin-top:8px">${detail}</div>
         <div class="row" style="gap:8px;margin-top:12px">
-          <input type="number" min="1" placeholder="minutes" data-mins="${s.id}" ${s.active ? '' : 'disabled'}>
-          <button class="sm primary" data-log="${s.id}" ${s.active ? '' : 'disabled'}>Log</button>
-          <button class="sm ghost" data-toggle="${s.id}">${s.active ? 'Queue' : 'Activate'}</button>
+          <button class="sm ghost" data-edit="${s.id}" style="flex:1">Edit</button>
+          <button class="sm ghost" data-toggle="${s.id}" style="flex:1">${s.active ? 'Pause' : 'Activate'}</button>
+          <button class="sm ghost danger" data-delete="${s.id}">Delete</button>
         </div>
       </div>`;
   }).join('');
 
-  const activeCount = state.skills.filter(s => s.active).length;
-
   return `
-    <h2>Skills · ${activeCount}/4 active</h2>
-    ${rows}
-    <div class="small dim" style="padding:0 4px">
-      Active skills earn XP. Queued skills earn nothing. Swap only at a weekly review.
-    </div>`;
+    <h2>Skills · ${state.skills.filter(s=>s.active).length} active / ${state.skills.length} total</h2>
+    ${rows || '<div class="card dim small">No skills yet.</div>'}
+    <button class="primary" id="add-skill" style="width:100%;margin-top:12px">+ Add skill</button>
+  `;
 }
 
 function viewLog(){
@@ -405,14 +619,12 @@ function viewLog(){
   return `
     <h2>Quick log</h2>
     <div class="grid">
-      <button data-xp="15" data-note="Workout 45–60 min">Workout +15</button>
-      <button data-xp="5"  data-note="Reading 30 min">Reading +5</button>
-      <button data-xp="10" data-note="Business deep work 1 hr">Business +10</button>
-      <button data-xp="10" data-note="Coding 1 hr">Coding +10</button>
+      <button data-xp="15" data-note="Workout">Workout +15</button>
+      <button data-xp="5"  data-note="Reading">Reading +5</button>
+      <button data-xp="10" data-note="Deep work hour">Deep work +10</button>
       <button data-xp="20" data-note="Book finished">Book +20</button>
-      <button data-xp="50" data-note="PR / benchmark hit">PR +50</button>
-      <button data-xp="100" data-note="Business milestone">Milestone +100</button>
-      <button data-xp="100" data-note="Weekly quest">Weekly +100</button>
+      <button data-xp="50" data-note="PR hit">PR +50</button>
+      <button data-xp="100" data-note="Milestone">Milestone +100</button>
     </div>
 
     <h2>Adjustment</h2>
@@ -423,30 +635,54 @@ function viewLog(){
         <button class="sm" id="adjgo">Add</button>
       </div>
       <div class="small dim" style="margin-top:10px">
-        Corrections are logged as negative XP. Nothing is deleted — the arithmetic stays visible.
+        Corrections are logged as negative XP. History is preserved.
       </div>
     </div>
 
     <h2>History</h2>
-    <div class="card">${rows}</div>`;
+    <div class="card">${rows}</div>
+  `;
 }
 
 function viewMore(){
   return `
-    <h2>Benchmarks passed</h2>
-    <div class="card">${
-      state.benchmarks.length
-        ? state.benchmarks.map(b => `<div class="logrow"><span>${esc(b)}</span><span class="xp">+50</span></div>`).join('')
-        : '<div class="dim small">None recorded. Use the Test button on a stat.</div>'
-    }</div>
+    <h2>Profile</h2>
+    <div class="card">
+      <div class="field">
+        <label>Name</label>
+        <input id="profile-name" value="${esc(state.name)}" maxlength="40">
+      </div>
+      <button class="sm" id="profile-save">Save name</button>
+    </div>
 
-    <h2>Data</h2>
+    <h2>AI settings</h2>
+    <div class="card">
+      <div class="notice">
+        Used only when you click "Generate with AI" on a skill. The key stays on this device — never sent to anyone except the AI provider you choose. If you don't have a key, use the copy-paste route in the skill editor instead.
+      </div>
+      <div class="field">
+        <label>API key</label>
+        <input id="ai-key" type="password" value="${esc(state.settings.apiKey)}" placeholder="sk-...">
+      </div>
+      <div class="field">
+        <label>Base URL (OpenAI-compatible)</label>
+        <input id="ai-base" value="${esc(state.settings.apiBase)}">
+        <div class="hint">OpenAI: https://api.openai.com/v1 — OpenRouter: https://openrouter.ai/api/v1</div>
+      </div>
+      <div class="field">
+        <label>Model</label>
+        <input id="ai-model" value="${esc(state.settings.apiModel)}">
+      </div>
+      <button class="sm primary" id="ai-save">Save AI settings</button>
+    </div>
+
+    <h2>Backup</h2>
     <div class="card">
       <button class="primary" id="export" style="width:100%;margin-bottom:8px">Export backup</button>
       <button id="import" style="width:100%;margin-bottom:8px">Import backup</button>
-      <button class="ghost" id="reset" style="width:100%;color:var(--danger)">Reset everything</button>
+      <button class="ghost" id="startover" style="width:100%;color:var(--danger)">Start over (erase all)</button>
       <div class="small dim" style="margin-top:12px">
-        Your data lives in this browser only. Export before clearing browser data or switching devices.
+        Data lives in this browser only. Export weekly — clearing browser data erases it.
       </div>
     </div>
 
@@ -454,87 +690,426 @@ function viewMore(){
     <div class="card small dim">
       <p>XP for level n = 50 × n × (n−1). Skill XP for level L = 10 × L.</p>
       <p>Stats move only on a tested benchmark. A stat with no date is a claim, not a fact.</p>
-      <p>No XP for plans, lists or feelings. Log the same day. Never inflate.</p>
+      <p>No XP for plans, lists or feelings.</p>
+      <p>Streak = consecutive days with at least one quest done. No penalty for missing days — the streak just resets.</p>
+    </div>
+  `;
+}
+
+/* ════════════════════════════════════════════
+   MODALS
+   ════════════════════════════════════════════ */
+function closeModal(){ document.getElementById('modal').innerHTML = ''; }
+
+function openModal(html){
+  document.getElementById('modal').innerHTML = `
+    <div class="modal-bg" onclick="if(event.target===this)closeModal()">
+      <div class="modal">${html}</div>
     </div>`;
 }
 
-/* ─────────────────────────────────────────
-   EVENTS
-   ───────────────────────────────────────── */
+/* — SKILL EDITOR — */
+function openSkillEditor(skillId){
+  const skill = skillId ? state.skills.find(s => s.id === skillId) : null;
+  const isNew = !skill;
+  const draft = skill ? JSON.parse(JSON.stringify(skill)) : makeStandardSkill('New skill');
 
+  renderEditor();
+
+  function renderEditor(){
+    const isWorkout = draft.type === 'workout';
+
+    const questSection = isWorkout ? `
+      <div class="field">
+        <label>Exercises</label>
+        <div id="exercises">
+          ${draft.plan.exercises.map((e, i) => `
+            <div class="exercise-row">
+              <input placeholder="Name" value="${esc(e.name)}" data-ex="${i}" data-key="name">
+              <input type="number" min="1" placeholder="Sets" value="${e.sets}" data-ex="${i}" data-key="sets">
+              <input type="number" min="1" placeholder="Reps" value="${e.reps}" data-ex="${i}" data-key="reps">
+              <button class="sm ghost danger" data-remove-ex="${i}">×</button>
+            </div>
+          `).join('')}
+        </div>
+        <button class="sm" id="add-ex" style="margin-top:8px">+ Add exercise</button>
+        <div class="hint">Reps field is seconds for holds (plank).</div>
+      </div>
+      <div class="field">
+        <label>Workout days</label>
+        <div class="grid" style="grid-template-columns:repeat(4,1fr)">
+          ${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((d, i) => `
+            <button class="sm ${draft.plan.workoutDays.includes(i) ? 'primary' : 'ghost'}" data-wday="${i}">${d}</button>
+          `).join('')}
+        </div>
+      </div>
+      <div class="field">
+        <label>Attempt day (test max reps)</label>
+        <div class="grid" style="grid-template-columns:repeat(4,1fr)">
+          ${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((d, i) => `
+            <button class="sm ${draft.plan.attemptDay === i ? 'primary' : 'ghost'}" data-aday="${i}">${d}</button>
+          `).join('')}
+        </div>
+      </div>
+    ` : `
+      <div class="field">
+        <label>Daily quests</label>
+        <div id="quests">
+          ${draft.quests.map((q, i) => `
+            <div class="exercise-row" style="grid-template-columns:1fr 70px 30px">
+              <input value="${esc(q.text)}" data-q="${i}" data-key="text">
+              <input type="number" min="1" value="${q.xp}" data-q="${i}" data-key="xp">
+              <button class="sm ghost danger" data-remove-q="${i}">×</button>
+            </div>
+          `).join('')}
+        </div>
+        <button class="sm" id="add-q" style="margin-top:8px">+ Add quest</button>
+      </div>
+      <button class="sm ghost" id="gen-ai" style="width:100%;margin-top:8px">✨ Generate quests with AI</button>
+    `;
+
+    openModal(`
+      <h2>${isNew ? 'New skill' : 'Edit skill'}</h2>
+      <div class="field">
+        <label>Name</label>
+        <input id="sk-name" value="${esc(draft.name)}" maxlength="40">
+      </div>
+      <div class="field">
+        <label>Type</label>
+        <div class="row" style="gap:8px">
+          <button class="sm ${draft.type==='standard'?'primary':'ghost'}" id="type-std" style="flex:1">Standard</button>
+          <button class="sm ${draft.type==='workout'?'primary':'ghost'}" id="type-wk" style="flex:1">Workout plan</button>
+        </div>
+        <div class="hint">Workout plans show as one full session, with a weekly attempt day.</div>
+      </div>
+      ${questSection}
+      <div class="row" style="gap:8px;margin-top:16px">
+        <button class="ghost" id="cancel" style="flex:1">Cancel</button>
+        <button class="primary" id="save" style="flex:2">${isNew ? 'Create' : 'Save'}</button>
+      </div>
+    `);
+
+    // bind
+    document.getElementById('cancel').onclick = closeModal;
+    document.getElementById('sk-name').oninput = e => { draft.name = e.target.value; };
+    document.getElementById('type-std').onclick = () => {
+      if (draft.type === 'standard') return;
+      draft.type = 'standard';
+      draft.quests = [{ id: newId(), text: `${draft.name || 'Practice'} — 20 min`, xp: 5 }];
+      renderEditor();
+    };
+    document.getElementById('type-wk').onclick = () => {
+      if (draft.type === 'workout') return;
+      draft.type = 'workout';
+      draft.plan = makeWorkoutSkill('').plan;
+      renderEditor();
+    };
+    document.getElementById('save').onclick = () => {
+      if (!draft.name.trim()) return alert('Name required.');
+      if (isNew){
+        draft.id = newId();
+        draft.level = 1; draft.xp = 0; draft.active = true;
+        state.skills.push(draft);
+      } else {
+        const i = state.skills.findIndex(s => s.id === draft.id);
+        state.skills[i] = draft;
+      }
+      save(); closeModal();
+    };
+
+    if (draft.type === 'standard'){
+      document.getElementById('add-q').onclick = () => {
+        draft.quests.push({ id: newId(), text: '', xp: 5 });
+        renderEditor();
+      };
+      document.querySelectorAll('[data-remove-q]').forEach(b => {
+        b.onclick = () => {
+          draft.quests.splice(+b.dataset.removeQ, 1);
+          renderEditor();
+        };
+      });
+      document.querySelectorAll('[data-q]').forEach(el => {
+        el.oninput = () => {
+          const i = +el.dataset.q, k = el.dataset.key;
+          draft.quests[i][k] = k === 'xp' ? parseInt(el.value, 10) || 1 : el.value;
+        };
+      });
+      document.getElementById('gen-ai').onclick = () => openAIGenerator(draft, renderEditor);
+    } else {
+      document.getElementById('add-ex').onclick = () => {
+        draft.plan.exercises.push({ name: '', sets: 3, reps: 10, unit: 'reps' });
+        renderEditor();
+      };
+      document.querySelectorAll('[data-remove-ex]').forEach(b => {
+        b.onclick = () => {
+          draft.plan.exercises.splice(+b.dataset.removeEx, 1);
+          renderEditor();
+        };
+      });
+      document.querySelectorAll('[data-ex]').forEach(el => {
+        el.oninput = () => {
+          const i = +el.dataset.ex, k = el.dataset.key;
+          draft.plan.exercises[i][k] = (k === 'sets' || k === 'reps')
+            ? parseInt(el.value, 10) || 1 : el.value;
+        };
+      });
+      document.querySelectorAll('[data-wday]').forEach(b => {
+        b.onclick = () => {
+          const d = +b.dataset.wday;
+          const i = draft.plan.workoutDays.indexOf(d);
+          if (i >= 0) draft.plan.workoutDays.splice(i, 1);
+          else draft.plan.workoutDays.push(d);
+          renderEditor();
+        };
+      });
+      document.querySelectorAll('[data-aday]').forEach(b => {
+        b.onclick = () => { draft.plan.attemptDay = +b.dataset.aday; renderEditor(); };
+      });
+    }
+  }
+}
+
+/* — AI GENERATOR — */
+function openAIGenerator(draft, back){
+  const prompt = buildAIPrompt(draft.name || 'the skill', draft.level || 1);
+  const key = state.settings.apiKey;
+  const base = state.settings.apiBase;
+  const model = state.settings.apiModel;
+
+  openModal(`
+    <h2>Generate quests</h2>
+    <div class="notice">
+      <b>Route 1 — API.</b> If you've saved an API key in More → AI settings, tap Generate below.<br><br>
+      <b>Route 2 — manual.</b> Copy the prompt, paste it into ChatGPT or any AI, then paste the JSON array back into the box.
+    </div>
+
+    <div class="field">
+      <label>Prompt</label>
+      <textarea id="ai-prompt" rows="6" readonly>${esc(prompt)}</textarea>
+      <button class="sm" id="copy-prompt" style="margin-top:8px">Copy prompt</button>
+    </div>
+
+    ${key ? `
+      <button class="primary" id="ai-run" style="width:100%">Generate via API (${esc(model)})</button>
+      <div id="ai-status" class="small dim" style="margin-top:8px;text-align:center"></div>
+    ` : `
+      <div class="small dim" style="margin-bottom:12px">No API key saved. Use the manual route, or add a key in More → AI settings.</div>
+    `}
+
+    <div class="field" style="margin-top:16px">
+      <label>Result (one quest per line, or paste the JSON array)</label>
+      <textarea id="ai-result" rows="6" placeholder='["Quest 1","Quest 2",...] or one per line'></textarea>
+    </div>
+
+    <div class="row" style="gap:8px">
+      <button class="ghost" id="ai-cancel" style="flex:1">Cancel</button>
+      <button class="primary" id="ai-add" style="flex:2">Add quests</button>
+    </div>
+  `);
+
+  document.getElementById('ai-cancel').onclick = closeModal;
+  document.getElementById('copy-prompt').onclick = () => {
+    const el = document.getElementById('ai-prompt');
+    el.select(); document.execCommand('copy');
+    document.getElementById('copy-prompt').textContent = 'Copied ✓';
+    setTimeout(() => { document.getElementById('copy-prompt').textContent = 'Copy prompt'; }, 1500);
+  };
+  const runBtn = document.getElementById('ai-run');
+  if (runBtn) runBtn.onclick = async () => {
+    const status = document.getElementById('ai-status');
+    status.textContent = 'Generating…';
+    try {
+      const arr = await callAI(prompt, key, base, model);
+      document.getElementById('ai-result').value = JSON.stringify(arr, null, 2);
+      status.textContent = `Got ${arr.length} quests. Review, then tap Add.`;
+    } catch(e){
+      status.textContent = 'Failed: ' + e.message;
+      status.style.color = 'var(--danger)';
+    }
+  };
+  document.getElementById('ai-add').onclick = () => {
+    let text = document.getElementById('ai-result').value.trim();
+    if (!text) return alert('Paste or generate quests first.');
+    let arr;
+    try {
+      if (text.startsWith('[')) arr = JSON.parse(text);
+      else arr = text.split('\n').map(l => l.trim()).filter(Boolean);
+    } catch(e){
+      return alert('Could not parse. Use a JSON array, or one quest per line.');
+    }
+    if (!Array.isArray(arr) || arr.length === 0) return alert('No quests found.');
+    arr.forEach(q => {
+      draft.quests.push({ id: newId(), text: String(q), xp: 5 });
+    });
+    closeModal();
+    back();
+  };
+}
+
+/* — ATTEMPT DAY — */
+function openAttemptDay(skillId){
+  const skill = state.skills.find(s => s.id === skillId);
+  if (!skill || skill.type !== 'workout') return;
+
+  openModal(`
+    <h2>${esc(skill.name)} — Attempt day</h2>
+    <p class="small dim">Enter your max for each exercise. Next week's working sets will become ~65% of your max. You can edit the plan afterwards.</p>
+    ${skill.plan.exercises.map((e, i) => `
+      <div class="field">
+        <label>${esc(e.name)} · current ${e.sets}×${e.reps}${e.unit === 'sec' ? 's' : ''}</label>
+        <input type="number" min="0" data-max="${i}" placeholder="max ${e.unit}">
+      </div>
+    `).join('')}
+    <div class="row" style="gap:8px;margin-top:12px">
+      <button class="ghost" id="at-cancel" style="flex:1">Cancel</button>
+      <button class="primary" id="at-save" style="flex:2">Save & update plan</button>
+    </div>
+  `);
+
+  document.getElementById('at-cancel').onclick = closeModal;
+  document.getElementById('at-save').onclick = () => {
+    let changed = false;
+    skill.plan.exercises.forEach((e, i) => {
+      const input = document.querySelector(`[data-max="${i}"]`);
+      const max = parseInt(input.value, 10);
+      if (!isNaN(max) && max > 0){
+        const suggested = Math.max(1, Math.round(max * 0.65));
+        e.reps = suggested;
+        changed = true;
+      }
+    });
+    if (changed){
+      // mark attempt quest done and award XP
+      const qid = `${skill.id}:attempt`;
+      const t = today();
+      state.quests[t] = state.quests[t] || {};
+      if (!state.quests[t][qid]){
+        state.quests[t][qid] = true;
+        addXP(50, `${skill.name} attempt day`);
+        addSkillXP(skill, 50);
+        state.benchmarks.unshift(`${skill.name} attempt — ${t}`);
+        updateStreak();
+      }
+      save();
+    }
+    closeModal();
+  };
+}
+
+/* — PROFILE / SETTINGS / BACKUP — */
+function importBackup(){
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'application/json';
+  input.onchange = e => {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        state = Object.assign(defaultState(), JSON.parse(reader.result));
+        save();
+      } catch(e){ alert('Could not read that file.'); }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
+/* ════════════════════════════════════════════
+   EVENT BINDING
+   ════════════════════════════════════════════ */
 function bind(){
-  document.querySelectorAll('[data-quest]').forEach(el =>
-    el.onclick = () => toggleQuest(+el.dataset.quest));
-
-  document.querySelectorAll('[data-xp]').forEach(el =>
+  document.querySelectorAll('[data-quest]').forEach(el => {
     el.onclick = () => {
-      addXP(+el.dataset.xp, el.dataset.note);
-      save();
-    });
-
-  document.querySelectorAll('[data-log]').forEach(btn =>
-    btn.onclick = () => {
-      const id = btn.dataset.log;
-      const input = document.querySelector(`[data-mins="${id}"]`);
-      const mins = parseInt(input.value, 10);
-      if (!mins || mins <= 0) return;
-      const skill = state.skills.find(s => s.id === id);
-      const xp = Math.round(mins / 6);
-      if (xp <= 0) return;
-      const leveled = addSkillXP(skill, xp);
-      addXP(xp, `${skill.name} ${mins} min`);
-      if (leveled) addXP(0, `${skill.name} reached Lv ${skill.level}`);
-      input.value = '';
-      save();
-    });
-
-  document.querySelectorAll('[data-toggle]').forEach(btn =>
-    btn.onclick = () => {
-      const skill = state.skills.find(s => s.id === btn.dataset.toggle);
-      const activeCount = state.skills.filter(s => s.active).length;
-      if (!skill.active && activeCount >= 4){
-        alert('Four skills are already active. Queue one first.');
+      const qid = el.dataset.quest;
+      const list = questsForToday();
+      const quest = list.find(q => q.id === qid);
+      if (!quest) return;
+      // attempt quests open a modal
+      if (quest.kind === 'attempt'){
+        if (isQuestDone(qid)) {
+          // allow un-ticking? treat as confirmation of removal
+          if (confirm('This attempt is already logged. Undo it?')){
+            const t = today();
+            if (state.quests[t] && state.quests[t][qid]){
+              delete state.quests[t][qid];
+              save();
+            }
+          }
+          return;
+        }
+        openAttemptDay(quest.skillId);
         return;
       }
-      skill.active = !skill.active;
-      save();
-    });
+      toggleQuest(quest);
+    };
+  });
 
-  document.querySelectorAll('[data-stat]').forEach(btn =>
-    btn.onclick = () => {
-      const k = btn.dataset.stat;
-      const v = prompt(`New ${k} value (only after a passed benchmark):`, state.stats[k]);
+  document.querySelectorAll('[data-xp]').forEach(el => {
+    el.onclick = () => { addXP(+el.dataset.xp, el.dataset.note); save(); };
+  });
+
+  document.querySelectorAll('[data-stat]').forEach(b => {
+    b.onclick = () => {
+      const k = b.dataset.stat;
+      const v = prompt(`New ${k} value (only after passing a benchmark):`, state.stats[k]);
       if (v === null) return;
       const n = parseInt(v, 10);
       if (isNaN(n) || n < 1 || n > 100) return;
       state.stats[k] = n;
       state.statDates[k] = today();
       state.benchmarks.unshift(`${k} ${n} — ${today()}`);
-      addXP(50, `Benchmark passed: ${k} ${n}`);
+      addXP(50, `Benchmark: ${k} ${n}`);
       save();
-    });
+    };
+  });
 
-  document.querySelectorAll('[data-main]').forEach(btn =>
-    btn.onclick = () => {
-      const i = +btn.dataset.main;
-      if (!confirm(`Complete: ${state.mainQuests[i]}?`)) return;
-      addXP(500, `Main quest: ${state.mainQuests[i]}`);
-      state.mainQuests.splice(i, 1);
+  const addSkill = document.getElementById('add-skill');
+  if (addSkill) addSkill.onclick = () => openSkillEditor();
+
+  document.querySelectorAll('[data-edit]').forEach(b => {
+    b.onclick = () => openSkillEditor(b.dataset.edit);
+  });
+  document.querySelectorAll('[data-toggle]').forEach(b => {
+    b.onclick = () => {
+      const skill = state.skills.find(s => s.id === b.dataset.toggle);
+      skill.active = !skill.active;
       save();
-    });
+    };
+  });
+  document.querySelectorAll('[data-delete]').forEach(b => {
+    b.onclick = () => {
+      const skill = state.skills.find(s => s.id === b.dataset.delete);
+      if (!confirm(`Delete "${skill.name}"? This cannot be undone.`)) return;
+      state.skills = state.skills.filter(s => s.id !== b.dataset.delete);
+      save();
+    };
+  });
 
   const adjgo = document.getElementById('adjgo');
   if (adjgo) adjgo.onclick = () => {
     const xp = parseInt(document.getElementById('adj').value, 10);
     const note = document.getElementById('adjnote').value || 'Adjustment';
     if (!xp) return;
-    addXP(xp, note);
+    addXP(xp, note); save();
+  };
+
+  const pSave = document.getElementById('profile-save');
+  if (pSave) pSave.onclick = () => {
+    state.name = document.getElementById('profile-name').value.trim();
+    save();
+  };
+
+  const aiSave = document.getElementById('ai-save');
+  if (aiSave) aiSave.onclick = () => {
+    state.settings.apiKey = document.getElementById('ai-key').value.trim();
+    state.settings.apiBase = document.getElementById('ai-base').value.trim() || 'https://api.openai.com/v1';
+    state.settings.apiModel = document.getElementById('ai-model').value.trim() || 'gpt-4o-mini';
     save();
   };
 
   const exp = document.getElementById('export');
   if (exp) exp.onclick = () => {
-    const blob = new Blob([JSON.stringify(state, null, 2)], {type:'application/json'});
+    const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `system-backup-${today()}.json`;
@@ -542,38 +1117,27 @@ function bind(){
   };
 
   const imp = document.getElementById('import');
-  if (imp) imp.onclick = () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'application/json';
-    input.onchange = e => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        try{
-          state = Object.assign(DEFAULT_STATE(), JSON.parse(reader.result));
-          save();
-        }catch(err){ alert('That file could not be read.'); }
-      };
-      reader.readAsText(file);
-    };
-    input.click();
-  };
+  if (imp) imp.onclick = importBackup;
 
-  const rst = document.getElementById('reset');
-  if (rst) rst.onclick = () => {
-    if (!confirm('Delete all progress? Export first.')) return;
-    if (!confirm('Really? This cannot be undone.')) return;
+  const startOver = document.getElementById('startover');
+  if (startOver) startOver.onclick = () => {
+    if (!confirm('Erase everything and start over? Export first if unsure.')) return;
+    if (!confirm('Really erase all progress?')) return;
     localStorage.removeItem(KEY);
-    state = DEFAULT_STATE();
+    state = defaultState();
+    onboardStep = 1;
+    onboardDraft.name = '';
+    onboardDraft.stats = { STR: 10, AGI: 5, VIT: 10, INT: 5, PER: 5 };
+    onboardDraft.selected = new Set(['calisthenics','reading','business','coding']);
     save();
   };
 }
 
-document.querySelectorAll('nav button').forEach(b =>
-  b.onclick = () => { tab = b.dataset.tab; render(); });
+document.querySelectorAll('#nav button').forEach(b => {
+  b.onclick = () => { tab = b.dataset.tab; render(); };
+});
 
+// start
 render();
 </script>
 </body>

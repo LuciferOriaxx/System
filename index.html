@@ -1140,4 +1140,570 @@ function openLadderAI(skill, back){
     </div>
   `);
 
-  document.getElementById('la-cancel').onclick =
+  document.getElementById('la-cancel').onclick = closeModal;
+  document.getElementById('la-copy').onclick = () => {
+    const el = document.getElementById('la-prompt');
+    el.select(); document.execCommand('copy');
+    const b = document.getElementById('la-copy');
+    b.textContent = 'Copied ✓';
+    setTimeout(() => { b.textContent = 'Copy prompt'; }, 1500);
+  };
+  const runBtn = document.getElementById('la-run');
+  if (runBtn) runBtn.onclick = async () => {
+    const status = document.getElementById('la-status');
+    status.textContent = 'Generating…';
+    try {
+      const arr = await callAI(prompt, key, base, model);
+      document.getElementById('la-result').value = JSON.stringify(arr, null, 2);
+      status.textContent = `Got ${arr.length} milestones. Review, then tap Replace.`;
+    } catch(e){
+      status.textContent = 'Failed: ' + e.message;
+      status.style.color = 'var(--danger)';
+    }
+  };
+  document.getElementById('la-save').onclick = () => {
+    const text = document.getElementById('la-result').value.trim();
+    if (!text) return alert('Paste or generate milestones first.');
+    let arr;
+    try {
+      arr = text.startsWith('[') ? JSON.parse(text)
+        : text.split('\n').map(l => l.trim()).filter(Boolean);
+    } catch(e){ return alert('Could not parse. Use a JSON array, or one per line.'); }
+    if (!Array.isArray(arr) || !arr.length) return alert('No milestones found.');
+    skill.ladder = arr.map(String);
+    skill.ladderDone = [];
+    save(); closeModal(); back();
+  };
+}
+
+/* — SKILL EDITOR — */
+function openSkillEditor(skillId){
+  const skill = skillId ? state.skills.find(s => s.id === skillId) : null;
+  const isNew = !skill;
+  const draft = skill ? JSON.parse(JSON.stringify(skill)) : makeSkillFromTemplate({ subtype: 'custom', label: 'New skill' }, 'New skill');
+  draft.ladderDone = draft.ladderDone || [];
+  renderEditor();
+
+  function renderEditor(){
+    const isWorkout = draft.type === 'workout';
+    const questSection = isWorkout ? `
+      <div class="field">
+        <label>Exercises</label>
+        <div id="exercises">
+          ${draft.plan.exercises.map((e, i) => `
+            <div class="exercise-row">
+              <input placeholder="Name" value="${esc(e.name)}" data-ex="${i}" data-key="name">
+              <input type="number" min="1" placeholder="Sets" value="${e.sets}" data-ex="${i}" data-key="sets">
+              <input type="number" min="1" placeholder="Reps" value="${e.reps}" data-ex="${i}" data-key="reps">
+              <button class="sm ghost danger" data-remove-ex="${i}">×</button>
+            </div>
+          `).join('')}
+        </div>
+        <button class="sm" id="add-ex" style="margin-top:8px">+ Add exercise</button>
+        <div class="hint">Reps field is seconds for holds (plank).</div>
+      </div>
+      <div class="field">
+        <label>Workout days</label>
+        <div class="grid" style="grid-template-columns:repeat(4,1fr)">
+          ${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((d, i) => `
+            <button class="sm ${draft.plan.workoutDays.includes(i) ? 'primary' : 'ghost'}" data-wday="${i}">${d}</button>
+          `).join('')}
+        </div>
+      </div>
+      <div class="field">
+        <label>Attempt day (test max reps)</label>
+        <div class="grid" style="grid-template-columns:repeat(4,1fr)">
+          ${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((d, i) => `
+            <button class="sm ${draft.plan.attemptDay === i ? 'primary' : 'ghost'}" data-aday="${i}">${d}</button>
+          `).join('')}
+        </div>
+      </div>
+    ` : `
+      <div class="field">
+        <label>Daily quests</label>
+        <div id="quests">
+          ${draft.quests.map((q, i) => `
+            <div class="exercise-row" style="grid-template-columns:1fr 70px 30px">
+              <input value="${esc(q.text)}" data-q="${i}" data-key="text">
+              <input type="number" min="1" value="${q.xp}" data-q="${i}" data-key="xp">
+              <button class="sm ghost danger" data-remove-q="${i}">×</button>
+            </div>
+          `).join('')}
+        </div>
+        <button class="sm" id="add-q" style="margin-top:8px">+ Add quest</button>
+      </div>
+      <button class="sm ghost" id="gen-ai" style="width:100%;margin-top:8px">✨ Generate quests with AI</button>
+    `;
+
+    openModal(`
+      <h2>${isNew ? 'New skill' : 'Edit skill'}</h2>
+      <div class="field">
+        <label>Name</label>
+        <input id="sk-name" value="${esc(draft.name)}" maxlength="40">
+      </div>
+      <div class="field">
+        <label>Status (where you are now)</label>
+        <input id="sk-status" value="${esc(draft.status || '')}" placeholder="e.g. Complete beginner, or A1">
+      </div>
+      <div class="field">
+        <label>Type</label>
+        <div class="row" style="gap:8px">
+          <button class="sm ${draft.type==='standard'?'primary':'ghost'}" id="type-std" style="flex:1">Standard</button>
+          <button class="sm ${draft.type==='workout'?'primary':'ghost'}" id="type-wk" style="flex:1">Workout plan</button>
+        </div>
+      </div>
+      ${questSection}
+      <div class="row" style="gap:8px;margin-top:16px">
+        <button class="ghost" id="cancel" style="flex:1">Cancel</button>
+        <button class="primary" id="save" style="flex:2">${isNew ? 'Create' : 'Save'}</button>
+      </div>
+    `);
+
+    document.getElementById('cancel').onclick = closeModal;
+    document.getElementById('sk-name').oninput = e => { draft.name = e.target.value; };
+    document.getElementById('sk-status').oninput = e => { draft.status = e.target.value; };
+    document.getElementById('type-std').onclick = () => {
+      if (draft.type === 'standard') return;
+      draft.type = 'standard';
+      draft.quests = [{ id: newId(), text: `${draft.name || 'Practice'} — 20 min`, xp: 5 }];
+      delete draft.plan;
+      renderEditor();
+    };
+    document.getElementById('type-wk').onclick = () => {
+      if (draft.type === 'workout') return;
+      draft.type = 'workout';
+      draft.plan = {
+        exercises: [
+          { name: 'Pushups', sets: 4, reps: 15, unit: 'reps' },
+          { name: 'Squats', sets: 4, reps: 20, unit: 'reps' },
+          { name: 'Chair dips', sets: 4, reps: 10, unit: 'reps' },
+          { name: 'Crunches', sets: 4, reps: 20, unit: 'reps' },
+          { name: 'Plank', sets: 4, reps: 45, unit: 'sec' }
+        ],
+        workoutDays: [1, 3, 5], attemptDay: 0
+      };
+      delete draft.quests;
+      renderEditor();
+    };
+    document.getElementById('save').onclick = () => {
+      if (!draft.name.trim()) return alert('Name required.');
+      if (isNew){
+        draft.id = newId();
+        draft.level = 1; draft.xp = 0; draft.active = true;
+        if (!draft.ladder) draft.ladder = defaultLadderFor(draft.subtype || 'custom');
+        if (!draft.ladderDone) draft.ladderDone = [];
+        state.skills.push(draft);
+      } else {
+        const i = state.skills.findIndex(s => s.id === draft.id);
+        state.skills[i] = draft;
+      }
+      save(); closeModal();
+    };
+
+    if (draft.type === 'standard'){
+      document.getElementById('add-q').onclick = () => {
+        draft.quests.push({ id: newId(), text: '', xp: 5 });
+        renderEditor();
+      };
+      document.querySelectorAll('[data-remove-q]').forEach(b => {
+        b.onclick = () => { draft.quests.splice(+b.dataset.removeQ, 1); renderEditor(); };
+      });
+      document.querySelectorAll('[data-q]').forEach(el => {
+        el.oninput = () => {
+          const i = +el.dataset.q, k = el.dataset.key;
+          draft.quests[i][k] = k === 'xp' ? parseInt(el.value, 10) || 1 : el.value;
+        };
+      });
+      document.getElementById('gen-ai').onclick = () => openAIGenerator(draft, renderEditor);
+    } else {
+      document.getElementById('add-ex').onclick = () => {
+        draft.plan.exercises.push({ name: '', sets: 3, reps: 10, unit: 'reps' });
+        renderEditor();
+      };
+      document.querySelectorAll('[data-remove-ex]').forEach(b => {
+        b.onclick = () => { draft.plan.exercises.splice(+b.dataset.removeEx, 1); renderEditor(); };
+      });
+      document.querySelectorAll('[data-ex]').forEach(el => {
+        el.oninput = () => {
+          const i = +el.dataset.ex, k = el.dataset.key;
+          draft.plan.exercises[i][k] = (k === 'sets' || k === 'reps')
+            ? parseInt(el.value, 10) || 1 : el.value;
+        };
+      });
+      document.querySelectorAll('[data-wday]').forEach(b => {
+        b.onclick = () => {
+          const d = +b.dataset.wday;
+          const i = draft.plan.workoutDays.indexOf(d);
+          if (i >= 0) draft.plan.workoutDays.splice(i, 1);
+          else draft.plan.workoutDays.push(d);
+          renderEditor();
+        };
+      });
+      document.querySelectorAll('[data-aday]').forEach(b => {
+        b.onclick = () => { draft.plan.attemptDay = +b.dataset.aday; renderEditor(); };
+      });
+    }
+  }
+}
+
+/* — QUEST AI — */
+function openAIGenerator(draft, back){
+  const prompt = buildQuestAIPrompt(draft.name || 'the skill', draft.level || 1);
+  const key = state.settings.apiKey;
+  const base = state.settings.apiBase;
+  const model = state.settings.apiModel;
+
+  openModal(`
+    <h2>Generate quests</h2>
+    <div class="notice"><b>Route 1 — API.</b> If you've saved a key in More → AI settings, tap Generate.<br><br><b>Route 2 — manual.</b> Copy the prompt, paste into ChatGPT, paste the JSON array back.</div>
+    <div class="field">
+      <label>Prompt</label>
+      <textarea id="ai-prompt" rows="6" readonly>${esc(prompt)}</textarea>
+      <button class="sm" id="copy-prompt" style="margin-top:8px">Copy prompt</button>
+    </div>
+    ${key ? `<button class="primary" id="ai-run" style="width:100%">Generate via API (${esc(model)})</button>
+             <div id="ai-status" class="small dim" style="margin-top:8px;text-align:center"></div>`
+          : `<div class="small dim" style="margin-bottom:12px">No API key saved. Use the manual route.</div>`}
+    <div class="field" style="margin-top:16px">
+      <label>Result (JSON array or one per line)</label>
+      <textarea id="ai-result" rows="6" placeholder='["Quest 1","Quest 2",...]'></textarea>
+    </div>
+    <div class="row" style="gap:8px">
+      <button class="ghost" id="ai-cancel" style="flex:1">Cancel</button>
+      <button class="primary" id="ai-add" style="flex:2">Add quests</button>
+    </div>
+  `);
+
+  document.getElementById('ai-cancel').onclick = closeModal;
+  document.getElementById('copy-prompt').onclick = () => {
+    const el = document.getElementById('ai-prompt');
+    el.select(); document.execCommand('copy');
+    const b = document.getElementById('copy-prompt');
+    b.textContent = 'Copied ✓';
+    setTimeout(() => { b.textContent = 'Copy prompt'; }, 1500);
+  };
+  const runBtn = document.getElementById('ai-run');
+  if (runBtn) runBtn.onclick = async () => {
+    const status = document.getElementById('ai-status');
+    status.textContent = 'Generating…';
+    try {
+      const arr = await callAI(prompt, key, base, model);
+      document.getElementById('ai-result').value = JSON.stringify(arr, null, 2);
+      status.textContent = `Got ${arr.length} quests. Review, then tap Add.`;
+    } catch(e){
+      status.textContent = 'Failed: ' + e.message;
+      status.style.color = 'var(--danger)';
+    }
+  };
+  document.getElementById('ai-add').onclick = () => {
+    const text = document.getElementById('ai-result').value.trim();
+    if (!text) return alert('Paste or generate quests first.');
+    let arr;
+    try {
+      arr = text.startsWith('[') ? JSON.parse(text)
+        : text.split('\n').map(l => l.trim()).filter(Boolean);
+    } catch(e){ return alert('Could not parse. Use a JSON array, or one per line.'); }
+    if (!Array.isArray(arr) || !arr.length) return alert('No quests found.');
+    arr.forEach(q => draft.quests.push({ id: newId(), text: String(q), xp: 5 }));
+    closeModal(); back();
+  };
+}
+
+/* — ATTEMPT DAY — */
+function openAttemptDay(skillId){
+  const skill = state.skills.find(s => s.id === skillId);
+  if (!skill || skill.type !== 'workout') return;
+
+  openModal(`
+    <h2>${esc(skill.name)} — Attempt day</h2>
+    <p class="small dim">Enter your max for each exercise. Next week's working sets become ~65% of your max. You can edit the plan afterwards.</p>
+    ${skill.plan.exercises.map((e, i) => `
+      <div class="field">
+        <label>${esc(e.name)} · current ${e.sets}×${e.reps}${e.unit === 'sec' ? 's' : ''}</label>
+        <input type="number" min="0" data-max="${i}" placeholder="max ${e.unit}">
+      </div>
+    `).join('')}
+    <div class="row" style="gap:8px;margin-top:12px">
+      <button class="ghost" id="at-cancel" style="flex:1">Cancel</button>
+      <button class="primary" id="at-save" style="flex:2">Save & update plan</button>
+    </div>
+  `);
+
+  document.getElementById('at-cancel').onclick = closeModal;
+  document.getElementById('at-save').onclick = () => {
+    let changed = false;
+    skill.plan.exercises.forEach((e, i) => {
+      const input = document.querySelector(`[data-max="${i}"]`);
+      const max = parseInt(input.value, 10);
+      if (!isNaN(max) && max > 0){
+        e.reps = Math.max(1, Math.round(max * 0.65));
+        changed = true;
+      }
+    });
+    if (changed){
+      const qid = `${skill.id}:attempt`;
+      const t = today();
+      state.quests[t] = state.quests[t] || {};
+      if (!state.quests[t][qid]){
+        state.quests[t][qid] = true;
+        addXP(50, `${skill.name} attempt day`);
+        addSkillXP(skill, 50);
+        state.benchmarks.unshift(`${skill.name} attempt — ${t}`);
+        updateStreak();
+      }
+      save();
+    }
+    closeModal();
+  };
+}
+
+/* — SKILL PICKER MODAL — */
+function openSkillPicker(onCreated){
+  let selected = null;
+
+  function renderPicker(){
+    if (!selected){
+      openModal(`
+        <h2>Add a skill</h2>
+        <p class="small dim">Pick a category to see specific options.</p>
+        <div style="margin-top:12px">
+          ${SKILL_SUGGESTIONS.map(sug => `
+            <div class="skill-row" data-pick-cat="${sug.id}">
+              <span>${esc(sug.label)}</span>
+              <span class="dim">›</span>
+            </div>
+          `).join('')}
+          <div class="skill-row" data-pick-custom="1">
+            <span>Custom skill</span>
+            <span class="dim">›</span>
+          </div>
+        </div>
+        <div class="row" style="gap:8px;margin-top:16px">
+          <button class="ghost" id="sp-cancel" style="width:100%">Cancel</button>
+        </div>
+      `);
+      document.getElementById('sp-cancel').onclick = closeModal;
+      document.querySelectorAll('[data-pick-cat]').forEach(el => {
+        el.onclick = () => {
+          selected = SKILL_SUGGESTIONS.find(s => s.id === el.dataset.pickCat);
+          renderPicker();
+        };
+      });
+      document.querySelector('[data-pick-custom]').onclick = () => {
+        selected = { custom: true }; renderPicker();
+      };
+      return;
+    }
+
+    if (selected.custom){
+      openModal(`
+        <h2>Custom skill</h2>
+        <div class="field">
+          <label>Name</label>
+          <input id="sp-name" placeholder="e.g., Chess, Pottery, Mandarin">
+        </div>
+        <div class="field">
+          <label>Current status (optional)</label>
+          <input id="sp-status" placeholder="e.g., Complete beginner">
+        </div>
+        <div class="row" style="gap:8px">
+          <button class="ghost" id="sp-back" style="flex:1">Back</button>
+          <button class="primary" id="sp-create" style="flex:2">Add</button>
+        </div>
+      `);
+      document.getElementById('sp-back').onclick = () => { selected = null; renderPicker(); };
+      document.getElementById('sp-create').onclick = () => {
+        const name = document.getElementById('sp-name').value.trim();
+        if (!name) return alert('Name required.');
+        const status = document.getElementById('sp-status').value.trim();
+        const skill = makeSkillFromTemplate({ subtype: 'custom', label: name }, name);
+        skill.status = status;
+        onCreated(skill); closeModal();
+      };
+      return;
+    }
+
+    openModal(`
+      <h2>${esc(selected.label)}</h2>
+      <p class="small dim">${esc(selected.ask)}</p>
+      <div style="margin-top:12px">
+        ${selected.options.map(opt => `
+          <div class="skill-row" data-pick-opt="${esc(opt)}">
+            <span>${esc(opt)}</span>
+            <span class="dim">›</span>
+          </div>
+        `).join('')}
+      </div>
+      <div class="row" style="gap:8px;margin-top:16px">
+        <button class="ghost" id="sp-back" style="width:100%">Back</button>
+      </div>
+    `);
+    document.getElementById('sp-back').onclick = () => { selected = null; renderPicker(); };
+    document.querySelectorAll('[data-pick-opt]').forEach(el => {
+      el.onclick = () => {
+        const opt = el.dataset.pickOpt;
+        const skill = makeSkillFromTemplate(selected, opt);
+        onCreated(skill); closeModal();
+      };
+    });
+  }
+
+  renderPicker();
+}
+
+/* — BACKUP — */
+function importBackup(){
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'application/json';
+  input.onchange = e => {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        state = Object.assign(defaultState(), JSON.parse(reader.result));
+        if (state.skills) state.skills = state.skills.map(migrateSkill);
+        if (!state.equipment) state.equipment = [];
+        save();
+      } catch(e){ alert('Could not read that file.'); }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
+/* ═════ BIND ═════ */
+function bind(){
+  document.querySelectorAll('[data-nav]').forEach(el => {
+    el.onclick = () => navTo(el.dataset.nav);
+  });
+
+  document.querySelectorAll('[data-skill-card]').forEach(el => {
+    el.onclick = () => openSkillDetail(el.dataset.skillCard);
+  });
+
+  document.querySelectorAll('[data-quest]').forEach(el => {
+    el.onclick = () => {
+      const qid = el.dataset.quest;
+      const list = questsForToday();
+      const quest = list.find(q => q.id === qid);
+      if (!quest) return;
+      if (quest.kind === 'attempt'){
+        if (isQuestDone(qid)){
+          if (confirm('This attempt is already logged. Undo it?')){
+            const t = today();
+            if (state.quests[t] && state.quests[t][qid]){
+              delete state.quests[t][qid]; save();
+            }
+          }
+          return;
+        }
+        openAttemptDay(quest.skillId);
+        return;
+      }
+      toggleQuest(quest);
+    };
+  });
+
+  document.querySelectorAll('[data-tier]').forEach(el => {
+    el.onclick = () => {
+      const [stat, vStr] = el.dataset.tier.split(':');
+      const v = parseInt(vStr, 10);
+      const cur = state.stats[stat];
+      const desc = BENCHMARKS[stat].tiers.find(t => t[0] === v)?.[1] || '';
+      if (v === cur){
+        if (confirm(`Re-test ${stat} at ${v} today?\n\n${desc}\n\nNo XP — the stat is unchanged.`)){
+          state.statDates[stat] = today(); save();
+        }
+      } else if (v > cur){
+        if (confirm(`Pass ${stat} tier ${v}?\n\n${desc}\n\n${stat}: ${cur} → ${v}. +50 XP.`)){
+          state.stats[stat] = v;
+          state.statDates[stat] = today();
+          state.benchmarks.unshift(`${stat} ${v} — ${today()}`);
+          addXP(50, `Benchmark: ${stat} ${v}`);
+          save();
+        }
+      } else {
+        if (confirm(`Demote ${stat} to tier ${v}?\n\n${desc}\n\nThe stat moves down. Honest calibration — no XP.`)){
+          state.stats[stat] = v;
+          state.statDates[stat] = today();
+          save();
+        }
+      }
+    };
+  });
+
+  document.querySelectorAll('[data-xp]').forEach(el => {
+    el.onclick = () => { addXP(+el.dataset.xp, el.dataset.note); save(); };
+  });
+
+  const addSkill = document.getElementById('add-skill');
+  if (addSkill) addSkill.onclick = () => {
+    openSkillPicker(skill => {
+      state.skills.push(skill);
+      save();
+    });
+  };
+
+  const adjgo = document.getElementById('adjgo');
+  if (adjgo) adjgo.onclick = () => {
+    const xp = parseInt(document.getElementById('adj').value, 10);
+    const note = document.getElementById('adjnote').value || 'Adjustment';
+    if (!xp) return;
+    addXP(xp, note); save();
+  };
+
+  const pSave = document.getElementById('profile-save');
+  if (pSave) pSave.onclick = () => {
+    state.name = document.getElementById('profile-name').value.trim(); save();
+  };
+
+  document.querySelectorAll('[data-eq]').forEach(el => {
+    el.onchange = () => {
+      state.equipment = state.equipment || [];
+      const id = el.dataset.eq;
+      const idx = state.equipment.indexOf(id);
+      if (el.checked && idx < 0) state.equipment.push(id);
+      if (!el.checked && idx >= 0) state.equipment.splice(idx, 1);
+      save();
+    };
+  });
+
+  const aiSave = document.getElementById('ai-save');
+  if (aiSave) aiSave.onclick = () => {
+    state.settings.apiKey = document.getElementById('ai-key').value.trim();
+    state.settings.apiBase = document.getElementById('ai-base').value.trim() || 'https://api.openai.com/v1';
+    state.settings.apiModel = document.getElementById('ai-model').value.trim() || 'gpt-4o-mini';
+    save();
+  };
+  const exp = document.getElementById('export');
+  if (exp) exp.onclick = () => {
+    const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `system-backup-${today()}.json`;
+    a.click();
+  };
+  const imp = document.getElementById('import');
+  if (imp) imp.onclick = importBackup;
+  const startOver = document.getElementById('startover');
+  if (startOver) startOver.onclick = () => {
+    if (!confirm('Erase everything and start over? Export first if unsure.')) return;
+    if (!confirm('Really erase all progress?')) return;
+    localStorage.removeItem(KEY);
+    state = defaultState();
+    onboardStep = 1;
+    onboardDraft.name = '';
+    onboardDraft.stats = { ...DEFAULT_STATS };
+    onboardDraft.skills = [];
+    save();
+  };
+}
+
+document.querySelectorAll('#nav button').forEach(b => {
+  b.onclick = () => { tab = b.dataset.tab; render(); window.scrollTo(0, 0); };
+});
+
+render();
+</script>
+</body>
+</html>

@@ -124,6 +124,8 @@ details>summary:active{background:#16202e}
   padding:8px 12px;border-radius:4px;font-size:13px;margin:10px 0}
 .skill-title{display:inline-block;font-size:11px;letter-spacing:.15em;text-transform:uppercase;
   color:var(--gold);font-weight:600;padding:2px 6px;border-radius:4px;background:rgba(255,200,87,.1)}
+.calibrated-tag{display:inline-block;font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--dim);padding:1px 5px;border-radius:3px;background:#1d2836;border:1px solid var(--line)}
 .difficulty-toast{position:fixed;bottom:90px;left:0;right:0;display:flex;justify-content:center;z-index:90;pointer-events:none}
 .difficulty-toast>div{pointer-events:auto}
 .levelup-toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:190;
@@ -202,7 +204,7 @@ function subtractSkillXP(skill, amount){
 }
 
 /* ═══════════════════════════════════════════
-   PLAYER LEVEL — derived from stats + skills
+   PLAYER LEVEL
    ═══════════════════════════════════════════ */
 function computePowerFrom(stats, skills){
   const statSum = Object.values(stats || {}).reduce((a,b) => a + (b||0), 0);
@@ -218,7 +220,36 @@ function computePlayerLevel(){ return computeLevelFrom(state.stats, state.skills
 function powerForLevel(n){ return Math.max(0, (n - 1) * 10); }
 
 /* ═══════════════════════════════════════════
-   SKILL TITLES — RPG styled, per subtype
+   SKILL CALIBRATION
+   ═══════════════════════════════════════════ */
+function calibrateFromPreTicks(preTickedCount, totalMilestones){
+  if (totalMilestones <= 0) return 1;
+  return Math.max(1, Math.min(50, Math.round((preTickedCount / totalMilestones) * 49) + 1));
+}
+function calibrateFromSTR(str){
+  // STR 5 (min) → Lv 1, STR 30 → Lv 13, STR 50 → Lv 23, STR 60 → Lv 29
+  return Math.max(1, Math.min(50, Math.round((str - 5) / 2) + 1));
+}
+function applyCalibrationToSkill(skill){
+  if (!skill) return;
+  let calLevel = null;
+  if (skill.ladderPreticked && skill.ladderPreticked.length > 0 && skill.ladder && skill.ladder.length > 0){
+    calLevel = calibrateFromPreTicks(skill.ladderPreticked.length, skill.ladder.length);
+  } else if (skill.type === 'workout' && skill.subtype === 'fitness'){
+    const str = (state.stats && state.stats.STR) || 5;
+    calLevel = calibrateFromSTR(str);
+  }
+  if (calLevel && calLevel > 1){
+    skill.calibratedLevel = calLevel;
+    if (calLevel > (skill.level || 1)){
+      skill.level = calLevel;
+      skill.xp = 0;
+    }
+  }
+}
+
+/* ═══════════════════════════════════════════
+   SKILL TITLES
    ═══════════════════════════════════════════ */
 const SKILL_TITLES = {
   language:       { D:'Tongue-Kin',         C:'Wordspeaker',      B:'Linguist',       A:'Master of Tongues', S:'Living Lexicon' },
@@ -479,228 +510,21 @@ const SKILL_SUGGESTIONS = [
 ];
 
 /* ═══════════════════════════════════════════
-   LADDERS — expanded
+   LADDERS
    ═══════════════════════════════════════════ */
 const LADDER_PRESETS = {
-  language: [
-    'A1 — 500 words, present tense',
-    'A1 — introduce yourself, 5-min conversation',
-    'A1 — understand slow speech',
-    'A2 — 1,500 words, past tenses',
-    'A2 — 15-min conversation, travel/ordering',
-    'A2 — read simple text, understand songs',
-    'B1 — 3,000 words, all major tenses',
-    'B1 — 30-min conversation',
-    'B1 — news article, learner podcasts',
-    'B2 — 5,000 words, subjunctive',
-    'B2 — 1-hour discussion, no subtitles',
-    'B2 — read a novel',
-    'C1 — professional fluency, complex topics',
-    'C1 — watch any content',
-    'C1 — write formal documents',
-    'C2 — native-adjacent',
-    'C2 — literature, wordplay',
-    'C2 — teach the language to others'
-  ],
-  coding: [
-    'HTML + CSS — one static page live',
-    'Git + first GitHub repo',
-    'JS basics — variables, functions, loops',
-    'JS — objects, DOM, events',
-    '3 small projects built and deployed',
-    'Python — one working script',
-    'Read and fix someone else\'s code',
-    'One API + database, full CRUD',
-    'TypeScript',
-    'React or equivalent',
-    'Auth working on a real project',
-    'Ship something a stranger uses',
-    'Payments or email integration',
-    'Tests + deploy pipeline',
-    'Contribute to open source',
-    'A game or serious OSS work',
-    'Performance / architecture work',
-    'Mentor someone else',
-    'Ship a second major project',
-    'Something you built is used by many'
-  ],
-  business: [
-    'Idea or niche written down in one sentence',
-    '10 customer conversations done',
-    'One-page proposition written',
-    'Company registered, bank open, domain secured',
-    'MVP live — public, usable',
-    'First customer enquiry',
-    'First paying customer',
-    '10 paying customers or £500 / 3 months',
-    '£1k / 3 months recurring',
-    'Repeatable acquisition channel',
-    '£2k / 3 months recurring',
-    'First hire or contractor',
-    '£5k / 3 months recurring',
-    'Documented systems for delivery',
-    '£10k / 3 months recurring',
-    'Team of 3+',
-    '£20k / 3 months recurring',
-    '£30k / 3 months',
-    '£50k / 3 months milestone',
-    'Market leader in niche'
-  ],
-  reading: [
-    '1 book finished this month',
-    '6 books/year with notes',
-    '12 books/year with applied ideas',
-    '18 books/year',
-    '24 books/year',
-    '30 books/year',
-    'Read a difficult book',
-    'One project built from books',
-    '50 books/year',
-    'Read across 5 different fields',
-    'Original synthesis published',
-    '100+ books/year or a book written'
-  ],
-  writing: [
-    'Premise + outline',
-    'First 1,000 words',
-    'First chapter',
-    '5 writing days/week for a month',
-    '10k words',
-    '15k words',
-    '30k words — Act 1 complete',
-    '40k words',
-    'Full first draft',
-    'First reread and revision',
-    'Beta readers engaged',
-    'Structural revision',
-    'Edited draft',
-    'Line edit',
-    'Query letter or pitch',
-    'Submission or self-pub ready',
-    'Published',
-    '10 reviews',
-    '100 copies sold',
-    'Second book started'
-  ],
-  fitness: [
-    'Complete first full workout',
-    '1 week of consistent workouts',
-    '4 weeks consistent',
-    'First PR (new max)',
-    'Noticeable strength gain',
-    '8 weeks consistent — habit locked',
-    'Complete a full program',
-    'Hit intermediate benchmarks (STR 30)',
-    '6 months consistent',
-    'Hit advanced benchmarks (STR 50)',
-    'Teach someone else a movement',
-    'Hit elite benchmarks (STR 70)',
-    '1 year consistent',
-    'Hit STR 85+',
-    'Maintain consistency for 2 years'
-  ],
-  engineering: [
-    'Branch chosen',
-    'Maths and mechanics refreshed',
-    'CAD refresher done',
-    '3 portfolio drawings or models',
-    'Portfolio project complete',
-    'Professional body affiliate membership',
-    '5 applications submitted',
-    'First interview',
-    'First role or contract',
-    'First project delivered',
-    'EngTech registration',
-    '2 years of experience',
-    'Lead a project',
-    'IEng registration',
-    'CEng registration'
-  ],
-  art: [
-    'Foundational technique studied',
-    'First 30 drawings/sketches',
-    'One coherent series (10 pieces)',
-    'Public sharing begun',
-    'First commission or sale',
-    '100 drawings completed',
-    'Recognisable style',
-    'Local exhibition or feature',
-    'Consistent body of work (50 pieces)',
-    'First gallery or show',
-    'Teach a class',
-    'Sell regularly',
-    'Regional recognition',
-    'National recognition',
-    'Retrospective or major award'
-  ],
-  instrument: [
-    'First chord or scale learned',
-    '15 min daily for a week',
-    'Play a simple song end-to-end',
-    'Basic scales in 2 keys',
-    '4 weeks consistent practice',
-    'Play 5 songs by memory',
-    'Barre chords or equivalent technique',
-    'Play with another musician',
-    'First performance (any setting)',
-    'Compose or improvise',
-    'Comfortable across keys',
-    'Play in a band or ensemble',
-    'Teach a beginner',
-    'Record an album or EP',
-    'Perform live for 100+ people'
-  ],
-  mind: [
-    'First 5-min practice',
-    '1 week consistent',
-    '4 weeks consistent',
-    '30 min uninterrupted session',
-    'Noticeable focus change in life',
-    '45 min session',
-    '3 months consistent',
-    'Practice becomes automatic',
-    '6 months consistent',
-    'Teach someone else',
-    '1 year consistent',
-    'Extended retreat or deep dive',
-    'Full day of practice',
-    'Recognised by others as calm and focused',
-    'Mastery'
-  ],
-  publicspeaking: [
-    'First 3-min speech recorded',
-    'Studied one speaking framework',
-    'Presented to 1 person',
-    'Presented to 5 people',
-    'Presented to 20 people',
-    'Joined a local speaking club',
-    'First formal speech',
-    'First paid or invited talk',
-    '10 talks given',
-    'Speak without notes',
-    'Handle Q&A confidently',
-    'Speak to 100+ people',
-    'Coach someone else',
-    'Keynote at an event',
-    'Known for your speaking'
-  ],
-  cooking: [
-    'First meal cooked from scratch',
-    '10 recipes learned by heart',
-    'Cook a full meal for 4 people',
-    'Knife skills practiced',
-    'One consistent cuisine learned',
-    'Confident with any ingredient given',
-    'First dish you would serve a chef',
-    'Cookbook or blog started',
-    'Teach someone to cook',
-    '50 recipes learned',
-    'Host a dinner party',
-    'Master a difficult technique',
-    'Pop-up or catering gig',
-    'Write a cookbook',
-    'Recognised chef'
-  ]
+  language: ['A1 — 500 words, present tense','A1 — introduce yourself, 5-min conversation','A1 — understand slow speech','A2 — 1,500 words, past tenses','A2 — 15-min conversation, travel/ordering','A2 — read simple text, understand songs','B1 — 3,000 words, all major tenses','B1 — 30-min conversation','B1 — news article, learner podcasts','B2 — 5,000 words, subjunctive','B2 — 1-hour discussion, no subtitles','B2 — read a novel','C1 — professional fluency, complex topics','C1 — watch any content','C1 — write formal documents','C2 — native-adjacent','C2 — literature, wordplay','C2 — teach the language to others'],
+  coding: ['HTML + CSS — one static page live','Git + first GitHub repo','JS basics — variables, functions, loops','JS — objects, DOM, events','3 small projects built and deployed','Python — one working script','Read and fix someone else\'s code','One API + database, full CRUD','TypeScript','React or equivalent','Auth working on a real project','Ship something a stranger uses','Payments or email integration','Tests + deploy pipeline','Contribute to open source','A game or serious OSS work','Performance / architecture work','Mentor someone else','Ship a second major project','Something you built is used by many'],
+  business: ['Idea or niche written down in one sentence','10 customer conversations done','One-page proposition written','Company registered, bank open, domain secured','MVP live — public, usable','First customer enquiry','First paying customer','10 paying customers or £500 / 3 months','£1k / 3 months recurring','Repeatable acquisition channel','£2k / 3 months recurring','First hire or contractor','£5k / 3 months recurring','Documented systems for delivery','£10k / 3 months recurring','Team of 3+','£20k / 3 months recurring','£30k / 3 months','£50k / 3 months milestone','Market leader in niche'],
+  reading: ['1 book finished this month','6 books/year with notes','12 books/year with applied ideas','18 books/year','24 books/year','30 books/year','Read a difficult book','One project built from books','50 books/year','Read across 5 different fields','Original synthesis published','100+ books/year or a book written'],
+  writing: ['Premise + outline','First 1,000 words','First chapter','5 writing days/week for a month','10k words','15k words','30k words — Act 1 complete','40k words','Full first draft','First reread and revision','Beta readers engaged','Structural revision','Edited draft','Line edit','Query letter or pitch','Submission or self-pub ready','Published','10 reviews','100 copies sold','Second book started'],
+  fitness: ['Complete first full workout','1 week of consistent workouts','4 weeks consistent','First PR (new max)','Noticeable strength gain','8 weeks consistent — habit locked','Complete a full program','Hit intermediate benchmarks (STR 30)','6 months consistent','Hit advanced benchmarks (STR 50)','Teach someone else a movement','Hit elite benchmarks (STR 70)','1 year consistent','Hit STR 85+','Maintain consistency for 2 years'],
+  engineering: ['Branch chosen','Maths and mechanics refreshed','CAD refresher done','3 portfolio drawings or models','Portfolio project complete','Professional body affiliate membership','5 applications submitted','First interview','First role or contract','First project delivered','EngTech registration','2 years of experience','Lead a project','IEng registration','CEng registration'],
+  art: ['Foundational technique studied','First 30 drawings/sketches','One coherent series (10 pieces)','Public sharing begun','First commission or sale','100 drawings completed','Recognisable style','Local exhibition or feature','Consistent body of work (50 pieces)','First gallery or show','Teach a class','Sell regularly','Regional recognition','National recognition','Retrospective or major award'],
+  instrument: ['First chord or scale learned','15 min daily for a week','Play a simple song end-to-end','Basic scales in 2 keys','4 weeks consistent practice','Play 5 songs by memory','Barre chords or equivalent technique','Play with another musician','First performance (any setting)','Compose or improvise','Comfortable across keys','Play in a band or ensemble','Teach a beginner','Record an album or EP','Perform live for 100+ people'],
+  mind: ['First 5-min practice','1 week consistent','4 weeks consistent','30 min uninterrupted session','Noticeable focus change in life','45 min session','3 months consistent','Practice becomes automatic','6 months consistent','Teach someone else','1 year consistent','Extended retreat or deep dive','Full day of practice','Recognised by others as calm and focused','Mastery'],
+  publicspeaking: ['First 3-min speech recorded','Studied one speaking framework','Presented to 1 person','Presented to 5 people','Presented to 20 people','Joined a local speaking club','First formal speech','First paid or invited talk','10 talks given','Speak without notes','Handle Q&A confidently','Speak to 100+ people','Coach someone else','Keynote at an event','Known for your speaking'],
+  cooking: ['First meal cooked from scratch','10 recipes learned by heart','Cook a full meal for 4 people','Knife skills practiced','One consistent cuisine learned','Confident with any ingredient given','First dish you would serve a chef','Cookbook or blog started','Teach someone to cook','50 recipes learned','Host a dinner party','Master a difficult technique','Pop-up or catering gig','Write a cookbook','Recognised chef']
 };
 function defaultLadderFor(subtype){ return LADDER_PRESETS[subtype] ? [...LADDER_PRESETS[subtype]] : null; }
 
@@ -770,7 +594,7 @@ let logDate = today();
 
 function defaultState(){
   return {
-    v: 10, onboarded: false, name: '', totalXP: 0,
+    v: 11, onboarded: false, name: '', totalXP: 0,
     stats: { ...DEFAULT_STATS }, statDates: {},
     skills: [], streak: 0, lastComplete: null,
     quests: {}, log: [], benchmarks: [], titles: [],
@@ -818,6 +642,19 @@ function migrateSkill(s){
     };
     if (map[n]) s.name = map[n];
   }
+
+  // One-time calibration for skills with pre-ticks
+  if (!s.calibratedLevel && s.ladderPreticked && s.ladderPreticked.length > 0 && s.ladder && s.ladder.length > 0){
+    const calLevel = calibrateFromPreTicks(s.ladderPreticked.length, s.ladder.length);
+    if (calLevel > 1){
+      s.calibratedLevel = calLevel;
+      if (calLevel > (s.level || 1)){
+        s.level = calLevel;
+        s.xp = 0;
+      }
+    }
+  }
+
   return s;
 }
 
@@ -833,6 +670,22 @@ function load(){
     if (parsed.equipmentConfigured === undefined) parsed.equipmentConfigured = false;
     if (!parsed.timeBudget) parsed.timeBudget = 30;
     if (parsed.deloadEnabled === undefined) parsed.deloadEnabled = true;
+
+    // Fitness auto-calibration from STR (one-time per skill)
+    (parsed.skills || []).forEach(s => {
+      if (s.type === 'workout' && s.subtype === 'fitness' && !s.calibratedLevel){
+        const str = (parsed.stats && parsed.stats.STR) || 5;
+        const calLevel = calibrateFromSTR(str);
+        if (calLevel > 1){
+          s.calibratedLevel = calLevel;
+          if (calLevel > (s.level || 1)){
+            s.level = calLevel;
+            s.xp = 0;
+          }
+        }
+      }
+    });
+
     parsed.lastPlayerLevel = computeLevelFrom(parsed.stats, parsed.skills);
     parsed.lastPlayerRank = rankOf(parsed.lastPlayerLevel);
     return parsed;
@@ -928,7 +781,7 @@ function showDifficultyToast(logEntryId){
 }
 
 /* ═══════════════════════════════════════════
-   LADDER TICK/UNTICK — scaled XP, full revert
+   LADDER TICK/UNTICK
    ═══════════════════════════════════════════ */
 function milestoneLogXP(i){ return 20 + i * 10; }
 function milestoneSkillXP(i){ return 100 + i * 25; }
@@ -942,7 +795,8 @@ function tickMilestone(skill, i){
   if (skill.ladderDone.includes(i)) return;
   skill.ladderDone.push(i);
 
-  if (skill.ladderPreticked.includes(i)){
+  // If pre-ticked AND never earned → inert. If previously earned → restore.
+  if (skill.ladderPreticked.includes(i) && !skill.ladderXpLogs[i]){
     ensureMilestoneQuests(skill);
     return;
   }
@@ -981,7 +835,7 @@ function tickMilestone(skill, i){
 function untickMilestone(skill, i){
   skill.ladderDone = (skill.ladderDone || []).filter(x => x !== i);
   const ref = skill.ladderXpLogs && skill.ladderXpLogs[i];
-  if (ref){
+  if (ref && ref.logId){
     const logXp = ref.logXp || ref.xp || 20;
     const skillXp = ref.skillXp !== undefined ? ref.skillXp : 20;
     state.totalXP = Math.max(0, state.totalXP - logXp);
@@ -1092,12 +946,18 @@ function applyProgression(skill, answers){
     skill.plan.calibratedTo = { STR: state.stats.STR, equipment: [...(state.equipment||[])], weights: { ...(state.equipmentWeights||{}) } };
   }
   if (answers.type) skill.detail = answers.type;
+
+  // Merge pre-ticks with earned (don't wipe earned progress)
   if (preTick){
-    skill.ladderDone = [...preTick];
     skill.ladderPreticked = [...preTick];
-    skill.ladderEarned = [];
-    skill.ladderXpLogs = {};
+    const merged = new Set([...preTick, ...(skill.ladderEarned || [])]);
+    skill.ladderDone = [...merged];
+    // ladderEarned and ladderXpLogs are NOT cleared — they hold real earned progress
   }
+
+  // Apply calibration
+  applyCalibrationToSkill(skill);
+
   ensureMilestoneQuests(skill);
 }
 
@@ -1287,7 +1147,7 @@ function buildLadderAIPrompt(skill){
   if (skill.subtype === 'business' && skill.detail && /not decided/i.test(skill.detail)){
     extra = `\n\nThe person hasn't chosen what business to start. First suggest 3 concrete ideas that fit 5–10 hrs/week and no capital. Then pick the most promising and produce 12–18 milestones for that business.`;
   }
-  return `You are a coach. Here is the current state:\n\n${buildAIContext(skill)}\n\nGenerate 12–18 concrete progression milestones for this skill at its current stage.${extra}\n\nEach milestone must be specific, testable, and build on the previous one. Aim for a milestone every few weeks of progress. Return ONLY a JSON array of milestone strings.`;
+  return `You are a coach. Here is the current state:\n\n${buildAIContext(skill)}\n\nGenerate 12–18 concrete progression milestones for this skill at its current stage.${extra}\n\nEach milestone must be specific, testable, and build on the previous one. Return ONLY a JSON array of milestone strings.`;
 }
 async function callAI(prompt, apiKey, baseUrl, model){
   const res = await fetch(`${baseUrl}/chat/completions`, {
@@ -1315,6 +1175,7 @@ function makeSkillFromTemplate(sug, detail){
     ladderXpLogs: {}, ladderPreticked: [],
     workoutsSinceAttempt: 0, cardioEnabled: true,
     why: '', quitCriteria: '', milestoneQuests: {},
+    calibratedLevel: null,
     type: isWorkoutType ? 'workout' : 'standard'
   };
   if (isWorkoutType){
@@ -1464,6 +1325,7 @@ function renderProgressionStep(){
 
   app.innerHTML = `
     <h1 style="margin-top:24px">Progression check</h1>
+    <p class="dim" style="margin-top:12px">Your answers set a calibrated starting level for each skill — a business with a domain and bank won't start at Lv 1.</p>
     ${showEquipment ? `<div class="card">${renderEquipmentSection()}</div>` : ''}
     ${body}
     <div class="row" style="gap:8px;margin-top:16px"><button class="ghost" id="ob-back" style="flex:1">Back</button><button class="primary" id="ob-next" style="flex:2">Start the System</button></div>`;
@@ -1542,6 +1404,8 @@ function finishOnboarding(){
       s.plan.calibratedTo = { STR: state.stats.STR, equipment: [...(state.equipment||[])], weights: { ...(state.equipmentWeights||{}) } };
     }
     ensureMilestoneQuests(s);
+    // Final calibration pass — apply now that state.stats is set
+    applyCalibrationToSkill(s);
   });
 
   state.totalXP = 0;
@@ -1686,7 +1550,8 @@ function viewSkills(){
       if (state.stats.STR !== s.plan.calibratedTo.STR || curW !== oldW) recal = ' · <span style="color:var(--gold)">recalibrate available</span>';
     }
     const title = titleForSkill(s);
-    return `<div class="card" data-skill-card="${s.id}" style="cursor:pointer"><div class="row between"><div class="row" style="gap:8px;flex:1;min-width:0"><h3 style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(s.name)}</h3>${title?`<span class="skill-title">${esc(title)}</span>`:''}<span class="tag ${s.active?'on rank-'+rankOf(s.level):''}">${s.active?rankOf(s.level):'paused'}</span></div><span class="mono small dim" style="white-space:nowrap">Lv ${s.level}</span></div><div class="bar"><i style="width:${pct}%"></i></div><div class="small dim" style="margin-top:8px">${esc(detail)}${ladderInfo?` · ${ladderInfo}`:''}${recal}</div>${milestone?`<div class="small dim" style="margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">→ ${esc(milestone)}</div>`:''}${s.why?`<div class="small dim" style="margin-top:4px;font-style:italic">"${esc(s.why)}"</div>`:''}</div>`;
+    const calibrated = s.calibratedLevel && s.calibratedLevel > 1;
+    return `<div class="card" data-skill-card="${s.id}" style="cursor:pointer"><div class="row between"><div class="row" style="gap:8px;flex:1;min-width:0"><h3 style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(s.name)}</h3>${title?`<span class="skill-title">${esc(title)}</span>`:''}<span class="tag ${s.active?'on rank-'+rankOf(s.level):''}">${s.active?rankOf(s.level):'paused'}</span></div><span class="mono small dim" style="white-space:nowrap">Lv ${s.level}</span></div><div class="bar"><i style="width:${pct}%"></i></div><div class="small dim" style="margin-top:8px">${esc(detail)}${ladderInfo?` · ${ladderInfo}`:''}${recal}</div>${milestone?`<div class="small dim" style="margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">→ ${esc(milestone)}</div>`:''}${s.why?`<div class="small dim" style="margin-top:4px;font-style:italic">"${esc(s.why)}"</div>`:''}${calibrated?`<div style="margin-top:6px"><span class="calibrated-tag">Calibrated Lv ${s.calibratedLevel}</span></div>`:''}</div>`;
   }).join('');
   return `<h2>Skills · ${state.skills.filter(s=>s.active).length} active / ${state.skills.length} total</h2>${rows || '<div class="card dim small">No skills yet.</div>'}<button class="primary" id="add-skill" style="width:100%;margin-top:12px">+ Add skill</button>`;
 }
@@ -1717,7 +1582,7 @@ function viewLog(){
 }
 
 function viewMore(){
-  return `<h2>Profile</h2><div class="card"><div class="field"><label>Name</label><input id="profile-name" value="${esc(state.name)}" maxlength="40"></div><div class="field"><label>Daily time budget</label><select id="profile-budget"><option value="15" ${state.timeBudget===15?'selected':''}>15 min</option><option value="30" ${state.timeBudget===30?'selected':''}>30 min</option><option value="45" ${state.timeBudget===45?'selected':''}>45 min</option><option value="60" ${state.timeBudget===60?'selected':''}>60+ min</option></select></div><div class="field"><label style="display:flex;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" id="profile-deload" ${state.deloadEnabled?'checked':''}><span style="text-transform:none;letter-spacing:0;color:var(--txt);font-size:13px">Deload weeks every 5th week</span></label><div class="hint">${state.startedAt?`Started ${state.startedAt}. Week ${deloadWeekStatus().weekNum} now.`:'Not started yet.'}</div></div><button class="sm" id="profile-save">Save</button></div><h2>Equipment</h2><div class="card">${renderEquipmentSection()}</div><h2>AI settings</h2><div class="card"><div class="notice">The AI receives your last 30 days, stats, equipment weights and current milestone.</div><div class="field"><label>API key</label><input id="ai-key" type="password" value="${esc(state.settings.apiKey)}" placeholder="sk-..."></div><div class="field"><label>Base URL</label><input id="ai-base" value="${esc(state.settings.apiBase)}"></div><div class="field"><label>Model</label><input id="ai-model" value="${esc(state.settings.apiModel)}"></div><button class="sm primary" id="ai-save">Save AI settings</button></div><h2>Backup</h2><div class="card"><button class="primary" id="export" style="width:100%;margin-bottom:8px">Export backup</button><button id="import" style="width:100%;margin-bottom:8px">Import backup</button><button class="ghost danger" id="startover" style="width:100%">Start over (erase all)</button></div><h2>Rules</h2><div class="card small dim"><p><b>Level = floor(power / 10) + 1</b>, where power = sum(stats) + 3 × sum(skill levels).</p><p>Levels can't be farmed — only stats and skill levels raise them.</p><p>Stats move only on a benchmark you pass. Testing down removes the level the stat gave you.</p><p>Milestone XP scales with milestone position: milestone 1 = 100 skill XP, milestone 20 = 575 skill XP.</p><p>Un-ticking a quest removes its XP, skill XP and log entry, with level-down handling.</p></div>`;
+  return `<h2>Profile</h2><div class="card"><div class="field"><label>Name</label><input id="profile-name" value="${esc(state.name)}" maxlength="40"></div><div class="field"><label>Daily time budget</label><select id="profile-budget"><option value="15" ${state.timeBudget===15?'selected':''}>15 min</option><option value="30" ${state.timeBudget===30?'selected':''}>30 min</option><option value="45" ${state.timeBudget===45?'selected':''}>45 min</option><option value="60" ${state.timeBudget===60?'selected':''}>60+ min</option></select></div><div class="field"><label style="display:flex;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" id="profile-deload" ${state.deloadEnabled?'checked':''}><span style="text-transform:none;letter-spacing:0;color:var(--txt);font-size:13px">Deload weeks every 5th week</span></label><div class="hint">${state.startedAt?`Started ${state.startedAt}. Week ${deloadWeekStatus().weekNum} now.`:'Not started yet.'}</div></div><button class="sm" id="profile-save">Save</button></div><h2>Equipment</h2><div class="card">${renderEquipmentSection()}</div><h2>AI settings</h2><div class="card"><div class="notice">The AI receives your last 30 days, stats, equipment weights and current milestone.</div><div class="field"><label>API key</label><input id="ai-key" type="password" value="${esc(state.settings.apiKey)}" placeholder="sk-..."></div><div class="field"><label>Base URL</label><input id="ai-base" value="${esc(state.settings.apiBase)}"></div><div class="field"><label>Model</label><input id="ai-model" value="${esc(state.settings.apiModel)}"></div><button class="sm primary" id="ai-save">Save AI settings</button></div><h2>Backup</h2><div class="card"><button class="primary" id="export" style="width:100%;margin-bottom:8px">Export backup</button><button id="import" style="width:100%;margin-bottom:8px">Import backup</button><button class="ghost danger" id="startover" style="width:100%">Start over (erase all)</button></div><h2>Rules</h2><div class="card small dim"><p><b>Level = floor(power / 10) + 1</b>, where power = sum(stats) + 3 × sum(skill levels).</p><p>Levels can't be farmed — only stats and skill levels raise them.</p><p>Stats move only on a benchmark you pass. Testing down removes the level the stat gave you.</p><p><b>Skill starting levels are calibrated</b> from your progression check — a business with a domain and bank starts at Lv 11, not Lv 1. Fitness skills auto-calibrate from STR.</p><p>Milestone XP scales with milestone position: milestone 1 = 100 skill XP, milestone 20 = 575 skill XP.</p><p>Un-ticking a quest removes its XP, skill XP and log entry, with level-down handling.</p></div>`;
 }
 
 /* ═══════════════════════════════════════════
@@ -1784,8 +1649,9 @@ function openSkillDetail(skillId){
     const ladderHtml = ladder.length ? ladder.map((m,i) => {
       const isDone = done.includes(i);
       const isNext = i === nextIdx;
+      const isPre = (skill.ladderPreticked||[]).includes(i);
       const willGive = milestoneSkillXP(i);
-      return `<div class="tier-row ${isNext?'current':''} ${isDone?'below':''}" data-ladder="${i}"><div class="tier-val">${isDone?'✓':(isNext?'›':'·')}</div><div class="tier-desc">${esc(m)}${!isDone?`<div class="small dim mono">+${willGive} skill XP</div>`:''}</div></div>`;
+      return `<div class="tier-row ${isNext?'current':''} ${isDone?'below':''}" data-ladder="${i}"><div class="tier-val">${isDone?'✓':(isNext?'›':'·')}</div><div class="tier-desc">${esc(m)}${!isDone?`<div class="small dim mono">+${willGive} skill XP</div>`:''}${isPre && isDone?`<div class="small dim" style="font-style:italic">calibration tick</div>`:''}</div></div>`;
     }).join('') : '<div class="dim small" style="padding:12px">No ladder set.</div>';
     const status = skill.status ? esc(skill.status) : '<span class="dim">Not set</span>';
     const isBusinessUndecided = skill.subtype === 'business' && /not decided/i.test(skill.detail || '');
@@ -1798,6 +1664,7 @@ function openSkillDetail(skillId){
     const currentQuests = (nextIdx >= 0 && skill.milestoneQuests && skill.milestoneQuests[nextIdx]) ? skill.milestoneQuests[nextIdx] : (skill.quests || []);
     openModal(`
       <div class="row between" style="margin-bottom:16px"><div><h2 style="margin:0">${esc(skill.name)}</h2>${title?`<div class="skill-title" style="margin-top:6px">${esc(title)}</div>`:''}</div><button class="sm ghost" id="sd-close">×</button></div>
+      ${skill.calibratedLevel && skill.calibratedLevel > 1 ? `<div class="notice" style="background:rgba(255,200,87,.06);border-color:rgba(255,200,87,.3);font-size:13px"><b>Calibrated start:</b> Lv ${skill.calibratedLevel} — because your progression check showed you were already at this stage.</div>`:''}
       ${needsRecal?`<div class="notice warn"><b>Your STR or equipment has changed since this plan was built.</b><button class="sm primary" id="sd-recalibrate" style="width:100%;margin-top:8px">Recalculate from stats</button></div>`:''}
       ${skill.why?`<div class="notice" style="font-style:italic">"${esc(skill.why)}"</div>`:''}
       ${nextMilestone?`<div class="milestone-focus"><b>Current focus:</b> ${esc(nextMilestone)}</div>`:''}

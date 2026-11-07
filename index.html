@@ -127,10 +127,16 @@ details>summary:active{background:#16202e}
   color:var(--gold);font-weight:600;padding:2px 6px;border-radius:4px;background:rgba(255,200,87,.1)}
 .calibrated-tag{display:inline-block;font-size:10px;letter-spacing:.1em;text-transform:uppercase;
   color:var(--dim);padding:1px 5px;border-radius:3px;background:#1d2836;border:1px solid var(--line)}
+.parked-tag{display:inline-block;font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--dim);padding:2px 6px;border-radius:3px;background:#0a0e14;border:1px solid var(--line)}
 .first-badge{display:inline-block;font-size:10px;letter-spacing:.1em;text-transform:uppercase;
   color:var(--gold);padding:1px 5px;border-radius:3px;background:rgba(255,200,87,.15);margin-left:6px}
 .partial-badge{display:inline-block;font-size:10px;letter-spacing:.1em;text-transform:uppercase;
   color:var(--dim);padding:1px 5px;border-radius:3px;background:#1d2836;margin-left:6px}
+.skill-card-parked{opacity:.7}
+.slot-counter{display:inline-block;font-family:ui-monospace,monospace;font-size:12px;letter-spacing:.1em;
+  color:var(--dim);padding:2px 8px;border-radius:4px;background:#0a0e14;border:1px solid var(--line)}
+.slot-counter.full{color:var(--gold);border-color:rgba(255,200,87,.4)}
 .levelup-toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:190;
   padding:10px 18px;border-radius:10px;background:#111823;border:1px solid var(--line);
   box-shadow:0 8px 24px rgba(0,0,0,.5);font-size:13px;animation:fadeIn .3s ease;max-width:92vw;text-align:center}
@@ -189,8 +195,10 @@ details>summary:active{background:#16202e}
 
 <script>
 /* ═══════════════════════════════════════════
-   RULES
+   RULES & CONSTANTS
    ═══════════════════════════════════════════ */
+const MAX_ACTIVE_SKILLS = 5;
+const COMMIT_DAYS = 30;
 const skillXpForLevel = L => 10 * L;
 const RANK_TABLE = [[50,'S'],[40,'A'],[30,'B'],[20,'C'],[10,'D'],[1,'E']];
 const rankOf = lvl => RANK_TABLE.find(([m]) => lvl >= m)[1];
@@ -213,8 +221,12 @@ function subtractSkillXP(skill, amount){
   if (skill.xp < 0) skill.xp = 0;
 }
 
+function activeSkills(){ return (state.skills || []).filter(s => s.active); }
+function parkedSkills(){ return (state.skills || []).filter(s => !s.active); }
+function activeSkillCount(){ return activeSkills().length; }
+
 /* ═══════════════════════════════════════════
-   PLAYER LEVEL — sqrt curve, level-1 skills contribute 0
+   PLAYER LEVEL
    ═══════════════════════════════════════════ */
 function computePowerFrom(stats, skills){
   const statSum = Object.values(stats || {}).reduce((a,b) => a + (b||0), 0);
@@ -576,7 +588,7 @@ function ensureMilestoneQuests(skill){
 }
 
 /* ═══════════════════════════════════════════
-   DELOAD (every 10th week)
+   DELOAD
    ═══════════════════════════════════════════ */
 function deloadWeekStatus(){
   if (!state.deloadEnabled || !state.startedAt) return { isDeload: false, weekNum: 0 };
@@ -596,7 +608,7 @@ let levelChangeReason = '';
 
 function defaultState(){
   return {
-    v: 13, onboarded: false, name: '', totalXP: 0,
+    v: 14, onboarded: false, name: '', totalXP: 0,
     telos: '', telosDate: '',
     stats: { ...DEFAULT_STATS }, statDates: {},
     skills: [], streak: 0, lastComplete: null,
@@ -607,6 +619,7 @@ function defaultState(){
     timeBudget: 30,
     startedAt: null, deloadEnabled: true,
     paused: false, pausedUntil: '',
+    committedUntil: '',
     lastOpenedDate: '',
     dailyBasics: {},
     firsts: [],
@@ -677,6 +690,7 @@ function load(){
     if (!parsed.dailyBasics) parsed.dailyBasics = {};
     if (!parsed.ladderNotes) parsed.ladderNotes = {};
     if (!parsed.telos) parsed.telos = '';
+    if (!parsed.committedUntil) parsed.committedUntil = '';
 
     (parsed.skills || []).forEach(s => {
       if (s.type === 'workout' && s.subtype === 'fitness' && !s.calibratedLevel){
@@ -784,7 +798,20 @@ function showLevelAdjust(oldLvl, newLvl, reason){
 }
 
 /* ═══════════════════════════════════════════
-   LADDER TICK/UNTICK — quadratic XP, friction, first-time bonus
+   COMMITMENT
+   ═══════════════════════════════════════════ */
+function isCommitted(){
+  if (!state.committedUntil) return false;
+  return state.committedUntil >= today();
+}
+function commitRemainingDays(){
+  if (!state.committedUntil) return 0;
+  const d = daysSinceDate(state.committedUntil);
+  return d === null ? 0 : Math.max(0, -d);
+}
+
+/* ═══════════════════════════════════════════
+   LADDER TICK/UNTICK
    ═══════════════════════════════════════════ */
 function milestoneLogXP(i){ return Math.round(50 + i*10); }
 function milestoneSkillXP(i){ return Math.round(100 + i*i*4); }
@@ -1244,7 +1271,7 @@ function makeSkillFromTemplate(sug, detail){
 }
 
 /* ═══════════════════════════════════════════
-   ONBOARDING — 3 steps
+   ONBOARDING
    ═══════════════════════════════════════════ */
 let tab = 'status';
 let onboardStep = 1;
@@ -1261,7 +1288,19 @@ function renderOnboarding(){
       <h1 style="margin-top:24px">The System</h1>
       <p class="dim" style="margin-top:8px">A personal tracker. Three steps, then you're in.</p>
 
-      <div class="card" style="margin-top:20px">
+      <div class="notice" style="margin-top:16px">
+        <b>Read this first.</b> When you finish setup, you'll be committed for <b>${COMMIT_DAYS} days</b>. During that time:
+        <ul style="margin:8px 0 0 18px;padding:0;font-size:13px;line-height:1.6">
+          <li>✓ Log, tick quests, test stats, milestones, pause — all work</li>
+          <li>✓ Swap skills in and out (max ${MAX_ACTIVE_SKILLS} active, unlimited parked)</li>
+          <li>✓ Add new skills from the catalog, delete skills you regret</li>
+          <li>✗ Cannot edit skill contents (quests, ladder, name)</li>
+          <li>✗ Cannot change settings or start over</li>
+        </ul>
+        <div style="margin-top:8px;font-size:12px;color:var(--dim)">The point is to stop you from tweaking the app instead of using it. If you don't want this, stop here.</div>
+      </div>
+
+      <div class="card">
         <div class="field">
           <label>Your name <span class="dim" style="text-transform:none;letter-spacing:0">(optional)</span></label>
           <input id="ob-name" placeholder="Name" value="${esc(onboardDraft.name)}" maxlength="40">
@@ -1269,7 +1308,7 @@ function renderOnboarding(){
       </div>
 
       <h2>Starting stats</h2>
-      <p class="small dim" style="margin-top:-4px;margin-bottom:12px">Pick the highest tier you can pass today. You can retest any time.</p>
+      <p class="small dim" style="margin-top:-4px;margin-bottom:12px">Pick the highest tier you can pass today. Retest any time.</p>
       <div class="card">
         ${['STR','AGI','VIT','INT','PER'].map(k => {
           const b = BENCHMARKS[k];
@@ -1280,7 +1319,6 @@ function renderOnboarding(){
 
       <div class="card" style="background:rgba(77,166,255,.06);border-color:rgba(77,166,255,.3)">
         <div class="row between"><span class="dim small">STARTING LEVEL</span><span class="mono" style="font-size:22px;font-weight:700;color:var(--accent)">Lv ${estimatedLevel}</span></div>
-        <div class="small dim" style="margin-top:6px">From your stats alone. Adding skills won't change it until you level them.</div>
       </div>
 
       <div class="card">
@@ -1314,15 +1352,20 @@ function renderOnboarding(){
   }
 
   if (onboardStep === 2){
+    const count = onboardDraft.skills.length;
+    const atCap = count >= MAX_ACTIVE_SKILLS;
     app.innerHTML = `
       <h1 style="margin-top:24px">Your skills</h1>
-      <p class="dim" style="margin-top:8px">Pick what you want to level. You can add or remove any skill later.</p>
+      <p class="dim" style="margin-top:8px">Pick what you want to level. Max ${MAX_ACTIVE_SKILLS} active. You can add or remove more later — or park any skill and swap in a different one without losing progress.</p>
+      <div class="card" style="padding:10px 14px"><div class="row between"><span class="small dim">Active skills</span><span class="slot-counter ${atCap?'full':''}">${count}/${MAX_ACTIVE_SKILLS}</span></div></div>
       ${onboardDraft.skills.length ? `<div class="card">${onboardDraft.skills.map((s, i) => `<div class="skill-row" style="cursor:default"><span>${esc(s.name)}</span><button class="sm ghost danger" data-obrm="${i}">Remove</button></div>`).join('')}</div>` : ''}
-      <h2>Add a skill</h2>
-      <div>
-        ${SKILL_SUGGESTIONS.map(sug => `<details><summary>${esc(sug.label)}</summary>${sug.options.map(opt => `<div class="tier-row" data-obadd="${sug.id}|${esc(opt)}" style="cursor:pointer"><div class="tier-desc">${esc(opt)}</div></div>`).join('')}</details>`).join('')}
-        <details><summary>Custom skill</summary><div style="padding:10px"><input id="ob-custom" placeholder="Skill name"><button class="sm primary" id="ob-custom-add" style="margin-top:8px">Add</button></div></details>
-      </div>
+      ${atCap ? `<div class="notice" style="margin-top:12px">At the 5-skill cap. Remove one above to free a slot, or continue — you'll be able to swap later from the Skills tab.</div>` : `
+        <h2>Add a skill</h2>
+        <div>
+          ${SKILL_SUGGESTIONS.map(sug => `<details><summary>${esc(sug.label)}</summary>${sug.options.map(opt => `<div class="tier-row" data-obadd="${sug.id}|${esc(opt)}" style="cursor:pointer"><div class="tier-desc">${esc(opt)}</div></div>`).join('')}</details>`).join('')}
+          <details><summary>Custom skill</summary><div style="padding:10px"><input id="ob-custom" placeholder="Skill name"><button class="sm primary" id="ob-custom-add" style="margin-top:8px">Add</button></div></details>
+        </div>
+      `}
       <div class="row" style="gap:8px;margin-top:16px">
         <button class="ghost" id="ob-back" style="flex:1">Back</button>
         <button class="primary" id="ob-next" style="flex:2">${onboardDraft.skills.length ? 'Continue' : 'Skip'}</button>
@@ -1330,6 +1373,7 @@ function renderOnboarding(){
     `;
     document.querySelectorAll('[data-obadd]').forEach(el => {
       el.onclick = () => {
+        if (onboardDraft.skills.length >= MAX_ACTIVE_SKILLS){ alert(`Max ${MAX_ACTIVE_SKILLS} active skills.`); return; }
         const [sugId, opt] = el.dataset.obadd.split('|');
         const sug = SKILL_SUGGESTIONS.find(s => s.id === sugId);
         if (!sug) return;
@@ -1339,7 +1383,9 @@ function renderOnboarding(){
       };
     });
     document.querySelectorAll('[data-obrm]').forEach(b => { b.onclick = () => { onboardDraft.skills.splice(+b.dataset.obrm, 1); render(); }; });
-    document.getElementById('ob-custom-add').onclick = () => {
+    const addCustomBtn = document.getElementById('ob-custom-add');
+    if (addCustomBtn) addCustomBtn.onclick = () => {
+      if (onboardDraft.skills.length >= MAX_ACTIVE_SKILLS){ alert(`Max ${MAX_ACTIVE_SKILLS} active skills.`); return; }
       const name = document.getElementById('ob-custom').value.trim();
       if (!name) return;
       if (onboardDraft.skills.some(s => s.name.toLowerCase() === name.toLowerCase())) return alert('Already added.');
@@ -1382,7 +1428,8 @@ function renderProgressionStep(){
 
   app.innerHTML = `
     <h1 style="margin-top:24px">Calibration</h1>
-    <p class="dim" style="margin-top:8px">Answer where you're at for each skill. This sets your starting level — a business with a domain and bank starts higher than one with just an idea. Skip if you'd rather start everything at Lv 1.</p>
+    <p class="dim" style="margin-top:8px">Answer where you're at for each skill. This sets a calibrated starting level — a business with a domain and bank starts higher than one with just an idea.</p>
+    <div class="notice warn" style="font-size:12px">Calibration locks once you start. Anything you skip stays at Lv 1 for 30 days — you can still work your way up from there, just slower.</div>
     ${showEquipment ? `<div class="card">${renderEquipmentSection()}</div>` : ''}
     ${body}
     <div class="row" style="gap:8px;margin-top:16px">
@@ -1468,6 +1515,7 @@ function finishOnboarding(){
   state.totalXP = 0;
   state.startedAt = today();
   state.lastOpenedDate = today();
+  state.committedUntil = dateOffset(COMMIT_DAYS);
   state.onboarded = true;
   state.lastPlayerLevel = computePlayerLevel();
   state.lastPlayerRank = rankOf(state.lastPlayerLevel);
@@ -1486,7 +1534,7 @@ function checkWelcomeBack(){
     setTimeout(() => {
       openModal(`
         <h2>Welcome back</h2>
-        <p class="small dim">You've been away ${gap} days. Your progress is intact. Streak reset but everything else is here.</p>
+        <p class="small dim">You've been away ${gap} days. Your progress is intact.</p>
         <p class="small dim" style="margin-top:12px">One thing today — a 5-minute version of any quest. That's the whole ask.</p>
         <div style="margin-top:16px">
           <button class="primary" style="width:100%" onclick="closeModal()">OK</button>
@@ -1560,7 +1608,7 @@ function viewStatus(){
     return `<div class="stat"><div><div class="small">${k}</div><div class="small mono ${isStale?'stat-label-stale':'dim'}">${label}</div></div><div class="mono" style="font-size:19px;font-weight:600">${state.stats[k]}</div></div>`;
   }).join('');
 
-  const active = state.skills.filter(s => s.active);
+  const active = activeSkills();
   const skillList = active.length ? active.map(s => {
     const idx = currentMilestoneIdx(s);
     const milestone = (idx >= 0 && s.ladder) ? s.ladder[idx] : null;
@@ -1578,6 +1626,7 @@ function viewStatus(){
     </div>`;
 
   const pauseBanner = state.paused ? `<div class="notice pause"><b>Paused.</b> Streak frozen. Unpause in More when ready.</div>` : '';
+  const commitBanner = isCommitted() ? `<div class="notice" style="background:rgba(77,166,255,.06);border-color:rgba(77,166,255,.3)"><b>Committed for ${commitRemainingDays()} more days.</b> Swap skills freely — editing contents waits until then.</div>` : '';
   const telosHtml = state.telos
     ? `<div class="card"><div class="small dim" style="font-style:italic">"${esc(state.telos)}"</div></div>`
     : `<div class="card"><div class="row between"><div class="small dim" style="flex:1">What is this System for? One sentence.</div><button class="sm ghost" id="add-telos">Add</button></div></div>`;
@@ -1585,6 +1634,7 @@ function viewStatus(){
   return `
     <div class="row between" style="margin-bottom:16px"><h1>The System</h1><button class="sm ghost" id="share-btn">Share ↗</button></div>
     ${pauseBanner}
+    ${commitBanner}
     <div class="card"><div class="row between"><div><div class="dim small mono">${esc(state.name || 'PLAYER')}</div><div class="big mono">Lv ${lvl}</div></div><div style="text-align:right"><div class="dim small mono">RANK</div><div class="big mono" style="color:var(--accent)">${rankOf(lvl)}</div></div></div>${powerBar()}</div>
     ${telosHtml}
     <div class="card"><div class="row between"><span class="dim small">STREAK</span><span class="mono" style="font-size:20px">${state.streak} <span class="dim small">days</span></span></div><div class="week-strip">${weekHtml}</div><div class="small dim" style="margin-top:14px;margin-bottom:6px">Year</div><div class="heatmap-year">${yearHtml}</div></div>
@@ -1615,25 +1665,62 @@ function viewQuests(){
 }
 
 function viewSkills(){
-  const rows = state.skills.map(s => {
+  const active = activeSkills();
+  const parked = parkedSkills();
+  const count = active.length;
+  const atCap = count >= MAX_ACTIVE_SKILLS;
+
+  function renderCard(s, isParked){
     const need = skillXpForLevel(s.level);
     const pct = s.level >= 50 ? 100 : (s.xp / need) * 100;
     const idx = currentMilestoneIdx(s);
     const milestone = (idx >= 0 && s.ladder) ? s.ladder[idx] : null;
     const detail = s.type === 'workout' && s.plan ? `${s.plan.exercises.length} exercises · ${s.plan.workoutDays.length} days/week` : (s.milestoneQuests && idx >= 0 && s.milestoneQuests[idx]) ? `${s.milestoneQuests[idx].length} quest${s.milestoneQuests[idx].length===1?'':'s'}` : (s.quests ? `${s.quests.length} quest${s.quests.length===1?'':'s'}` : '');
     const ladderInfo = s.ladder && s.ladder.length ? `${(s.ladderDone||[]).length}/${s.ladder.length} milestones` : '';
-    let recal = '';
-    if (s.type === 'workout' && s.subtype === 'fitness' && s.plan && s.plan.calibratedTo){
-      const curW = JSON.stringify(state.equipmentWeights || {});
-      const oldW = JSON.stringify(s.plan.calibratedTo.weights || {});
-      if (state.stats.STR !== s.plan.calibratedTo.STR || curW !== oldW) recal = ' · <span style="color:var(--gold)">recalibrate</span>';
-    }
     const title = titleForSkill(s);
     const calibrated = s.calibratedLevel && s.calibratedLevel > 1;
     const identity = s.identity ? `<div class="small dim" style="margin-top:4px;font-style:italic">"${esc(s.identity)}"</div>` : '';
-    return `<div class="card" data-skill-card="${s.id}" style="cursor:pointer"><div class="row between"><div class="row" style="gap:8px;flex:1;min-width:0"><h3 style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(s.name)}</h3>${title?`<span class="skill-title">${esc(title)}</span>`:''}<span class="tag ${s.active?'on rank-'+rankOf(s.level):''}">${s.active?rankOf(s.level):'paused'}</span></div><span class="mono small dim" style="white-space:nowrap">Lv ${s.level}</span></div><div class="bar"><i style="width:${pct}%"></i></div><div class="small dim" style="margin-top:8px">${esc(detail)}${ladderInfo?` · ${ladderInfo}`:''}${recal}</div>${milestone?`<div class="small dim" style="margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">→ ${esc(milestone)}</div>`:''}${identity}${calibrated?`<div style="margin-top:6px"><span class="calibrated-tag">Calibrated Lv ${s.calibratedLevel}</span></div>`:''}</div>`;
-  }).join('');
-  return `<h2>Skills · ${state.skills.filter(s=>s.active).length} active / ${state.skills.length} total</h2>${rows || '<div class="card dim small">No skills yet.</div>'}<button class="primary" id="add-skill" style="width:100%;margin-top:12px">+ Add skill</button>`;
+    return `
+      <div class="card ${isParked?'skill-card-parked':''}" data-skill-card="${s.id}" style="cursor:pointer">
+        <div class="row between">
+          <div class="row" style="gap:8px;flex:1;min-width:0">
+            <h3 style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(s.name)}</h3>
+            ${isParked ? `<span class="parked-tag">parked</span>` : ''}
+            ${title?`<span class="skill-title">${esc(title)}</span>`:''}
+            <span class="tag ${s.active?'on rank-'+rankOf(s.level):''}">${rankOf(s.level)}</span>
+          </div>
+          <span class="mono small dim" style="white-space:nowrap">Lv ${s.level}</span>
+        </div>
+        <div class="bar"><i style="width:${pct}%"></i></div>
+        <div class="small dim" style="margin-top:8px">${esc(detail)}${ladderInfo?` · ${ladderInfo}`:''}</div>
+        ${milestone?`<div class="small dim" style="margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">→ ${esc(milestone)}</div>`:''}
+        ${identity}
+        ${calibrated?`<div style="margin-top:6px"><span class="calibrated-tag">Calibrated Lv ${s.calibratedLevel}</span></div>`:''}
+        <div class="row" style="gap:6px;margin-top:10px" onclick="event.stopPropagation()">
+          <button class="sm ghost" data-park-toggle="${s.id}">${isParked?'Activate':'Park'}</button>
+        </div>
+      </div>`;
+  }
+
+  const activeHtml = active.length ? active.map(s => renderCard(s, false)).join('') : '<div class="card dim small">No active skills.</div>';
+  const parkedHtml = parked.length ? parked.map(s => renderCard(s, true)).join('') : '';
+
+  const addBtn = atCap
+    ? `<div class="small dim" style="text-align:center;padding:10px">At ${MAX_ACTIVE_SKILLS}/${MAX_ACTIVE_SKILLS}. Park one to free a slot, or delete one.</div>`
+    : `<button class="primary" id="add-skill" style="width:100%;margin-top:12px">+ Add skill</button>`;
+
+  return `
+    <div class="row between" style="margin-bottom:12px">
+      <h1 style="margin:0">Skills</h1>
+      <span class="slot-counter ${atCap?'full':''}">${count}/${MAX_ACTIVE_SKILLS}</span>
+    </div>
+    <h2 style="margin-top:8px">Active</h2>
+    ${activeHtml}
+    ${addBtn}
+    <h2 style="margin-top:24px">Parked ${parked.length ? `(${parked.length})` : ''}</h2>
+    <p class="small dim" style="margin-top:-4px;margin-bottom:12px">Progress kept. Activate to resume quests — if you have a free slot.</p>
+    ${parkedHtml || '<div class="small dim" style="padding:8px 0">None parked.</div>'}
+  `;
 }
 
 function viewBench(){
@@ -1664,9 +1751,13 @@ function viewLog(){
 }
 
 function viewMore(){
-  const telosField = `<div class="field"><label>Telos <span class="dim" style="text-transform:none;letter-spacing:0">(optional)</span></label><textarea id="telos-input" rows="2" placeholder="What is this System for? One sentence.">${esc(state.telos)}</textarea></div>`;
-  const nameField = `<div class="field"><label>Name</label><input id="profile-name" value="${esc(state.name)}" maxlength="40"></div>`;
-  const budgetField = `<div class="field"><label>Daily time budget</label><select id="profile-budget"><option value="15" ${state.timeBudget===15?'selected':''}>15 min</option><option value="30" ${state.timeBudget===30?'selected':''}>30 min</option><option value="45" ${state.timeBudget===45?'selected':''}>45 min</option><option value="60" ${state.timeBudget===60?'selected':''}>60+ min</option></select></div>`;
+  const locked = isCommitted();
+  const lockNote = locked ? `<div class="notice"><b>Committed for ${commitRemainingDays()} more days.</b> You can still log, tick quests, test stats, and swap skills. Editing skill contents and changing settings is locked until then.</div>` : '';
+
+  const telosField = `<div class="field"><label>Telos <span class="dim" style="text-transform:none;letter-spacing:0">(optional)</span></label><textarea id="telos-input" rows="2" placeholder="What is this System for? One sentence." ${locked?'disabled':''}>${esc(state.telos)}</textarea></div>`;
+  const nameField = `<div class="field"><label>Name</label><input id="profile-name" value="${esc(state.name)}" maxlength="40" ${locked?'disabled':''}></div>`;
+  const budgetField = `<div class="field"><label>Daily time budget</label><select id="profile-budget" ${locked?'disabled':''}><option value="15" ${state.timeBudget===15?'selected':''}>15 min</option><option value="30" ${state.timeBudget===30?'selected':''}>30 min</option><option value="45" ${state.timeBudget===45?'selected':''}>45 min</option><option value="60" ${state.timeBudget===60?'selected':''}>60+ min</option></select></div>`;
+  const saveBtn = locked ? '' : '<button class="sm" id="profile-save">Save</button>';
 
   const pauseField = `
     <div class="card">
@@ -1678,13 +1769,21 @@ function viewMore(){
       ${state.pausedUntil ? `<div class="small dim" style="margin-top:6px">Until ${state.pausedUntil}</div>` : ''}
     </div>`;
 
-  return `
-    <h2>Profile</h2><div class="card">${nameField}${telosField}${budgetField}<div class="field"><label style="display:flex;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" id="profile-deload" ${state.deloadEnabled?'checked':''}><span style="text-transform:none;letter-spacing:0;color:var(--txt);font-size:13px">Deload every 10th week</span></label><div class="hint">${state.startedAt?`Started ${state.startedAt}. Week ${deloadWeekStatus().weekNum} now.`:'Not started yet.'}</div></div><button class="sm" id="profile-save">Save</button></div>
+  const commitField = locked
+    ? `<div class="card"><div class="small dim">Committed until <b style="color:var(--txt)">${state.committedUntil}</b>. ${commitRemainingDays()} days remaining.</div></div>`
+    : `<div class="card"><div class="small dim">Not committed. Commit for ${COMMIT_DAYS} days?</div><button class="sm primary" id="commit-30" style="margin-top:10px">Commit</button></div>`;
+
+  const equipSection = renderEquipmentSection();
+  const aiSaveBtn = '<button class="sm primary" id="ai-save">Save AI settings</button>';
+
+  return `${lockNote}
+    <h2>Profile</h2><div class="card">${nameField}${telosField}${budgetField}<div class="field"><label style="display:flex;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" id="profile-deload" ${state.deloadEnabled?'checked':''} ${locked?'disabled':''}><span style="text-transform:none;letter-spacing:0;color:var(--txt);font-size:13px">Deload every 10th week</span></label><div class="hint">${state.startedAt?`Started ${state.startedAt}. Week ${deloadWeekStatus().weekNum} now.`:'Not started yet.'}</div></div>${saveBtn}</div>
     <h2>Pause</h2>${pauseField}
-    <h2>Equipment</h2><div class="card">${renderEquipmentSection()}</div>
-    <h2>AI settings</h2><div class="card"><div class="notice">Optional. Key stays on this device.</div><div class="field"><label>API key</label><input id="ai-key" type="password" value="${esc(state.settings.apiKey)}" placeholder="sk-..."></div><div class="field"><label>Base URL</label><input id="ai-base" value="${esc(state.settings.apiBase)}"></div><div class="field"><label>Model</label><input id="ai-model" value="${esc(state.settings.apiModel)}"></div><button class="sm primary" id="ai-save">Save AI settings</button></div>
-    <h2>Backup</h2><div class="card"><button class="primary" id="export" style="width:100%;margin-bottom:8px">Export backup</button><button id="import" style="width:100%;margin-bottom:8px">Import backup</button><button class="ghost danger" id="startover" style="width:100%">Start over</button></div>
-    <h2>Rules</h2><div class="card small dim"><p><b>Level = round(√power × 2)</b>, where power = sum(stats) + 3 × sum(skill level − 1).</p><p>Level-1 skills contribute 0 power. Level 100 ≈ 2,500 power.</p><p>Stats move only on a benchmark you pass.</p><p>Milestone XP scales quadratically — M0 = 100, M19 = ~1,544.</p><p>Any logged activity preserves the streak.</p><p>Milestones ask for one sentence before ticking. First-time quests pay double.</p><p>Everything is editable any time. Nothing is locked.</p></div>`;
+    <h2>Commitment</h2>${commitField}
+    <h2>Equipment</h2><div class="card">${equipSection}</div>
+    <h2>AI settings</h2><div class="card"><div class="notice">Optional. Key stays on this device.</div><div class="field"><label>API key</label><input id="ai-key" type="password" value="${esc(state.settings.apiKey)}" placeholder="sk-..."></div><div class="field"><label>Base URL</label><input id="ai-base" value="${esc(state.settings.apiBase)}"></div><div class="field"><label>Model</label><input id="ai-model" value="${esc(state.settings.apiModel)}"></div>${aiSaveBtn}</div>
+    <h2>Backup</h2><div class="card"><button class="primary" id="export" style="width:100%;margin-bottom:8px">Export backup</button><button id="import" style="width:100%;margin-bottom:8px">Import backup</button><button class="ghost danger" id="startover" style="width:100%" ${locked?'disabled':''}>Start over</button></div>
+    <h2>Rules</h2><div class="card small dim"><p><b>Level = round(√power × 2)</b>, where power = sum(stats) + 3 × sum(skill level − 1).</p><p>Level-1 skills contribute 0 power. Level 100 ≈ 2,500 power.</p><p>Stats move only on a benchmark you pass.</p><p>Milestone XP scales quadratically — M0 = 100, M19 = ~1,544.</p><p>Any logged activity preserves the streak.</p><p>Max ${MAX_ACTIVE_SKILLS} active skills. Park one to swap — progress preserved.</p><p>Commitment for ${COMMIT_DAYS} days locks skill editing and settings. Adding, deleting, and swapping skills still works.</p></div>`;
 }
 
 /* ═══════════════════════════════════════════
@@ -1783,9 +1882,26 @@ function openMilestoneFriction(skill, i, then){
   };
 }
 
+function togglePark(skillId){
+  const skill = state.skills.find(s => s.id === skillId);
+  if (!skill) return;
+  if (skill.active){
+    skill.active = false;
+    save();
+  } else {
+    if (activeSkillCount() >= MAX_ACTIVE_SKILLS){
+      alert(`Already ${MAX_ACTIVE_SKILLS} active skills. Park one first.`);
+      return;
+    }
+    skill.active = true;
+    save();
+  }
+}
+
 function openSkillDetail(skillId){
   const skill = state.skills.find(s => s.id === skillId);
   if (!skill) return;
+  const locked = isCommitted();
   function renderDetail(){
     const ladder = skill.ladder || [], done = skill.ladderDone || [];
     const nextIdx = currentMilestoneIdx(skill);
@@ -1802,24 +1918,38 @@ function openSkillDetail(skillId){
     const status = skill.status ? esc(skill.status) : '<span class="dim">Not set</span>';
     const isBusinessUndecided = skill.subtype === 'business' && /not decided/i.test(skill.detail || '');
     const currentQuests = (nextIdx >= 0 && skill.milestoneQuests && skill.milestoneQuests[nextIdx]) ? skill.milestoneQuests[nextIdx] : (skill.quests || []);
+    const parked = !skill.active;
     openModal(`
-      <div class="row between" style="margin-bottom:16px"><div><h2 style="margin:0">${esc(skill.name)}</h2>${title?`<div class="skill-title" style="margin-top:6px">${esc(title)}</div>`:''}</div><button class="sm ghost" id="sd-close">×</button></div>
+      <div class="row between" style="margin-bottom:16px"><div><h2 style="margin:0">${esc(skill.name)}</h2>${parked?`<div class="parked-tag" style="margin-top:6px">parked</div>`:''}${title?`<div class="skill-title" style="margin-top:6px">${esc(title)}</div>`:''}</div><button class="sm ghost" id="sd-close">×</button></div>
       ${skill.calibratedLevel && skill.calibratedLevel > 1 ? `<div class="notice" style="background:rgba(255,200,87,.06);border-color:rgba(255,200,87,.3);font-size:13px"><b>Calibrated start:</b> Lv ${skill.calibratedLevel}</div>`:''}
       ${skill.identity?`<div class="notice" style="font-style:italic">"${esc(skill.identity)}"</div>`:''}
       ${nextMilestone?`<div class="milestone-focus"><b>Current focus:</b> ${esc(nextMilestone)}</div>`:''}
-      <div class="card"><div class="row between"><span class="dim small">STATUS</span><button class="sm ghost" id="sd-progress">Update</button></div><div style="margin-top:6px">${status}</div></div>
+      <div class="card"><div class="row between"><span class="dim small">STATUS</span>${locked?'':'<button class="sm ghost" id="sd-progress">Update</button>'}</div><div style="margin-top:6px">${status}</div></div>
       ${currentQuests.length>0?`<div class="row between" style="margin:16px 0 8px"><span class="dim small">DAILY QUESTS FOR CURRENT MILESTONE</span></div><div class="card">${currentQuests.map(q => `<div class="logrow"><span>${esc(q.text)}</span><span class="xp">+${q.xp}</span></div>`).join('')}</div>`:''}
-      ${isBusinessUndecided?`<div class="notice"><b>Business not decided.</b> Tap Regenerate to let AI suggest 3 ideas and build the ladder.</div>`:''}
-      <div class="row between" style="margin:16px 0 8px"><span class="dim small">LADDER (${done.length}/${ladder.length})</span><button class="sm ghost" id="sd-regen-ai">✨ Regenerate</button></div>
+      ${isBusinessUndecided?`<div class="notice"><b>Business not decided.</b> ${locked?'Regenerate will unlock after commitment.':'Tap Regenerate to let AI suggest 3 ideas and build the ladder.'}</div>`:''}
+      <div class="row between" style="margin:16px 0 8px"><span class="dim small">LADDER (${done.length}/${ladder.length})</span>${locked?'<span class="small dim">locked</span>':'<button class="sm ghost" id="sd-regen-ai">✨ Regenerate</button>'}</div>
       <div style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:4px">${ladderHtml}</div>
       ${nextIdx>=0?`<div class="notice" style="margin-top:16px"><b>Next step:</b> ${esc(ladder[nextIdx])}</div>`:(ladder.length?`<div class="notice ok" style="margin-top:16px"><b>Ladder complete.</b></div>`:'')}
-      <div class="row" style="gap:8px;margin-top:16px"><button class="ghost" id="sd-pause" style="flex:1">${skill.active?'Pause':'Activate'}</button><button class="ghost" id="sd-edit" style="flex:1">Edit</button><button class="ghost danger" id="sd-del" style="flex:1">Delete</button></div>`);
+      <div class="row" style="gap:8px;margin-top:16px">
+        <button class="ghost" id="sd-park" style="flex:1">${skill.active?'Park':'Activate'}</button>
+        ${locked?'':'<button class="ghost" id="sd-edit" style="flex:1">Edit</button>'}
+        <button class="ghost danger" id="sd-del" style="flex:1">Delete</button>
+      </div>
+      ${locked?`<div class="small dim" style="margin-top:10px;text-align:center">Editing is locked during commitment (${commitRemainingDays()} days).</div>`:''}
+    `);
     document.getElementById('sd-close').onclick = closeModal;
-    document.getElementById('sd-progress').onclick = () => openProgressionModal(skill, renderDetail);
-    document.getElementById('sd-regen-ai').onclick = () => openLadderAI(skill, renderDetail);
-    document.getElementById('sd-pause').onclick = () => { skill.active = !skill.active; save(); renderDetail(); };
-    document.getElementById('sd-edit').onclick = () => { closeModal(); openSkillEditor(skill.id); };
-    document.getElementById('sd-del').onclick = () => { if (!confirm(`Delete "${skill.name}"?`)) return; state.skills = state.skills.filter(s => s.id !== skill.id); save(); closeModal(); };
+    const progBtn = document.getElementById('sd-progress');
+    if (progBtn) progBtn.onclick = () => openProgressionModal(skill, renderDetail);
+    const regenBtn = document.getElementById('sd-regen-ai');
+    if (regenBtn) regenBtn.onclick = () => openLadderAI(skill, renderDetail);
+    document.getElementById('sd-park').onclick = () => { togglePark(skill.id); closeModal(); };
+    const editBtn = document.getElementById('sd-edit');
+    if (editBtn) editBtn.onclick = () => { closeModal(); openSkillEditor(skill.id); };
+    document.getElementById('sd-del').onclick = () => {
+      if (!confirm(`Delete "${skill.name}" permanently? Its progress and milestones will be lost. If you just want a break, use Park instead.`)) return;
+      state.skills = state.skills.filter(s => s.id !== skill.id);
+      save(); closeModal();
+    };
     document.querySelectorAll('[data-ladder]').forEach(el => {
       el.onclick = () => {
         const i = +el.dataset.ladder;
@@ -1876,6 +2006,16 @@ function openLadderAI(skill, back){
 
 function openSkillEditor(skillId){
   const skill = skillId ? state.skills.find(s => s.id === skillId) : null;
+  /* PATCH: only block editing of EXISTING skills during commit. Creating new skills is allowed. */
+  if (isCommitted() && skill){
+    openModal(`
+      <h2>Locked</h2>
+      <p class="small dim">Skill editing is locked during commitment. ${commitRemainingDays()} days remaining.</p>
+      <p class="small dim" style="margin-top:10px">You can still park, activate, delete this skill, or add a new one from the catalog. Just not edit this skill's contents.</p>
+      <button class="primary" style="width:100%;margin-top:16px" onclick="closeModal()">OK</button>
+    `);
+    return;
+  }
   const isNew = !skill;
   const draft = skill ? JSON.parse(JSON.stringify(skill)) : makeSkillFromTemplate({ subtype: 'custom', label: 'New skill' }, 'New skill');
   draft.ladderDone = draft.ladderDone || []; draft.ladderEarned = draft.ladderEarned || [];
@@ -1892,7 +2032,7 @@ function openSkillEditor(skillId){
     else if (idx >= 0 && draft.milestoneQuests[idx]) questsToEdit = draft.milestoneQuests[idx];
     else if (draft.quests) questsToEdit = draft.quests;
     const questSection = isWorkout ? `<div class="field"><label>Exercises</label><div id="exercises">${draft.plan.exercises.map((e,i) => `<div class="exercise-row"><input placeholder="Name" value="${esc(e.name)}" data-ex="${i}" data-key="name"><input type="number" min="1" placeholder="Sets" value="${e.sets}" data-ex="${i}" data-key="sets"><input type="number" min="1" placeholder="Reps" value="${e.reps}" data-ex="${i}" data-key="reps"><button class="sm ghost danger" data-remove-ex="${i}">×</button></div>`).join('')}</div><button class="sm" id="add-ex" style="margin-top:8px">+ Add exercise</button></div><div class="field"><label>Workout days</label><div class="day-picker">${[0,1,2,3,4,5,6].map(d => `<button type="button" class="${draft.plan.workoutDays.includes(d)?'primary':'ghost'}" data-wday="${d}">${dayShort(d)}</button>`).join('')}</div></div><div class="field"><label>Attempt day</label><div class="day-picker">${[0,1,2,3,4,5,6].map(d => `<button type="button" class="${draft.plan.attemptDay===d?'primary':'ghost'}" data-aday="${d}">${dayShort(d)}</button>`).join('')}</div></div>${showCardio?`<div class="field"><label style="display:flex;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" id="sk-cardio" ${draft.cardioEnabled!==false?'checked':''}><span style="text-transform:none;letter-spacing:0;color:var(--txt);font-size:13px">Cardio on rest days</span></label></div>`:''}` : `${currentMilestone?`<div class="milestone-focus"><b>Quests for:</b> ${esc(currentMilestone)}</div>`:''}<div class="field"><label>Daily quests</label><div id="quests">${questsToEdit.map((q,i) => `<div class="exercise-row" style="grid-template-columns:1fr 70px 30px"><input value="${esc(q.text)}" data-q="${i}" data-key="text"><input type="number" min="1" value="${q.xp}" data-q="${i}" data-key="xp"><button class="sm ghost danger" data-remove-q="${i}">×</button></div>`).join('')}</div><button class="sm" id="add-q" style="margin-top:8px">+ Add quest</button></div><button class="sm ghost" id="gen-ai" style="width:100%;margin-top:8px">✨ Generate quests with AI</button>`;
-    openModal(`<h2>${isNew?'New skill':'Edit skill'}</h2><div class="field"><label>Name</label><input id="sk-name" value="${esc(draft.name)}" maxlength="40"></div><div class="field"><label>Status</label><input id="sk-status" value="${esc(draft.status||'')}" placeholder="e.g. Complete beginner"></div>${!isNew?`<div class="field"><label>Type</label><div class="row" style="gap:8px"><button class="sm ${draft.type==='standard'?'primary':'ghost'}" id="type-std" style="flex:1">Standard</button><button class="sm ${draft.type==='workout'?'primary':'ghost'}" id="type-wk" style="flex:1">Workout plan</button></div></div>`:''}${questSection}<hr><div class="small dim" style="margin-bottom:10px">Optional. Helpful for AI suggestions and for your own commitment.</div><div class="field"><label>Why this matters <span class="dim" style="text-transform:none;letter-spacing:0">(optional)</span></label><input id="sk-why" value="${esc(draft.why)}" placeholder="One sentence."></div><div class="field"><label>Identity <span class="dim" style="text-transform:none;letter-spacing:0">(optional)</span></label><input id="sk-identity" value="${esc(draft.identity)}" placeholder="I am someone who..."></div><div class="field"><label>Drop criteria <span class="dim" style="text-transform:none;letter-spacing:0">(optional)</span></label><input id="sk-quit" value="${esc(draft.quitCriteria)}" placeholder="e.g. not touched in 30 days"></div><div class="row" style="gap:8px;margin-top:16px"><button class="ghost" id="cancel" style="flex:1">Cancel</button><button class="primary" id="save" style="flex:2">${isNew?'Create':'Save'}</button></div>`);
+    openModal(`<h2>${isNew?'New skill':'Edit skill'}</h2><div class="field"><label>Name</label><input id="sk-name" value="${esc(draft.name)}" maxlength="40"></div><div class="field"><label>Status</label><input id="sk-status" value="${esc(draft.status||'')}" placeholder="e.g. Complete beginner"></div>${!isNew?`<div class="field"><label>Type</label><div class="row" style="gap:8px"><button class="sm ${draft.type==='standard'?'primary':'ghost'}" id="type-std" style="flex:1">Standard</button><button class="sm ${draft.type==='workout'?'primary':'ghost'}" id="type-wk" style="flex:1">Workout plan</button></div></div>`:''}${questSection}<hr><div class="small dim" style="margin-bottom:10px">Optional. Helpful for AI suggestions and your own commitment.</div><div class="field"><label>Why this matters <span class="dim" style="text-transform:none;letter-spacing:0">(optional)</span></label><input id="sk-why" value="${esc(draft.why)}" placeholder="One sentence."></div><div class="field"><label>Identity <span class="dim" style="text-transform:none;letter-spacing:0">(optional)</span></label><input id="sk-identity" value="${esc(draft.identity)}" placeholder="I am someone who..."></div><div class="field"><label>Drop criteria <span class="dim" style="text-transform:none;letter-spacing:0">(optional)</span></label><input id="sk-quit" value="${esc(draft.quitCriteria)}" placeholder="e.g. not touched in 30 days"></div><div class="row" style="gap:8px;margin-top:16px"><button class="ghost" id="cancel" style="flex:1">Cancel</button><button class="primary" id="save" style="flex:2">${isNew?'Create':'Save'}</button></div>`);
     document.getElementById('cancel').onclick = closeModal;
     document.getElementById('sk-name').oninput = e => { draft.name = e.target.value; };
     document.getElementById('sk-why').oninput = e => { draft.why = e.target.value; };
@@ -1905,7 +2045,10 @@ function openSkillEditor(skillId){
     document.getElementById('save').onclick = () => {
       if (!draft.name.trim()) return alert('Name required.');
       const cardioEl = document.getElementById('sk-cardio'); if (cardioEl) draft.cardioEnabled = cardioEl.checked;
-      if (isNew){ draft.id = newId(); draft.level = 1; draft.xp = 0; draft.active = true; if (!draft.ladder) draft.ladder = defaultLadderFor(draft.subtype || 'custom'); if (draft.workoutsSinceAttempt === undefined) draft.workoutsSinceAttempt = 0; if (draft.cardioEnabled === undefined) draft.cardioEnabled = true; state.skills.push(draft); }
+      if (isNew){
+        if (activeSkillCount() >= MAX_ACTIVE_SKILLS){ alert(`Max ${MAX_ACTIVE_SKILLS} active skills.`); return; }
+        draft.id = newId(); draft.level = 1; draft.xp = 0; draft.active = true; if (!draft.ladder) draft.ladder = defaultLadderFor(draft.subtype || 'custom'); if (draft.workoutsSinceAttempt === undefined) draft.workoutsSinceAttempt = 0; if (draft.cardioEnabled === undefined) draft.cardioEnabled = true; state.skills.push(draft);
+      }
       else { const i = state.skills.findIndex(s => s.id === draft.id); state.skills[i] = draft; }
       ensureMilestoneQuests(draft); save(); closeModal();
     };
@@ -1977,7 +2120,7 @@ function openSkillPicker(onCreated){
   let selected = null;
   function renderPicker(){
     if (!selected){
-      openModal(`<h2>Add a skill</h2><div style="margin-top:12px">${SKILL_SUGGESTIONS.map(sug => `<div class="skill-row" data-pick-cat="${sug.id}"><span>${esc(sug.label)}</span><span class="dim">›</span></div>`).join('')}<div class="skill-row" data-pick-custom="1"><span>Custom skill</span><span class="dim">›</span></div></div><div class="row" style="gap:8px;margin-top:16px"><button class="ghost" id="sp-cancel" style="width:100%">Cancel</button></div>`);
+      openModal(`<h2>Add a skill</h2><div class="small dim">Active: ${activeSkillCount()}/${MAX_ACTIVE_SKILLS}</div><div style="margin-top:12px">${SKILL_SUGGESTIONS.map(sug => `<div class="skill-row" data-pick-cat="${sug.id}"><span>${esc(sug.label)}</span><span class="dim">›</span></div>`).join('')}<div class="skill-row" data-pick-custom="1"><span>Custom skill</span><span class="dim">›</span></div></div><div class="row" style="gap:8px;margin-top:16px"><button class="ghost" id="sp-cancel" style="width:100%">Cancel</button></div>`);
       document.getElementById('sp-cancel').onclick = closeModal;
       document.querySelectorAll('[data-pick-cat]').forEach(el => { el.onclick = () => { selected = SKILL_SUGGESTIONS.find(s => s.id === el.dataset.pickCat); renderPicker(); }; });
       document.querySelector('[data-pick-custom]').onclick = () => { selected = { custom: true }; renderPicker(); };
@@ -1986,7 +2129,11 @@ function openSkillPicker(onCreated){
     if (selected.custom){
       openModal(`<h2>Custom skill</h2><div class="field"><label>Name</label><input id="sp-name" placeholder="e.g., Chess, Pottery"></div><div class="row" style="gap:8px"><button class="ghost" id="sp-back" style="flex:1">Back</button><button class="primary" id="sp-create" style="flex:2">Add</button></div>`);
       document.getElementById('sp-back').onclick = () => { selected = null; renderPicker(); };
-      document.getElementById('sp-create').onclick = () => { const name = document.getElementById('sp-name').value.trim(); if (!name) return alert('Name required.'); const skill = makeSkillFromTemplate({ subtype: 'custom', label: name }, name); closeModal(); openProgressionModal(skill, () => onCreated(skill)); };
+      document.getElementById('sp-create').onclick = () => {
+        const name = document.getElementById('sp-name').value.trim(); if (!name) return alert('Name required.');
+        const skill = makeSkillFromTemplate({ subtype: 'custom', label: name }, name);
+        closeModal(); openProgressionModal(skill, () => onCreated(skill));
+      };
       return;
     }
     openModal(`<h2>${esc(selected.label)}</h2><p class="small dim">${esc(selected.ask)}</p><div style="margin-top:12px">${selected.options.map(opt => `<div class="skill-row" data-pick-opt="${esc(opt)}"><span>${esc(opt)}</span><span class="dim">›</span></div>`).join('')}</div><div class="row" style="gap:8px;margin-top:16px"><button class="ghost" id="sp-back" style="width:100%">Back</button></div>`);
@@ -2030,6 +2177,9 @@ function importBackup(){
 function bind(){
   document.querySelectorAll('[data-nav]').forEach(el => { el.onclick = () => navTo(el.dataset.nav); });
   document.querySelectorAll('[data-skill-card]').forEach(el => { el.onclick = () => openSkillDetail(el.dataset.skillCard); });
+  document.querySelectorAll('[data-park-toggle]').forEach(el => {
+    el.onclick = (e) => { e.stopPropagation(); togglePark(el.dataset.parkToggle); };
+  });
   document.querySelectorAll('[data-basic]').forEach(el => {
     el.onchange = () => {
       const t = today();
@@ -2089,7 +2239,12 @@ function bind(){
   });
   document.querySelectorAll('[data-xp]').forEach(el => { el.onclick = () => { addXP(+el.dataset.xp, el.dataset.note, null, logDate); save(); }; });
   const logDateInput = document.getElementById('log-date'); if (logDateInput) logDateInput.onchange = () => { logDate = logDateInput.value || today(); };
-  const addSkill = document.getElementById('add-skill'); if (addSkill) addSkill.onclick = () => openSkillPicker(skill => { state.skills.push(skill); save(); });
+  /* PATCH: adding a new skill is allowed during the commit lock — only the 5-slot cap blocks it. */
+  const addSkill = document.getElementById('add-skill');
+  if (addSkill) addSkill.onclick = () => {
+    if (activeSkillCount() >= MAX_ACTIVE_SKILLS){ alert(`Max ${MAX_ACTIVE_SKILLS} active. Park one first.`); return; }
+    openSkillPicker(skill => { if (activeSkillCount() >= MAX_ACTIVE_SKILLS) { alert(`Max ${MAX_ACTIVE_SKILLS} active.`); return; } state.skills.push(skill); save(); });
+  };
   const adjgo = document.getElementById('adjgo'); if (adjgo) adjgo.onclick = () => { const xp = parseInt(document.getElementById('adj').value, 10); const note = document.getElementById('adjnote').value || 'Adjustment'; if (!xp) return; addXP(xp, note, null, logDate); save(); };
   const pSave = document.getElementById('profile-save');
   if (pSave) pSave.onclick = () => {
@@ -2109,6 +2264,12 @@ function bind(){
     }
     save();
   };
+  const commitBtn = document.getElementById('commit-30');
+  if (commitBtn) commitBtn.onclick = () => {
+    if (!confirm(`Commit for ${COMMIT_DAYS} days? Skill editing and settings will lock. You can still add, delete, and swap skills and use everything else.`)) return;
+    state.committedUntil = dateOffset(COMMIT_DAYS);
+    save();
+  };
   const addTelos = document.getElementById('add-telos'); if (addTelos) addTelos.onclick = openTelosModal;
   document.querySelectorAll('[data-eq]').forEach(el => { el.onchange = () => { state.equipment = state.equipment || []; const id = el.dataset.eq; const idx = state.equipment.indexOf(id); if (el.checked && idx < 0) state.equipment.push(id); if (!el.checked && idx >= 0) state.equipment.splice(idx, 1); save(); }; });
   document.querySelectorAll('[data-eqw]').forEach(el => { el.onchange = () => { state.equipmentWeights = state.equipmentWeights || {}; state.equipmentWeights[el.dataset.eqw] = parseFloat(el.value) || 0; save(); }; });
@@ -2118,6 +2279,7 @@ function bind(){
   const imp = document.getElementById('import'); if (imp) imp.onclick = importBackup;
   const startOver = document.getElementById('startover');
   if (startOver) startOver.onclick = () => {
+    if (isCommitted()){ alert(`Locked during commitment (${commitRemainingDays()} days).`); return; }
     if (!confirm('Erase everything?')) return;
     if (!confirm('Really erase all progress?')) return;
     localStorage.removeItem(KEY);

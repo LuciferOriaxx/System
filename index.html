@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0a0e14">
+<link rel="manifest" href="./manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="System">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
 <title>The System</title>
 <style>
 :root{--bg:#0a0e14;--panel:#111823;--line:#1d2836;--txt:#c8d4e4;--dim:#6b7c93;
@@ -116,8 +122,14 @@ details>summary:active{background:#16202e}
 .stat-label-stale{color:var(--gold)}
 .milestone-focus{background:rgba(77,166,255,.06);border-left:3px solid var(--accent);
   padding:8px 12px;border-radius:4px;font-size:13px;margin:10px 0}
+.skill-title{display:inline-block;font-size:11px;letter-spacing:.15em;text-transform:uppercase;
+  color:var(--gold);font-weight:600;padding:2px 6px;border-radius:4px;background:rgba(255,200,87,.1)}
 .difficulty-toast{position:fixed;bottom:90px;left:0;right:0;display:flex;justify-content:center;z-index:90;pointer-events:none}
 .difficulty-toast>div{pointer-events:auto}
+.levelup-toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:190;
+  padding:10px 18px;border-radius:10px;background:#111823;border:1px solid var(--line);
+  box-shadow:0 8px 24px rgba(0,0,0,.5);font-size:13px;animation:fadeIn .3s ease}
+@keyframes fadeIn{from{opacity:0;transform:translate(-50%,-10px)}to{opacity:1;transform:translate(-50%,0)}}
 .equip-weight{display:grid;grid-template-columns:1fr 90px;gap:8px;align-items:center;margin-top:6px;padding-left:26px}
 .equip-weight input{min-height:36px;padding:6px 8px;font-size:13px}
 .levelup-overlay{position:fixed;inset:0;background:rgba(10,14,20,.92);z-index:200;
@@ -164,12 +176,13 @@ details>summary:active{background:#16202e}
 </nav>
 
 <script>
-/* ═════ RULES ═════ */
-const xpForLevel = n => 50 * n * (n - 1);
-function levelFromXP(xp){ let n = 1; while (xpForLevel(n+1) <= xp) n++; return n; }
+/* ═══════════════════════════════════════════
+   RULES
+   ═══════════════════════════════════════════ */
 const skillXpForLevel = L => 10 * L;
 const RANK_TABLE = [[50,'S'],[40,'A'],[30,'B'],[20,'C'],[10,'D'],[1,'E']];
 const rankOf = lvl => RANK_TABLE.find(([m]) => lvl >= m)[1];
+
 function addSkillXP(skill, amount){
   skill.xp += amount;
   let leveled = 0;
@@ -181,17 +194,56 @@ function addSkillXP(skill, amount){
 }
 function subtractSkillXP(skill, amount){
   skill.xp -= amount;
-  let leveledDown = 0;
   while (skill.xp < 0 && skill.level > 1){
     skill.level--;
     skill.xp += skillXpForLevel(skill.level);
-    leveledDown++;
   }
   if (skill.xp < 0) skill.xp = 0;
-  return leveledDown;
 }
 
-/* ═════ BENCHMARKS ═════ */
+/* ═══════════════════════════════════════════
+   PLAYER LEVEL — derived from stats + skills
+   ═══════════════════════════════════════════ */
+function computeTotalPower(){
+  const statSum = Object.values(state.stats || {}).reduce((a,b) => a + (b||0), 0);
+  const skillSum = (state.skills || []).reduce((a,s) => a + (s.level||1), 0);
+  return statSum + skillSum * 3;
+}
+function computePlayerLevel(){
+  const power = computeTotalPower();
+  return Math.max(1, Math.min(100, Math.round(power / 10)));
+}
+function powerForLevel(n){ return Math.max(0, n * 10); }
+
+/* ═══════════════════════════════════════════
+   SKILL TITLES (per rank, per subtype)
+   ═══════════════════════════════════════════ */
+const SKILL_TITLES = {
+  language:      { D:'The Student', C:'The Conversationalist', B:'The Fluent', A:'The Bilingual', S:'The Polyglot' },
+  coding:        { D:'The Scriptor', C:'The Developer', B:'The Engineer', A:'The Architect', S:'The Master' },
+  business:      { D:'The Founder', C:'The Operator', B:'The Builder', A:'The Magnate', S:'The Mogul' },
+  fitness:       { D:'The Iron', C:'The Steel', B:'The Peak', A:'The Apex', S:'The Legend' },
+  reading:       { D:'The Reader', C:'The Scholar', B:'The Sage', A:'The Oracle', S:'The Library' },
+  writing:       { D:'The Scribe', C:'The Author', B:'The Novelist', A:'The Voice', S:'The Laureate' },
+  engineering:   { D:'The Tinkerer', C:'The Builder', B:'The Engineer', A:'The Architect', S:'The Master Builder' },
+  instrument:    { D:'The Beginner', C:'The Player', B:'The Musician', A:'The Virtuoso', S:'The Maestro' },
+  art:           { D:'The Sketcher', C:'The Artist', B:'The Painter', A:'The Master', S:'The Old Master' },
+  mind:          { D:'The Calm', C:'The Focused', B:'The Centered', A:'The Wise', S:'The Enlightened' },
+  publicspeaking:{ D:'The Voice', C:'The Speaker', B:'The Orator', A:'The Rhetorician', S:'The Legend' },
+  cooking:       { D:'The Cook', C:'The Chef', B:'The Master Chef', A:'The Maestro', S:'The Legend' },
+  custom:        { D:'Adept', C:'Skilled', B:'Proficient', A:'Expert', S:'Master' }
+};
+function titleForSkill(skill){
+  if (!skill) return null;
+  const rank = rankOf(skill.level);
+  if (rank === 'E') return null;
+  const titles = SKILL_TITLES[skill.subtype] || SKILL_TITLES.custom;
+  return titles[rank] || null;
+}
+
+/* ═══════════════════════════════════════════
+   BENCHMARKS
+   ═══════════════════════════════════════════ */
 const BENCHMARKS = {
   STR: {
     label: 'Strength',
@@ -271,6 +323,9 @@ const BENCHMARKS = {
   }
 };
 
+/* ═══════════════════════════════════════════
+   EXERCISE DERIVATION
+   ═══════════════════════════════════════════ */
 function strToMaxes(tier){
   const map = {
     5:   { pushups: 5,  pullups: 0, dips: 0, squats: 15, plank: 20 },
@@ -283,27 +338,22 @@ function strToMaxes(tier){
   };
   return map[tier] || map[5];
 }
+const EQUIPMENT_NEEDED_SUBTYPES = ['Calisthenics','Weightlifting','Mixed fitness'];
+function fitnessNeedsEquipment(detail){ return EQUIPMENT_NEEDED_SUBTYPES.includes(detail); }
 
-const EQUIPMENT_NEEDED_SUBTYPES = ['Calisthenics', 'Weightlifting', 'Mixed fitness'];
-function fitnessNeedsEquipment(detail){
-  return EQUIPMENT_NEEDED_SUBTYPES.includes(detail);
-}
-
-function getWeightedExercise(weights, str){
+function getWeightedExercise(weights){
   if (!weights) return null;
-  const w = weights;
-  // Lower weight = higher reps. Target: reps ~ 300 / weight, clamped 4..20.
-  if (w.barbell && w.barbell >= 10){
-    const reps = Math.max(4, Math.min(15, Math.round(300 / w.barbell)));
-    return { name: `Barbell RDL (${w.barbell}kg)`, sets: 3, reps, unit: 'reps' };
+  if (weights.barbell && weights.barbell >= 10){
+    const reps = Math.max(4, Math.min(15, Math.round(300 / weights.barbell)));
+    return { name: `Barbell RDL (${weights.barbell}kg)`, sets: 3, reps, unit: 'reps' };
   }
-  if (w.dumbbell && w.dumbbell >= 4){
-    const reps = Math.max(5, Math.min(20, Math.round(300 / w.dumbbell)));
-    return { name: `Dumbbell rows (${w.dumbbell}kg)`, sets: 3, reps, unit: 'reps' };
+  if (weights.dumbbell && weights.dumbbell >= 4){
+    const reps = Math.max(5, Math.min(20, Math.round(300 / weights.dumbbell)));
+    return { name: `Dumbbell rows (${weights.dumbbell}kg)`, sets: 3, reps, unit: 'reps' };
   }
-  if (w.kettlebell && w.kettlebell >= 4){
-    const reps = Math.max(5, Math.min(20, Math.round(300 / w.kettlebell)));
-    return { name: `Kettlebell swings (${w.kettlebell}kg)`, sets: 3, reps, unit: 'reps' };
+  if (weights.kettlebell && weights.kettlebell >= 4){
+    const reps = Math.max(5, Math.min(20, Math.round(300 / weights.kettlebell)));
+    return { name: `Kettlebell swings (${weights.kettlebell}kg)`, sets: 3, reps, unit: 'reps' };
   }
   return null;
 }
@@ -315,8 +365,8 @@ function deriveExercisesFromStats(){
   const hasDipBars = (state.equipment || []).includes('dip_bars');
   const weights = state.equipmentWeights || {};
   const maxes = strToMaxes(str);
-
   const reps = max => Math.max(2, Math.round(max * 0.6));
+
   let sets, maxExercises;
   if (budget <= 15){ sets = 2; maxExercises = 3; }
   else if (budget <= 30){ sets = 3; maxExercises = 4; }
@@ -334,20 +384,15 @@ function deriveExercisesFromStats(){
   if (str >= 20)
     all.push({ name: 'Wall handstand', sets, reps: str >= 40 ? 45 : 20, unit: 'sec' });
 
-  // Weighted exercise at the end, replaces bodyweight variant if available
-  const weighted = getWeightedExercise(weights, str);
+  const weighted = getWeightedExercise(weights);
   if (weighted) all.push(weighted);
 
   return all.slice(0, maxExercises + (weighted ? 1 : 0));
 }
 
-/* ═════ STARTING LEVEL FROM STATS ═════ */
-function computeStartingLevel(stats){
-  const sum = (stats.STR||0) + (stats.AGI||0) + (stats.VIT||0) + (stats.INT||0) + (stats.PER||0);
-  return Math.max(1, Math.min(50, Math.round(sum / 10)));
-}
-
-/* ═════ EQUIPMENT ═════ */
+/* ═══════════════════════════════════════════
+   EQUIPMENT
+   ═══════════════════════════════════════════ */
 const EQUIPMENT_OPTIONS = [
   { id: 'pullup_bar', label: 'Pullup bar' },
   { id: 'dumbbells', label: 'Dumbbells', weight: 'dumbbell', weightLabel: 'Weight per dumbbell', weightUnit: 'kg' },
@@ -399,100 +444,285 @@ function renderEquipmentSection(){
     </div>`;
 }
 
-/* ═════ SKILL SUGGESTIONS ═════ */
+/* ═══════════════════════════════════════════
+   SKILL SUGGESTIONS
+   ═══════════════════════════════════════════ */
 const SKILL_SUGGESTIONS = [
-  { id: 'fitness', label: 'Fitness & strength', ask: 'What type?', options: ['Calisthenics', 'Weightlifting', 'Running', 'Yoga', 'Pilates', 'Mixed fitness'], subtype: 'fitness' },
-  { id: 'language', label: 'Learn a language', ask: 'Which language?', options: ['Spanish', 'French', 'German', 'Italian', 'Japanese', 'Mandarin', 'Arabic', 'Portuguese', 'Dutch', 'Other'], subtype: 'language' },
-  { id: 'coding', label: 'Learn to code', ask: 'Focus?', options: ['Web development', 'Mobile apps', 'Game development', 'Data science', 'Automation / scripting', 'Full-stack'], subtype: 'coding' },
-  { id: 'business', label: 'Build a business', ask: 'What type?', options: ['Not decided yet', 'Freelancing', 'E-commerce', 'SaaS / software', 'Consulting', 'Local service', 'Content / creator', 'Other'], subtype: 'business' },
-  { id: 'reading', label: 'Read more', ask: 'Preference?', options: ['Non-fiction', 'Fiction', 'Both', 'Business', 'Science', 'History', 'Philosophy'], subtype: 'reading' },
-  { id: 'writing', label: 'Write a book', ask: 'What kind?', options: ['Non-fiction', 'Fiction', 'Essay collection', 'Memoir', 'Technical', 'Not sure yet'], subtype: 'writing' },
-  { id: 'instrument', label: 'Learn an instrument', ask: 'Which one?', options: ['Guitar', 'Piano', 'Drums', 'Bass', 'Violin', 'Ukulele', 'Other'], subtype: 'instrument' },
-  { id: 'art', label: 'Art & drawing', ask: 'What kind?', options: ['Drawing', 'Painting', 'Digital art', 'Sculpture', 'Photography'], subtype: 'art' },
-  { id: 'mind', label: 'Mind & focus', ask: 'Practice?', options: ['Meditation', 'Journaling', 'Chess', 'Deep work'], subtype: 'mind' },
-  { id: 'publicspeaking', label: 'Public speaking', ask: 'Context?', options: ['Work presentations', 'Debate', 'Teaching', 'Content creation'], subtype: 'publicspeaking' },
-  { id: 'engineering', label: 'Engineering / technical', ask: 'Branch?', options: ['Civil', 'Mechanical', 'Electrical', 'Software', 'Other'], subtype: 'engineering' },
-  { id: 'cooking', label: 'Cooking', ask: 'Focus?', options: ['Everyday cooking', 'Baking', 'Specific cuisine', 'Professional'], subtype: 'cooking' }
+  { id: 'fitness', label: 'Fitness & strength', ask: 'What type?', options: ['Calisthenics','Weightlifting','Running','Yoga','Pilates','Mixed fitness'], subtype: 'fitness' },
+  { id: 'language', label: 'Learn a language', ask: 'Which language?', options: ['Spanish','French','German','Italian','Japanese','Mandarin','Arabic','Portuguese','Dutch','Other'], subtype: 'language' },
+  { id: 'coding', label: 'Learn to code', ask: 'Focus?', options: ['Web development','Mobile apps','Game development','Data science','Automation / scripting','Full-stack'], subtype: 'coding' },
+  { id: 'business', label: 'Build a business', ask: 'What type?', options: ['Not decided yet','Freelancing','E-commerce','SaaS / software','Consulting','Local service','Content / creator','Other'], subtype: 'business' },
+  { id: 'reading', label: 'Read more', ask: 'Preference?', options: ['Non-fiction','Fiction','Both','Business','Science','History','Philosophy'], subtype: 'reading' },
+  { id: 'writing', label: 'Write a book', ask: 'What kind?', options: ['Non-fiction','Fiction','Essay collection','Memoir','Technical','Not sure yet'], subtype: 'writing' },
+  { id: 'instrument', label: 'Learn an instrument', ask: 'Which one?', options: ['Guitar','Piano','Drums','Bass','Violin','Ukulele','Other'], subtype: 'instrument' },
+  { id: 'art', label: 'Art & drawing', ask: 'What kind?', options: ['Drawing','Painting','Digital art','Sculpture','Photography'], subtype: 'art' },
+  { id: 'mind', label: 'Mind & focus', ask: 'Practice?', options: ['Meditation','Journaling','Chess','Deep work'], subtype: 'mind' },
+  { id: 'publicspeaking', label: 'Public speaking', ask: 'Context?', options: ['Work presentations','Debate','Teaching','Content creation'], subtype: 'publicspeaking' },
+  { id: 'engineering', label: 'Engineering / technical', ask: 'Branch?', options: ['Civil','Mechanical','Electrical','Software','Other'], subtype: 'engineering' },
+  { id: 'cooking', label: 'Cooking', ask: 'Focus?', options: ['Everyday cooking','Baking','Specific cuisine','Professional'], subtype: 'cooking' }
 ];
 
-/* ═════ LADDERS ═════ */
+/* ═══════════════════════════════════════════
+   LADDERS — expanded
+   ═══════════════════════════════════════════ */
 const LADDER_PRESETS = {
-  language: ['A1 — 500 words, present tense, introduce yourself', 'A2 — 1,500 words, past tenses, 15-min conversation', 'B1 — 3,000 words, all major tenses, 30-min conversation, read news', 'B2 — 5,000 words, subjunctive, 1-hour discussion, series without subtitles', 'C1 — Professional fluency', 'C2 — Native-adjacent'],
-  coding: ['HTML + CSS — one static page live', 'Git + first GitHub repo', 'JS basics — variables, functions, loops', '3 small projects built and deployed', 'Python — one working script', 'One API + database, full CRUD', 'TypeScript + React', 'Auth working on a real project', 'Ship something a stranger uses', 'Open-source contribution or a full game'],
-  business: ['Idea or niche written down in one sentence', '10 customer conversations done', 'One-page proposition written', 'Company registered, bank open, domain secured', 'MVP live — public, usable', 'First customer enquiry', 'First paying customer', '10 paying customers or £500 / 3 months', '£2k / 3 months recurring', '£10k / 3 months — systems, small team', '£50k / 3 months — market leader'],
-  reading: ['1 book finished this month', '6 books/year with notes', '12 books/year with applied ideas', '18 books/year, one project built from them', '24 books/year', '30+ books/year — original synthesis'],
-  writing: ['Premise + outline', 'First 1,000 words', 'First chapter', '10k words', '30k words — Act 1 complete', 'Full first draft', 'Beta readers engaged', 'Edited draft', 'Submission or self-pub ready', 'Published — reviews, sales'],
-  fitness: ['Complete first full workout', '1 week of consistent workouts', '4 weeks consistent', 'First PR (new max in any lift/movement)', 'Noticeable strength gain', '8 weeks consistent — habit locked', 'Complete a full program', 'Hit intermediate benchmarks (see STR)', 'Hit advanced benchmarks', 'Maintain consistency for 1 year'],
-  engineering: ['Branch chosen', 'Maths and mechanics refreshed', 'CAD refresher done', '3 portfolio drawings or models', 'Professional body membership', 'Portfolio project complete', '5 applications submitted', 'First interview', 'First role or contract', 'Professional registration'],
-  art: ['Foundational technique studied', 'First 30 drawings/sketches done', 'One coherent series (10 pieces)', 'Public sharing begun', 'First commission or sale', 'Recognisable style', 'Local exhibition or feature', 'Consistent body of work'],
-  instrument: ['First chord or scale learned', '15 min practice daily for a week', 'Play a simple song end-to-end', 'Basic scales in 2 keys', 'Barre chords or equivalent technique', 'Play 5 songs by memory', 'Play with another musician', 'First performance', 'Compose or improvise', 'Comfortable across keys and styles'],
-  mind: ['Started daily practice', '1 week consistent', '4 weeks consistent', '30 min uninterrupted session', 'Noticeable focus change in daily life', '45 min session or equivalent', '3 months consistent', 'Practice becomes automatic'],
-  publicspeaking: ['First 3-min speech recorded on phone', 'Studied one speaking framework', 'Presented to 1 person', 'Presented to 5 people', 'Presented to 20 people', 'Joined a local speaking club', 'First formal speech', 'First paid or invited talk'],
-  cooking: ['First meal cooked from scratch', '10 recipes learned by heart', 'Cook a full meal for 4 people', 'Knife skills practiced', 'One consistent cuisine learned', 'Confident with any ingredient given', 'First dish you would serve a chef', 'Cookbook or blog started']
+  language: [
+    'A1 — 500 words, present tense',
+    'A1 — introduce yourself, 5-min conversation',
+    'A1 — understand slow speech',
+    'A2 — 1,500 words, past tenses',
+    'A2 — 15-min conversation, travel/ordering',
+    'A2 — read simple text, understand songs',
+    'B1 — 3,000 words, all major tenses',
+    'B1 — 30-min conversation',
+    'B1 — news article, learner podcasts',
+    'B2 — 5,000 words, subjunctive',
+    'B2 — 1-hour discussion, no subtitles',
+    'B2 — read a novel',
+    'C1 — professional fluency, complex topics',
+    'C1 — watch any content',
+    'C1 — write formal documents',
+    'C2 — native-adjacent',
+    'C2 — literature, wordplay',
+    'C2 — teach the language to others'
+  ],
+  coding: [
+    'HTML + CSS — one static page live',
+    'Git + first GitHub repo',
+    'JS basics — variables, functions, loops',
+    'JS — objects, DOM, events',
+    '3 small projects built and deployed',
+    'Python — one working script',
+    'Read and fix someone else\'s code',
+    'One API + database, full CRUD',
+    'TypeScript',
+    'React or equivalent',
+    'Auth working on a real project',
+    'Ship something a stranger uses',
+    'Payments or email integration',
+    'Tests + deploy pipeline',
+    'Contribute to open source',
+    'A game or serious OSS work',
+    'Performance / architecture work',
+    'Mentor someone else',
+    'Ship a second major project',
+    'Something you built is used by many'
+  ],
+  business: [
+    'Idea or niche written down in one sentence',
+    '10 customer conversations done',
+    'One-page proposition written',
+    'Company registered, bank open, domain secured',
+    'MVP live — public, usable',
+    'First customer enquiry',
+    'First paying customer',
+    '10 paying customers or £500 / 3 months',
+    '£1k / 3 months recurring',
+    'Repeatable acquisition channel',
+    '£2k / 3 months recurring',
+    'First hire or contractor',
+    '£5k / 3 months recurring',
+    'Documented systems for delivery',
+    '£10k / 3 months recurring',
+    'Team of 3+',
+    '£20k / 3 months recurring',
+    '£30k / 3 months',
+    '£50k / 3 months milestone',
+    'Market leader in niche'
+  ],
+  reading: [
+    '1 book finished this month',
+    '6 books/year with notes',
+    '12 books/year with applied ideas',
+    '18 books/year',
+    '24 books/year',
+    '30 books/year',
+    'Read a difficult book',
+    'One project built from books',
+    '50 books/year',
+    'Read across 5 different fields',
+    'Original synthesis published',
+    '100+ books/year or a book written'
+  ],
+  writing: [
+    'Premise + outline',
+    'First 1,000 words',
+    'First chapter',
+    '5 writing days/week for a month',
+    '10k words',
+    '15k words',
+    '30k words — Act 1 complete',
+    '40k words',
+    'Full first draft',
+    'First reread and revision',
+    'Beta readers engaged',
+    'Structural revision',
+    'Edited draft',
+    'Line edit',
+    'Query letter or pitch',
+    'Submission or self-pub ready',
+    'Published',
+    '10 reviews',
+    '100 copies sold',
+    'Second book started'
+  ],
+  fitness: [
+    'Complete first full workout',
+    '1 week of consistent workouts',
+    '4 weeks consistent',
+    'First PR (new max)',
+    'Noticeable strength gain',
+    '8 weeks consistent — habit locked',
+    'Complete a full program',
+    'Hit intermediate benchmarks (STR 30)',
+    '6 months consistent',
+    'Hit advanced benchmarks (STR 50)',
+    'Teach someone else a movement',
+    'Hit elite benchmarks (STR 70)',
+    '1 year consistent',
+    'Hit STR 85+',
+    'Maintain consistency for 2 years'
+  ],
+  engineering: [
+    'Branch chosen',
+    'Maths and mechanics refreshed',
+    'CAD refresher done',
+    '3 portfolio drawings or models',
+    'Portfolio project complete',
+    'Professional body affiliate membership',
+    '5 applications submitted',
+    'First interview',
+    'First role or contract',
+    'First project delivered',
+    'EngTech registration',
+    '2 years of experience',
+    'Lead a project',
+    'IEng registration',
+    'CEng registration'
+  ],
+  art: [
+    'Foundational technique studied',
+    'First 30 drawings/sketches',
+    'One coherent series (10 pieces)',
+    'Public sharing begun',
+    'First commission or sale',
+    '100 drawings completed',
+    'Recognisable style',
+    'Local exhibition or feature',
+    'Consistent body of work (50 pieces)',
+    'First gallery or show',
+    'Teach a class',
+    'Sell regularly',
+    'Regional recognition',
+    'National recognition',
+    'Retrospective or major award'
+  ],
+  instrument: [
+    'First chord or scale learned',
+    '15 min daily for a week',
+    'Play a simple song end-to-end',
+    'Basic scales in 2 keys',
+    '4 weeks consistent practice',
+    'Play 5 songs by memory',
+    'Barre chords or equivalent technique',
+    'Play with another musician',
+    'First performance (any setting)',
+    'Compose or improvise',
+    'Comfortable across keys',
+    'Play in a band or ensemble',
+    'Teach a beginner',
+    'Record an album or EP',
+    'Perform live for 100+ people'
+  ],
+  mind: [
+    'First 5-min practice',
+    '1 week consistent',
+    '4 weeks consistent',
+    '30 min uninterrupted session',
+    'Noticeable focus change in life',
+    '45 min session',
+    '3 months consistent',
+    'Practice becomes automatic',
+    '6 months consistent',
+    'Teach someone else',
+    '1 year consistent',
+    'Extended retreat or deep dive',
+    'Full day of practice',
+    'Recognised by others as calm and focused',
+    'Mastery'
+  ],
+  publicspeaking: [
+    'First 3-min speech recorded',
+    'Studied one speaking framework',
+    'Presented to 1 person',
+    'Presented to 5 people',
+    'Presented to 20 people',
+    'Joined a local speaking club',
+    'First formal speech',
+    'First paid or invited talk',
+    '10 talks given',
+    'Speak without notes',
+    'Handle Q&A confidently',
+    'Speak to 100+ people',
+    'Coach someone else',
+    'Keynote at an event',
+    'Known for your speaking'
+  ],
+  cooking: [
+    'First meal cooked from scratch',
+    '10 recipes learned by heart',
+    'Cook a full meal for 4 people',
+    'Knife skills practiced',
+    'One consistent cuisine learned',
+    'Confident with any ingredient given',
+    'First dish you would serve a chef',
+    'Cookbook or blog started',
+    'Teach someone to cook',
+    '50 recipes learned',
+    'Host a dinner party',
+    'Master a difficult technique',
+    'Pop-up or catering gig',
+    'Write a cookbook',
+    'Recognised chef'
+  ]
 };
 function defaultLadderFor(subtype){ return LADDER_PRESETS[subtype] ? [...LADDER_PRESETS[subtype]] : null; }
 
-/* ═════ HELPERS ═════ */
+/* ═══════════════════════════════════════════
+   HELPERS
+   ═══════════════════════════════════════════ */
 const newId = () => 'x' + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
 const pad = n => String(n).padStart(2, '0');
-function today(){
-  const d = new Date();
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-}
-function yesterday(){
-  const d = new Date(); d.setDate(d.getDate() - 1);
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-}
-function dateOffset(n){
-  const d = new Date(); d.setDate(d.getDate() + n);
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-}
+function today(){ const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+function yesterday(){ const d = new Date(); d.setDate(d.getDate()-1); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+function dateOffset(n){ const d = new Date(); d.setDate(d.getDate()+n); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
 function dayName(n){ return ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][n]; }
 function dayShort(n){ return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][n]; }
-function esc(s){
-  return String(s ?? '').replace(/[&<>"']/g, c =>
-    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
+function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function daysSinceDate(dateStr){
   if (!dateStr) return null;
   const d = new Date(dateStr + 'T00:00:00');
   if (isNaN(d.getTime())) return null;
   return Math.floor((Date.now() - d.getTime()) / (1000*60*60*24));
 }
-
 function smartSkillName(sug, detail){
   if (!detail) return sug.label || 'New skill';
   const generic = ['not decided yet','not sure yet','other','new'];
   if (generic.includes(String(detail).toLowerCase().trim())){
-    const map = {
-      business: 'Business development',
-      writing: 'Book writing',
-      language: 'New language',
-      engineering: 'Engineering',
-      instrument: 'Instrument',
-      fitness: 'Fitness',
-      coding: 'Coding',
-      reading: 'Reading'
-    };
+    const map = { business:'Business development', writing:'Book writing', language:'New language', engineering:'Engineering', instrument:'Instrument', fitness:'Fitness', coding:'Coding', reading:'Reading' };
     return map[sug.id] || sug.label || 'Skill';
   }
   return detail;
 }
-
 function currentMilestoneIdx(skill){
-  const done = skill.ladderDone || [];
-  const ladder = skill.ladder || [];
-  for (let i = 0; i < ladder.length; i++){
-    if (!done.includes(i)) return i;
-  }
+  const done = skill.ladderDone || [], ladder = skill.ladder || [];
+  for (let i = 0; i < ladder.length; i++) if (!done.includes(i)) return i;
   return -1;
 }
-
 function milestoneQuestFallback(skill, idx){
   if (idx < 0 || !skill.ladder || !skill.ladder[idx]) return null;
   return { id: newId(), text: `${skill.name}: ${skill.ladder[idx]}`, xp: 5 };
 }
-
 function ensureMilestoneQuests(skill){
   if (skill.type !== 'standard') return;
   if (!skill.milestoneQuests) skill.milestoneQuests = {};
@@ -504,24 +734,27 @@ function ensureMilestoneQuests(skill){
   }
 }
 
-/* ═════ DELOAD ═════ */
+/* ═══════════════════════════════════════════
+   DELOAD
+   ═══════════════════════════════════════════ */
 function deloadWeekStatus(){
   if (!state.deloadEnabled || !state.startedAt) return { isDeload: false, weekNum: 0 };
   const days = daysSinceDate(state.startedAt);
   if (days === null) return { isDeload: false, weekNum: 0 };
   const weekNum = Math.floor(days / 7) + 1;
-  const isDeload = weekNum > 0 && weekNum % 5 === 0;
-  return { isDeload, weekNum };
+  return { isDeload: weekNum > 0 && weekNum % 5 === 0, weekNum };
 }
 
-/* ═════ STATE ═════ */
+/* ═══════════════════════════════════════════
+   STATE
+   ═══════════════════════════════════════════ */
 const KEY = 'the-system-v2';
 const DEFAULT_STATS = { STR: 5, AGI: 5, VIT: 5, INT: 5, PER: 1 };
 let logDate = today();
 
 function defaultState(){
   return {
-    v: 8, onboarded: false, name: '', totalXP: 0,
+    v: 9, onboarded: false, name: '', totalXP: 0,
     stats: { ...DEFAULT_STATS }, statDates: {},
     skills: [], streak: 0, lastComplete: null,
     quests: {}, log: [], benchmarks: [], titles: [],
@@ -530,8 +763,7 @@ function defaultState(){
     equipmentConfigured: false,
     timeBudget: 30,
     startedAt: null, deloadEnabled: true,
-    lastCelebratedLevel: 1,
-    lastCelebratedRank: 'E',
+    lastPlayerLevel: 1, lastPlayerRank: 'E',
     settings: { apiKey: '', apiBase: 'https://api.openai.com/v1', apiModel: 'gpt-4o-mini' }
   };
 }
@@ -565,17 +797,11 @@ function migrateSkill(s){
   if (s.name){
     const n = s.name.trim().toLowerCase();
     const map = {
-      'not decided yet': 'Business development',
-      'not sure yet': 'Book writing',
-      'other': s.subtype === 'business' ? 'Business development' :
-               s.subtype === 'writing' ? 'Book writing' :
-               s.subtype === 'language' ? 'New language' :
-               s.subtype === 'engineering' ? 'Engineering' :
-               s.subtype === 'instrument' ? 'Instrument' : 'Skill'
+      'not decided yet':'Business development', 'not sure yet':'Book writing',
+      'other': s.subtype === 'business' ? 'Business development' : s.subtype === 'writing' ? 'Book writing' : s.subtype === 'language' ? 'New language' : s.subtype === 'engineering' ? 'Engineering' : s.subtype === 'instrument' ? 'Instrument' : 'Skill'
     };
     if (map[n]) s.name = map[n];
   }
-
   return s;
 }
 
@@ -591,18 +817,16 @@ function load(){
     if (parsed.equipmentConfigured === undefined) parsed.equipmentConfigured = false;
     if (!parsed.timeBudget) parsed.timeBudget = 30;
     if (parsed.deloadEnabled === undefined) parsed.deloadEnabled = true;
-    const curLvl = levelFromXP(parsed.totalXP || 0);
-    if (!parsed.lastCelebratedLevel || parsed.lastCelebratedLevel < curLvl){
-      parsed.lastCelebratedLevel = curLvl;
-    }
-    if (!parsed.lastCelebratedRank || parsed.lastCelebratedRank !== rankOf(parsed.lastCelebratedLevel)){
-      parsed.lastCelebratedRank = rankOf(parsed.lastCelebratedLevel);
-    }
+    if (!parsed.lastPlayerLevel) parsed.lastPlayerLevel = 1;
+    if (!parsed.lastPlayerRank) parsed.lastPlayerRank = 'E';
     return parsed;
   } catch(e){ return defaultState(); }
 }
+
 function save(){
   localStorage.setItem(KEY, JSON.stringify(state));
+  checkSkillTitles();
+  checkLevelUp();
   render();
 }
 
@@ -611,65 +835,71 @@ function addXP(amount, note, id, date, skillId){
   state.totalXP += amount;
   state.log.unshift(entry);
   state.log = state.log.slice(0, 500);
-  if (amount > 0){
-    const lvl = levelFromXP(state.totalXP);
-    if (lvl > state.lastCelebratedLevel){
-      const oldRank = state.lastCelebratedRank || rankOf(state.lastCelebratedLevel);
-      const newRank = rankOf(lvl);
-      state.lastCelebratedLevel = lvl;
-      state.lastCelebratedRank = newRank;
-      setTimeout(() => {
-        if (newRank !== oldRank) showRankUp(newRank, lvl);
-        else showLevelUp(lvl);
-      }, 120);
-    }
-  }
   return entry.id;
+}
+
+function checkSkillTitles(){
+  (state.skills || []).forEach(skill => {
+    const t = titleForSkill(skill);
+    if (t && !state.titles.includes(t)) state.titles.push(t);
+  });
+}
+
+function checkLevelUp(){
+  const current = computePlayerLevel();
+  const prev = state.lastPlayerLevel || 1;
+  if (current > prev){
+    const oldRank = rankOf(prev);
+    const newRank = rankOf(current);
+    state.lastPlayerLevel = current;
+    state.lastPlayerRank = newRank;
+    setTimeout(() => {
+      if (newRank !== oldRank) showRankUp(newRank, current);
+      else showLevelUp(current);
+    }, 120);
+  } else if (current < prev){
+    // Silent level down
+    const old = prev;
+    state.lastPlayerLevel = current;
+    state.lastPlayerRank = rankOf(current);
+    showLevelAdjust(old, current);
+  }
 }
 
 function showLevelUp(level){
   const el = document.createElement('div');
   el.className = 'levelup-overlay';
-  el.innerHTML = `
-    <div class="levelup-card">
-      <div class="label">Level up</div>
-      <div class="big">Lv ${level}</div>
-      <div class="rank">Rank ${rankOf(level)}</div>
-    </div>`;
+  el.innerHTML = `<div class="levelup-card"><div class="label">Level up</div><div class="big">Lv ${level}</div><div class="rank">Rank ${rankOf(level)}</div></div>`;
   const dismiss = () => { el.classList.remove('show'); setTimeout(() => el.remove(), 400); };
   el.onclick = dismiss;
   document.body.appendChild(el);
   requestAnimationFrame(() => el.classList.add('show'));
   setTimeout(dismiss, 2800);
 }
-
 function showRankUp(rank, level){
   const el = document.createElement('div');
   el.className = 'levelup-overlay rankup';
-  el.innerHTML = `
-    <div class="levelup-card rankup-card">
-      <div class="label">Rank Up</div>
-      <div class="big rank-big">${rank}</div>
-      <div class="rank">Level ${level}</div>
-    </div>`;
+  el.innerHTML = `<div class="levelup-card rankup-card"><div class="label">Rank Up</div><div class="big rank-big">${rank}</div><div class="rank">Level ${level}</div></div>`;
   const dismiss = () => { el.classList.remove('show'); setTimeout(() => el.remove(), 500); };
   el.onclick = dismiss;
   document.body.appendChild(el);
   requestAnimationFrame(() => el.classList.add('show'));
   setTimeout(dismiss, 3500);
 }
-
+function showLevelAdjust(oldLvl, newLvl){
+  document.querySelectorAll('.levelup-toast').forEach(e => e.remove());
+  const el = document.createElement('div');
+  el.className = 'levelup-toast';
+  el.style.color = newLvl < oldLvl ? 'var(--gold)' : 'var(--accent)';
+  el.textContent = `Level adjusted: ${oldLvl} → ${newLvl}`;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
 function showDifficultyToast(logEntryId){
   document.querySelectorAll('.difficulty-toast').forEach(e => e.remove());
   const el = document.createElement('div');
   el.className = 'difficulty-toast';
-  el.innerHTML = `
-    <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:#111823;border-radius:12px;border:1px solid #1d2836;box-shadow:0 8px 24px rgba(0,0,0,0.4)">
-      <span class="small dim" style="margin-right:4px">How was it?</span>
-      <button class="tiny" data-diff="easy">Easy</button>
-      <button class="tiny" data-diff="right">Right</button>
-      <button class="tiny" data-diff="hard">Hard</button>
-    </div>`;
+  el.innerHTML = `<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:#111823;border-radius:12px;border:1px solid #1d2836;box-shadow:0 8px 24px rgba(0,0,0,0.4)"><span class="small dim" style="margin-right:4px">How was it?</span><button class="tiny" data-diff="easy">Easy</button><button class="tiny" data-diff="right">Right</button><button class="tiny" data-diff="hard">Hard</button></div>`;
   el.querySelectorAll('[data-diff]').forEach(btn => {
     btn.onclick = () => {
       const entry = state.log.find(e => e.id === logEntryId);
@@ -682,7 +912,12 @@ function showDifficultyToast(logEntryId){
   setTimeout(() => el.remove(), 8000);
 }
 
-/* ═════ LADDER TICK/UNTICK ═════ */
+/* ═══════════════════════════════════════════
+   LADDER TICK/UNTICK — scaled XP, full revert
+   ═══════════════════════════════════════════ */
+function milestoneLogXP(i){ return 20 + i * 10; }
+function milestoneSkillXP(i){ return 100 + i * 25; }
+
 function tickMilestone(skill, i){
   skill.ladderDone = skill.ladderDone || [];
   skill.ladderEarned = skill.ladderEarned || [];
@@ -700,38 +935,32 @@ function tickMilestone(skill, i){
   const ref = skill.ladderXpLogs[i];
   if (ref){
     // Restore
-    const mainId = addXP(ref.xp, ref.note, null, null, skill.id);
-    addSkillXP(skill, ref.xp);
-    skill.ladderXpLogs[i] = { ...ref, logId: mainId };
-    const lvl = levelFromXP(state.totalXP);
-    if (lvl > state.lastCelebratedLevel){
-      const oldRank = state.lastCelebratedRank || rankOf(state.lastCelebratedLevel);
-      const newRank = rankOf(lvl);
-      state.lastCelebratedLevel = lvl;
-      state.lastCelebratedRank = newRank;
-      setTimeout(() => {
-        if (newRank !== oldRank) showRankUp(newRank, lvl);
-        else showLevelUp(lvl);
-      }, 120);
-    }
+    const logXp = ref.logXp || ref.xp || milestoneLogXP(i);
+    const skillXp = ref.skillXp !== undefined ? ref.skillXp : (ref.xp || 20);
+    const mainId = addXP(logXp, ref.note, null, null, skill.id);
+    const oldSkillRank = rankOf(skill.level);
+    addSkillXP(skill, skillXp);
+    const extraLogIds = [];
+    const newSkillRank = rankOf(skill.level);
+    if (newSkillRank !== oldSkillRank) extraLogIds.push(addXP(0, `${skill.name} — Rank ${newSkillRank}`, null, null, skill.id));
+    else if (skill.level > 1) extraLogIds.push(addXP(0, `${skill.name} reached Lv ${skill.level}`, null, null, skill.id));
+    skill.ladderXpLogs[i] = { logId: mainId, logXp, skillXp, note: ref.note, extraLogIds };
   } else {
     const note = `${skill.name}: ${skill.ladder[i]}`;
-    const logId = addXP(20, note, null, null, skill.id);
+    const logXp = milestoneLogXP(i);
+    const skillXp = milestoneSkillXP(i);
+    const logId = addXP(logXp, note, null, null, skill.id);
     const oldSkillRank = rankOf(skill.level);
-    const skillLeveled = addSkillXP(skill, 20);
+    const skillLeveled = addSkillXP(skill, skillXp);
     const extraLogIds = [];
     if (skillLeveled){
       const newSkillRank = rankOf(skill.level);
-      if (newSkillRank !== oldSkillRank){
-        extraLogIds.push(addXP(0, `${skill.name} — Rank ${newSkillRank}`, null, null, skill.id));
-      } else {
-        extraLogIds.push(addXP(0, `${skill.name} reached Lv ${skill.level}`, null, null, skill.id));
-      }
+      if (newSkillRank !== oldSkillRank) extraLogIds.push(addXP(0, `${skill.name} — Rank ${newSkillRank}`, null, null, skill.id));
+      else extraLogIds.push(addXP(0, `${skill.name} reached Lv ${skill.level}`, null, null, skill.id));
     }
     skill.ladderEarned.push(i);
-    skill.ladderXpLogs[i] = { logId, xp: 20, note, extraLogIds };
+    skill.ladderXpLogs[i] = { logId, logXp, skillXp, note, extraLogIds };
   }
-
   ensureMilestoneQuests(skill);
 }
 
@@ -739,19 +968,22 @@ function untickMilestone(skill, i){
   skill.ladderDone = (skill.ladderDone || []).filter(x => x !== i);
   const ref = skill.ladderXpLogs && skill.ladderXpLogs[i];
   if (ref){
-    state.totalXP = Math.max(0, state.totalXP - ref.xp);
+    const logXp = ref.logXp || ref.xp || 20;
+    const skillXp = ref.skillXp !== undefined ? ref.skillXp : 20;
+    state.totalXP = Math.max(0, state.totalXP - logXp);
     state.log = state.log.filter(e => e.id !== ref.logId);
     if (ref.extraLogIds && ref.extraLogIds.length){
-      const extras = new Set(ref.extraLogIds);
-      state.log = state.log.filter(e => !extras.has(e.id));
+      const ex = new Set(ref.extraLogIds);
+      state.log = state.log.filter(e => !ex.has(e.id));
     }
-    subtractSkillXP(skill, ref.xp);
-    // Keep ladderXpLogs[i] so re-tick restores; clear extraLogIds so re-tick regenerates them
-    skill.ladderXpLogs[i] = { logId: null, xp: ref.xp, note: ref.note };
+    subtractSkillXP(skill, skillXp);
+    skill.ladderXpLogs[i] = { logId: null, logXp, skillXp, note: ref.note };
   }
 }
 
-/* ═════ PROGRESSION ═════ */
+/* ═══════════════════════════════════════════
+   PROGRESSION
+   ═══════════════════════════════════════════ */
 function progressionFor(skill){
   const sub = skill.subtype || 'custom';
   const detail = skill.detail || skill.name || '';
@@ -760,18 +992,14 @@ function progressionFor(skill){
     { id: 'workoutDays', label: 'Which days will you train?', type: 'days', multi: true, default: [1,3,5] },
     { id: 'attemptDay', label: 'Attempt day (test your max)', type: 'days', multi: false, default: 0 }
   ];
-
-  if (sub === 'language') return [
-    { id: 'level', label: `Current level in ${detail}`, options: [
-      { value: 'A0', label: 'Never studied', preTick: [] },
-      { value: 'A1', label: 'A1 — 500 words', preTick: [0] },
-      { value: 'A2', label: 'A2 — simple conversations', preTick: [0,1] },
-      { value: 'B1', label: 'B1 — comfortable everyday', preTick: [0,1,2] },
-      { value: 'B2', label: 'B2 — fluent discussion', preTick: [0,1,2,3] },
-      { value: 'C1', label: 'C1 — professional', preTick: [0,1,2,3,4] }
-    ]}
-  ];
-
+  if (sub === 'language') return [{ id: 'level', label: `Current level in ${detail}`, options: [
+    { value: 'A0', label: 'Never studied', preTick: [] },
+    { value: 'A1', label: 'A1 — 500 words', preTick: [0,1,2] },
+    { value: 'A2', label: 'A2 — simple conversations', preTick: [0,1,2,3,4,5] },
+    { value: 'B1', label: 'B1 — comfortable everyday', preTick: [0,1,2,3,4,5,6,7,8] },
+    { value: 'B2', label: 'B2 — fluent discussion', preTick: [0,1,2,3,4,5,6,7,8,9,10,11] },
+    { value: 'C1', label: 'C1 — professional', preTick: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14] }
+  ]}];
   if (sub === 'business') return [
     { id: 'stage', label: 'Where are you now?', options: [
       { value: 'not_decided', label: "Haven't decided", preTick: [] },
@@ -782,84 +1010,64 @@ function progressionFor(skill){
       { value: 'first_customer', label: 'Have paying customers', preTick: [0,1,2,3,4,5,6] }
     ]},
     { id: 'type', label: 'What kind of business?', onlyIf: a => a.stage && a.stage !== 'not_decided', options: [
-      { value: 'Freelancing',   label: 'Freelancing / consulting' },
-      { value: 'E-commerce',    label: 'E-commerce' },
-      { value: 'SaaS',          label: 'Software / app' },
-      { value: 'Local service', label: 'Local service' },
-      { value: 'Content',       label: 'Content / creator' },
-      { value: 'Other',         label: 'Something else' }
+      { value:'Freelancing', label:'Freelancing / consulting' },
+      { value:'E-commerce', label:'E-commerce' },
+      { value:'SaaS', label:'Software / app' },
+      { value:'Local service', label:'Local service' },
+      { value:'Content', label:'Content / creator' },
+      { value:'Other', label:'Something else' }
     ]}
   ];
-
-  if (sub === 'coding') return [
-    { id: 'level', label: 'Where are you now?', options: [
-      { value: 'never',     label: "Never coded", preTick: [] },
-      { value: 'basics',    label: 'Some basics', preTick: [0,2] },
-      { value: 'pages',     label: 'Can build simple pages', preTick: [0,1,2] },
-      { value: 'projects',  label: 'Build with help', preTick: [0,1,2,3,5] },
-      { value: 'confident', label: 'Build full apps', preTick: [0,1,2,3,4,5,6] }
-    ]}
-  ];
-
-  if (sub === 'reading') return [
-    { id: 'count', label: 'Books finished in last 12 months', options: [
-      { value: '0',    label: '0', preTick: [] },
-      { value: '1-3',  label: '1–3', preTick: [0] },
-      { value: '4-6',  label: '4–6', preTick: [0,1] },
-      { value: '7-11', label: '7–11', preTick: [0,1,2] },
-      { value: '12+',  label: '12+', preTick: [0,1,2] }
-    ]}
-  ];
-
-  if (sub === 'writing') return [
-    { id: 'stage', label: 'Where are you?', options: [
-      { value: 'idea',          label: 'Idea only', preTick: [] },
-      { value: 'outline',       label: 'Outline', preTick: [0] },
-      { value: 'first_words',   label: 'Some words', preTick: [0,1] },
-      { value: 'first_chapter', label: 'First chapter', preTick: [0,1,2] },
-      { value: 'mid_draft',     label: '10k+ words', preTick: [0,1,2,3] },
-      { value: 'draft_done',    label: 'Draft complete', preTick: [0,1,2,3,4,5] },
-      { value: 'editing',       label: 'Editing', preTick: [0,1,2,3,4,5,6] },
-      { value: 'published',     label: 'Published', preTick: [0,1,2,3,4,5,6,7,8,9] }
-    ]}
-  ];
-
-  if (sub === 'engineering') return [
-    { id: 'stage', label: 'Where are you?', options: [
-      { value: 'start',      label: 'Starting fresh', preTick: [] },
-      { value: 'refreshing', label: 'Refreshing', preTick: [0,1] },
-      { value: 'portfolio',  label: 'Building portfolio', preTick: [0,1,2,3] },
-      { value: 'applying',   label: 'Applying', preTick: [0,1,2,3,4,5,6] },
-      { value: 'working',    label: 'Working in field', preTick: [0,1,2,3,4,5,6,7,8] }
-    ]}
-  ];
-
-  return [
-    { id: 'level', label: 'Where are you now?', options: [
-      { value: 'beginner',     label: 'Complete beginner', preTick: [] },
-      { value: 'some',         label: 'Some experience', preTick: [] },
-      { value: 'intermediate', label: 'Intermediate', preTick: [] },
-      { value: 'advanced',     label: 'Advanced', preTick: [] }
-    ]}
-  ];
+  if (sub === 'coding') return [{ id: 'level', label: 'Where are you now?', options: [
+    { value:'never', label:"Never coded", preTick: [] },
+    { value:'basics', label:'Some basics', preTick: [0,1,2] },
+    { value:'pages', label:'Can build simple pages', preTick: [0,1,2,3,4] },
+    { value:'projects', label:'Build with help', preTick: [0,1,2,3,4,5,6,7] },
+    { value:'confident', label:'Build full apps', preTick: [0,1,2,3,4,5,6,7,8,9,10,11] }
+  ]}];
+  if (sub === 'reading') return [{ id: 'count', label: 'Books finished last 12 months', options: [
+    { value:'0', label:'0', preTick: [] },
+    { value:'1-3', label:'1–3', preTick: [0] },
+    { value:'4-6', label:'4–6', preTick: [0,1] },
+    { value:'7-11', label:'7–11', preTick: [0,1,2] },
+    { value:'12+', label:'12+', preTick: [0,1,2,3] }
+  ]}];
+  if (sub === 'writing') return [{ id: 'stage', label: 'Where are you?', options: [
+    { value:'idea', label:'Idea only', preTick: [] },
+    { value:'outline', label:'Outline', preTick: [0] },
+    { value:'first_words', label:'Some words', preTick: [0,1] },
+    { value:'first_chapter', label:'First chapter', preTick: [0,1,2] },
+    { value:'mid_draft', label:'10k+ words', preTick: [0,1,2,3,4] },
+    { value:'draft_done', label:'Draft complete', preTick: [0,1,2,3,4,5,6,7,8] },
+    { value:'editing', label:'Editing', preTick: [0,1,2,3,4,5,6,7,8,9,10,11,12,13] },
+    { value:'published', label:'Published', preTick: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17] }
+  ]}];
+  if (sub === 'engineering') return [{ id: 'stage', label: 'Where are you?', options: [
+    { value:'start', label:'Starting fresh', preTick: [] },
+    { value:'refreshing', label:'Refreshing', preTick: [0,1] },
+    { value:'portfolio', label:'Building portfolio', preTick: [0,1,2,3,4] },
+    { value:'applying', label:'Applying', preTick: [0,1,2,3,4,5,6,7] },
+    { value:'working', label:'Working in field', preTick: [0,1,2,3,4,5,6,7,8,9,10] }
+  ]}];
+  return [{ id: 'level', label: 'Where are you now?', options: [
+    { value:'beginner', label:'Complete beginner', preTick: [] },
+    { value:'some', label:'Some experience', preTick: [] },
+    { value:'intermediate', label:'Intermediate', preTick: [] },
+    { value:'advanced', label:'Advanced', preTick: [] }
+  ]}];
 }
 
 function applyProgression(skill, answers){
   const questions = progressionFor(skill);
-  let statusParts = [];
-  let preTick = null;
-
+  let statusParts = [], preTick = null;
   questions.forEach(q => {
     if (q.type === 'days') return;
     if (q.onlyIf && !q.onlyIf(answers)) return;
-    const val = answers[q.id];
-    if (!val) return;
-    const opt = q.options.find(o => o.value === val);
-    if (!opt) return;
+    const val = answers[q.id]; if (!val) return;
+    const opt = q.options.find(o => o.value === val); if (!opt) return;
     statusParts.push(opt.label);
     if (opt.preTick) preTick = opt.preTick;
   });
-
   skill.status = statusParts.join(' — ') || skill.status || '';
 
   if (skill.subtype === 'fitness' && skill.type === 'workout'){
@@ -869,16 +1077,13 @@ function applyProgression(skill, answers){
     skill.plan.exercises = deriveExercisesFromStats();
     skill.plan.calibratedTo = { STR: state.stats.STR, equipment: [...(state.equipment||[])], weights: { ...(state.equipmentWeights||{}) } };
   }
-
   if (answers.type) skill.detail = answers.type;
-
   if (preTick){
     skill.ladderDone = [...preTick];
     skill.ladderPreticked = [...preTick];
     skill.ladderEarned = [];
     skill.ladderXpLogs = {};
   }
-
   ensureMilestoneQuests(skill);
 }
 
@@ -886,7 +1091,6 @@ function defaultQuestsForSkill(skill){
   const sub = skill.subtype || 'custom';
   const status = (skill.status || '').toLowerCase();
   const name = skill.name || 'practice';
-
   if (sub === 'language'){
     if (/a2|b1|b2|c1/i.test(status)) return [
       { id: newId(), text: `${name} — 15 min speaking practice`, xp: 4 },
@@ -919,46 +1123,32 @@ function defaultQuestsForSkill(skill){
       { id: newId(), text: 'Review or refactor one thing', xp: 3 }
     ];
   }
-  if (sub === 'reading'){
-    return [
-      { id: newId(), text: 'Read 30 min, phone away', xp: 5 },
-      { id: newId(), text: '3 sentences of notes', xp: 2 }
-    ];
-  }
+  if (sub === 'reading') return [
+    { id: newId(), text: 'Read 30 min, phone away', xp: 5 },
+    { id: newId(), text: '3 sentences of notes', xp: 2 }
+  ];
   if (sub === 'writing'){
     if (/idea|outline/i.test(status)) return [{ id: newId(), text: 'Write 200 words of premise', xp: 3 }];
     if (/first_words|first_chapter|mid_draft/i.test(status)) return [{ id: newId(), text: 'Write 500 words', xp: 5 }];
     if (/draft_done|editing|published/i.test(status)) return [{ id: newId(), text: '30 min editing or marketing', xp: 5 }];
     return [{ id: newId(), text: 'Write 300 words', xp: 5 }];
   }
-  if (sub === 'engineering'){
-    return [
-      { id: newId(), text: '30 min technical study', xp: 5 },
-      { id: newId(), text: '1 portfolio step', xp: 3 }
-    ];
-  }
-  if (sub === 'mind'){
-    return [{ id: newId(), text: `${name} — 5 min practice`, xp: 2 }];
-  }
-  if (sub === 'instrument'){
-    return [{ id: newId(), text: `${name} — 15 min practice`, xp: 3 }];
-  }
-  if (sub === 'art'){
-    return [{ id: newId(), text: `${name} — 20 min practice`, xp: 4 }];
-  }
-  if (sub === 'publicspeaking'){
-    return [{ id: newId(), text: '5 min out-loud practice or record a snippet', xp: 3 }];
-  }
-  if (sub === 'cooking'){
-    return [{ id: newId(), text: `${name} — cook one dish or practice one skill`, xp: 4 }];
-  }
-  if (sub === 'fitness'){
-    return [{ id: newId(), text: `${name} — 20 min session`, xp: 4 }];
-  }
+  if (sub === 'engineering') return [
+    { id: newId(), text: '30 min technical study', xp: 5 },
+    { id: newId(), text: '1 portfolio step', xp: 3 }
+  ];
+  if (sub === 'mind') return [{ id: newId(), text: `${name} — 5 min practice`, xp: 2 }];
+  if (sub === 'instrument') return [{ id: newId(), text: `${name} — 15 min practice`, xp: 3 }];
+  if (sub === 'art') return [{ id: newId(), text: `${name} — 20 min practice`, xp: 4 }];
+  if (sub === 'publicspeaking') return [{ id: newId(), text: '5 min out-loud practice or record a snippet', xp: 3 }];
+  if (sub === 'cooking') return [{ id: newId(), text: `${name} — cook one dish or practice one skill`, xp: 4 }];
+  if (sub === 'fitness') return [{ id: newId(), text: `${name} — 20 min session`, xp: 4 }];
   return [{ id: newId(), text: `${name} — 20 min focused practice`, xp: 5 }];
 }
 
-/* ═════ QUESTS ═════ */
+/* ═══════════════════════════════════════════
+   QUESTS
+   ═══════════════════════════════════════════ */
 function questsForToday(){
   const day = new Date().getDay();
   const list = [];
@@ -966,39 +1156,29 @@ function questsForToday(){
     if (skill.type === 'workout' && skill.plan){
       const plan = skill.plan;
       if (day === plan.attemptDay){
-        list.push({ id: `${skill.id}:attempt`, skillId: skill.id, kind: 'attempt',
-          text: `${skill.name} — Attempt day: test your max reps`, xp: 50 });
+        list.push({ id: `${skill.id}:attempt`, skillId: skill.id, kind: 'attempt', text: `${skill.name} — Attempt day: test your max reps`, xp: 50 });
       } else if (plan.workoutDays.includes(day)){
         const summary = plan.exercises.map(e => `${e.sets}×${e.reps} ${e.name}`).join(' · ');
-        list.push({ id: `${skill.id}:workout`, skillId: skill.id, kind: 'workout',
-          text: `${skill.name}: ${summary}`, xp: 15 });
+        list.push({ id: `${skill.id}:workout`, skillId: skill.id, kind: 'workout', text: `${skill.name}: ${summary}`, xp: 15 });
       } else if (skill.subtype === 'fitness' && skill.cardioEnabled !== false){
-        list.push({ id: `${skill.id}:cardio`, skillId: skill.id, kind: 'cardio',
-          text: `${skill.name} cardio (VIT): 20 min brisk walk, cycle, or housework`, xp: 8 });
+        list.push({ id: `${skill.id}:cardio`, skillId: skill.id, kind: 'cardio', text: `${skill.name} cardio (VIT): 20 min brisk walk, cycle, or housework`, xp: 8 });
       }
     } else {
       ensureMilestoneQuests(skill);
       const idx = currentMilestoneIdx(skill);
       let quests = null;
-      if (idx >= 0 && skill.milestoneQuests && skill.milestoneQuests[idx]){
-        quests = skill.milestoneQuests[idx];
-      } else if (skill.quests){
-        quests = skill.quests;
-      }
+      if (idx >= 0 && skill.milestoneQuests && skill.milestoneQuests[idx]) quests = skill.milestoneQuests[idx];
+      else if (skill.quests) quests = skill.quests;
       if (quests){
         const milestone = (idx >= 0 && skill.ladder) ? skill.ladder[idx] : null;
-        quests.forEach(q => list.push({
-          id: `${skill.id}:${q.id}`, skillId: skill.id, kind: 'standard',
-          text: q.text, xp: q.xp, milestone
-        }));
+        quests.forEach(q => list.push({ id: `${skill.id}:${q.id}`, skillId: skill.id, kind: 'standard', text: q.text, xp: q.xp, milestone }));
       }
     }
   });
   return list;
 }
-function isQuestDone(qid){
-  return !!(state.quests[today()] && state.quests[today()][qid]);
-}
+function isQuestDone(qid){ return !!(state.quests[today()] && state.quests[today()][qid]); }
+
 function toggleQuest(quest){
   const t = today();
   state.quests[t] = state.quests[t] || {};
@@ -1006,29 +1186,16 @@ function toggleQuest(quest){
   const current = state.quests[t][quest.id];
 
   if (current){
-    // UNCHECK
+    // UNCHECK — full revert
     const data = (typeof current === 'object' && current !== null) ? current : null;
     if (data && data.logId){
       state.log = state.log.filter(e => e.id !== data.logId);
       if (data.extraLogIds && data.extraLogIds.length){
-        const extras = new Set(data.extraLogIds);
-        state.log = state.log.filter(e => !extras.has(e.id));
+        const ex = new Set(data.extraLogIds);
+        state.log = state.log.filter(e => !ex.has(e.id));
       }
       state.totalXP = Math.max(0, state.totalXP - (data.xp || 0));
-      if (skill && data.skillXp !== undefined){
-        subtractSkillXP(skill, data.skillXp);
-      }
-    } else {
-      // Legacy boolean: best-effort search
-      const candidates = state.log.filter(e =>
-        e.date === t && e.skillId === quest.skillId && e.note === quest.text && e.xp === quest.xp
-      );
-      if (candidates.length){
-        const entry = candidates[0];
-        state.log = state.log.filter(e => e.id !== entry.id);
-        state.totalXP = Math.max(0, state.totalXP - entry.xp);
-        if (skill) subtractSkillXP(skill, entry.xp);
-      }
+      if (skill && data.skillXp !== undefined) subtractSkillXP(skill, data.skillXp);
     }
     if (quest.kind === 'workout' && skill){
       skill.workoutsSinceAttempt = Math.max(0, (skill.workoutsSinceAttempt || 0) - 1);
@@ -1042,24 +1209,17 @@ function toggleQuest(quest){
   const logId = addXP(quest.xp, quest.text, null, null, quest.skillId);
   const extraLogIds = [];
   let skillXp = 0;
-
   if (skill){
-    const oldSkillRank = rankOf(skill.level);
+    const oldRank = rankOf(skill.level);
     const leveled = addSkillXP(skill, quest.xp);
     skillXp = quest.xp;
     if (leveled){
-      const newSkillRank = rankOf(skill.level);
-      if (newSkillRank !== oldSkillRank){
-        extraLogIds.push(addXP(0, `${skill.name} — Rank ${newSkillRank}`, null, null, skill.id));
-      } else {
-        extraLogIds.push(addXP(0, `${skill.name} reached Lv ${skill.level}`, null, null, skill.id));
-      }
+      const newRank = rankOf(skill.level);
+      if (newRank !== oldRank) extraLogIds.push(addXP(0, `${skill.name} — Rank ${newRank}`, null, null, skill.id));
+      else extraLogIds.push(addXP(0, `${skill.name} reached Lv ${skill.level}`, null, null, skill.id));
     }
-    if (quest.kind === 'workout'){
-      skill.workoutsSinceAttempt = (skill.workoutsSinceAttempt || 0) + 1;
-    }
+    if (quest.kind === 'workout') skill.workoutsSinceAttempt = (skill.workoutsSinceAttempt || 0) + 1;
   }
-
   state.quests[t][quest.id] = { logId, extraLogIds, xp: quest.xp, skillXp };
   updateStreak();
   save();
@@ -1075,12 +1235,13 @@ function updateStreak(){
   if (state.streak % 7 === 0) addXP(50, `7-day streak (day ${state.streak})`);
 }
 
-/* ═════ AI CONTEXT ═════ */
+/* ═══════════════════════════════════════════
+   AI
+   ═══════════════════════════════════════════ */
 function buildAIContext(skill){
   const lines = [];
-  lines.push(`Player: ${state.name || 'unnamed'}. Player level ${levelFromXP(state.totalXP)}. Streak: ${state.streak} days.`);
+  lines.push(`Player: ${state.name || 'unnamed'}. Player level ${computePlayerLevel()}. Streak: ${state.streak} days.`);
   lines.push(`Stats: STR ${state.stats.STR}, AGI ${state.stats.AGI}, VIT ${state.stats.VIT}, INT ${state.stats.INT}, PER ${state.stats.PER}.`);
-
   const cutoff = dateOffset(-30);
   const recent = state.log.filter(e => e.date >= cutoff && e.xp > 0);
   if (recent.length){
@@ -1088,15 +1249,11 @@ function buildAIContext(skill){
     const diffs = { easy: 0, right: 0, hard: 0 };
     recent.forEach(e => { if (e.difficulty) diffs[e.difficulty]++; });
     lines.push(`Last 30 days: ${recent.length} activities, ${totalXp} XP. Difficulty — easy ${diffs.easy}, right ${diffs.right}, hard ${diffs.hard}.`);
-  } else {
-    lines.push('Last 30 days: no activity logged.');
-  }
-
+  } else lines.push('Last 30 days: no activity logged.');
   const w = state.equipmentWeights || {};
   if (w.dumbbell || w.barbell || w.kettlebell){
     lines.push(`Equipment weights: dumbbell ${w.dumbbell||0}kg, barbell ${w.barbell||0}kg${w.barbellPlates?' (plates available)':''}, kettlebell ${w.kettlebell||0}kg.`);
   }
-
   if (skill){
     lines.push(`Skill: ${skill.name}. Status: ${skill.status || 'unknown'}. Type: ${skill.subtype || 'custom'}.`);
     lines.push(`Skill level ${skill.level}/50. Ladder ${(skill.ladderDone||[]).length}/${(skill.ladder||[]).length} done.`);
@@ -1105,25 +1262,20 @@ function buildAIContext(skill){
     if (skill.why) lines.push(`Why it matters to them: ${skill.why}`);
     if (skill.quitCriteria) lines.push(`They will drop this if: ${skill.quitCriteria}`);
   }
-
   return lines.join('\n');
 }
 
 function buildQuestAIPrompt(skill){
-  const ctx = buildAIContext(skill);
-  return `You are a coach. Here is the current state:\n\n${ctx}\n\nGenerate 6 concrete daily practice quests for this skill at its current level. Each quest must be specific, self-contained, 20–60 min, doable at home without a coach. Every quest text MUST start with the skill name and a clear action verb (e.g. "Meditation: 5 min breath focus", not "Started daily practice"). Focus on the current milestone.
+  return `You are a coach. Here is the current state:\n\n${buildAIContext(skill)}\n\nGenerate 6 concrete daily practice quests for this skill at its current level. Each quest must be specific, self-contained, 20–60 min, doable at home without a coach. Every quest text MUST start with the skill name and a clear action verb.
 
-Return ONLY a valid JSON array of 6 strings. No markdown, no preamble.
-
-Example: ["Meditation: 5 min breath focus","Meditation: 10 min body scan",...]`;
+Return ONLY a valid JSON array of 6 strings. No markdown, no preamble.`;
 }
 function buildLadderAIPrompt(skill){
-  const ctx = buildAIContext(skill);
   let extra = '';
   if (skill.subtype === 'business' && skill.detail && /not decided/i.test(skill.detail)){
-    extra = `\n\nThe person hasn't chosen what business to start. First suggest 3 concrete ideas that fit 5–10 hrs/week and no capital. Then pick the most promising and produce 8–10 milestones for that business.`;
+    extra = `\n\nThe person hasn't chosen what business to start. First suggest 3 concrete ideas that fit 5–10 hrs/week and no capital. Then pick the most promising and produce 12–18 milestones for that business.`;
   }
-  return `You are a coach. Here is the current state:\n\n${ctx}\n\nGenerate 8–10 concrete progression milestones for this skill at its current stage.${extra}\n\nEach milestone must be specific, testable, and build on the previous one. Return ONLY a JSON array of milestone strings.`;
+  return `You are a coach. Here is the current state:\n\n${buildAIContext(skill)}\n\nGenerate 12–18 concrete progression milestones for this skill at its current stage.${extra}\n\nEach milestone must be specific, testable, and build on the previous one. Aim for a milestone every few weeks of progress. Return ONLY a JSON array of milestone strings.`;
 }
 async function callAI(prompt, apiKey, baseUrl, model){
   const res = await fetch(`${baseUrl}/chat/completions`, {
@@ -1131,19 +1283,19 @@ async function callAI(prompt, apiKey, baseUrl, model){
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
     body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], temperature: 0.8 })
   });
-  if (!res.ok){ const b = await res.text().catch(() => ''); throw new Error(`API ${res.status}: ${b.slice(0, 120)}`); }
+  if (!res.ok){ const b = await res.text().catch(() => ''); throw new Error(`API ${res.status}: ${b.slice(0,120)}`); }
   const data = await res.json();
   const text = data.choices[0].message.content.trim();
-  const cleaned = text.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '');
-  return JSON.parse(cleaned);
+  return JSON.parse(text.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, ''));
 }
 
-/* ═════ SKILL CREATION ═════ */
+/* ═══════════════════════════════════════════
+   SKILL CREATION
+   ═══════════════════════════════════════════ */
 function makeSkillFromTemplate(sug, detail){
   const subtype = sug.subtype || 'custom';
   const name = smartSkillName(sug, detail);
   const isWorkoutType = subtype === 'fitness' && ['Calisthenics','Weightlifting','Mixed fitness'].includes(detail);
-
   const skill = {
     id: newId(), name, subtype, detail: detail || '', status: '',
     active: true, level: 1, xp: 0,
@@ -1154,11 +1306,7 @@ function makeSkillFromTemplate(sug, detail){
     type: isWorkoutType ? 'workout' : 'standard'
   };
   if (isWorkoutType){
-    skill.plan = {
-      exercises: deriveExercisesFromStats(),
-      workoutDays: [1, 3, 5], attemptDay: 0,
-      calibratedTo: { STR: state.stats.STR, equipment: [...(state.equipment||[])], weights: { ...(state.equipmentWeights||{}) } }
-    };
+    skill.plan = { exercises: deriveExercisesFromStats(), workoutDays: [1,3,5], attemptDay: 0, calibratedTo: { STR: state.stats.STR, equipment: [...(state.equipment||[])], weights: { ...(state.equipmentWeights||{}) } } };
   } else {
     skill.quests = defaultQuestsForSkill(skill);
     ensureMilestoneQuests(skill);
@@ -1166,36 +1314,19 @@ function makeSkillFromTemplate(sug, detail){
   return skill;
 }
 
-/* ═════ ONBOARDING ═════ */
+/* ═══════════════════════════════════════════
+   ONBOARDING
+   ═══════════════════════════════════════════ */
 let tab = 'status';
 let onboardStep = 1;
-const onboardDraft = {
-  name: '',
-  stats: { ...DEFAULT_STATS },
-  timeBudget: 30,
-  skills: [],
-  progression: {},
-  why: {},
-  quit: {}
-};
+const onboardDraft = { name: '', stats: { ...DEFAULT_STATS }, timeBudget: 30, skills: [], progression: {}, why: {}, quit: {} };
 
 function renderOnboarding(){
   document.getElementById('nav').classList.add('hide');
   const app = document.getElementById('app');
 
   if (onboardStep === 1){
-    app.innerHTML = `
-      <h1 style="margin-top:24px">The System</h1>
-      <p class="dim" style="margin-top:12px">A personal level-up tracker. Every value is yours — stored on this device only.</p>
-      <div class="card" style="margin-top:24px">
-        <div class="field">
-          <label>What should I call you?</label>
-          <input id="ob-name" placeholder="Name" value="${esc(onboardDraft.name)}" maxlength="40">
-        </div>
-        <button class="primary" id="ob-next" style="width:100%">Continue</button>
-      </div>
-      <p class="small dim">Already have a backup? <a href="#" id="ob-import" style="color:var(--accent)">Import it instead</a></p>
-    `;
+    app.innerHTML = `<h1 style="margin-top:24px">The System</h1><p class="dim" style="margin-top:12px">A personal level-up tracker. Stored on this device only.</p><div class="card" style="margin-top:24px"><div class="field"><label>What should I call you?</label><input id="ob-name" placeholder="Name" value="${esc(onboardDraft.name)}" maxlength="40"></div><button class="primary" id="ob-next" style="width:100%">Continue</button></div><p class="small dim">Already have a backup? <a href="#" id="ob-import" style="color:var(--accent)">Import it instead</a></p>`;
     document.getElementById('ob-next').onclick = () => {
       const v = document.getElementById('ob-name').value.trim();
       if (!v) return alert('Enter a name to continue.');
@@ -1206,52 +1337,37 @@ function renderOnboarding(){
   }
 
   if (onboardStep === 2){
-    const previewLevel = computeStartingLevel(onboardDraft.stats);
-    const previewXP = xpForLevel(previewLevel);
+    const preview = { stats: onboardDraft.stats };
+    const statSum = Object.values(onboardDraft.stats).reduce((a,b) => a+b, 0);
+    const estimatedPower = statSum;
+    const estimatedLevel = Math.max(1, Math.min(100, Math.round(estimatedPower / 10)));
     app.innerHTML = `
       <h1 style="margin-top:24px">Starting stats</h1>
-      <p class="dim" style="margin-top:12px">Pick the highest tier you can <b>pass today</b>. Between two tiers, take the lower. Your starting player level is derived from these stats.</p>
+      <p class="dim" style="margin-top:12px">Pick the highest tier you can <b>pass today</b>. Your starting level is derived from these stats — a strong start means a high starting level.</p>
       <div class="card" style="margin-top:16px">
         ${['STR','AGI','VIT','INT','PER'].map(k => {
           const b = BENCHMARKS[k];
           const cur = onboardDraft.stats[k];
           const curDesc = (b.tiers.find(t => t[0] === cur) || b.tiers[0])[1];
-          return `
-            <div class="field">
-              <label>${k} · ${b.label}</label>
-              <select data-obstat="${k}">
-                ${b.tiers.map(([v, desc]) =>
-                  `<option value="${v}" ${v===cur?'selected':''}>${v} — ${esc(desc)}</option>`
-                ).join('')}
-              </select>
-              <div class="hint" id="ob-hint-${k}">${esc(curDesc)}</div>
-            </div>`;
+          return `<div class="field"><label>${k} · ${b.label}</label><select data-obstat="${k}">${b.tiers.map(([v, desc]) => `<option value="${v}" ${v===cur?'selected':''}>${v} — ${esc(desc)}</option>`).join('')}</select><div class="hint" id="ob-hint-${k}">${esc(curDesc)}</div></div>`;
         }).join('')}
       </div>
       <div class="card" style="background:rgba(77,166,255,.06);border-color:rgba(77,166,255,.3)">
-        <div class="row between">
-          <span class="dim small">STARTING LEVEL</span>
-          <span class="mono" style="font-size:22px;font-weight:700;color:var(--accent)">Lv ${previewLevel}</span>
-        </div>
-        <div class="small dim" style="margin-top:8px">Derived from your stats (sum ÷ 10). Starting XP will be ${previewXP.toLocaleString()}. You'll earn the XP toward the next level yourself.</div>
+        <div class="row between"><span class="dim small">ESTIMATED STARTING LEVEL</span><span class="mono" style="font-size:22px;font-weight:700;color:var(--accent)">Lv ${estimatedLevel}</span></div>
+        <div class="small dim" style="margin-top:8px">Based on stats alone. Adding skills at level 1 will nudge it slightly higher.</div>
       </div>
       <div class="card">
         <div class="field">
           <label>Daily time budget</label>
           <select data-obtb>
-            <option value="15" ${onboardDraft.timeBudget===15?'selected':''}>15 min — quick, one focused thing</option>
-            <option value="30" ${onboardDraft.timeBudget===30?'selected':''}>30 min — a solid daily practice</option>
-            <option value="45" ${onboardDraft.timeBudget===45?'selected':''}>45 min — a full workout or deep session</option>
-            <option value="60" ${onboardDraft.timeBudget===60?'selected':''}>60+ min — intense, multiple activities</option>
+            <option value="15" ${onboardDraft.timeBudget===15?'selected':''}>15 min</option>
+            <option value="30" ${onboardDraft.timeBudget===30?'selected':''}>30 min</option>
+            <option value="45" ${onboardDraft.timeBudget===45?'selected':''}>45 min</option>
+            <option value="60" ${onboardDraft.timeBudget===60?'selected':''}>60+ min</option>
           </select>
-          <div class="hint">Affects how many exercises and quests you get by default.</div>
         </div>
       </div>
-      <div class="row" style="gap:8px">
-        <button class="ghost" id="ob-back" style="flex:1">Back</button>
-        <button class="primary" id="ob-next" style="flex:2">Continue</button>
-      </div>
-    `;
+      <div class="row" style="gap:8px"><button class="ghost" id="ob-back" style="flex:1">Back</button><button class="primary" id="ob-next" style="flex:2">Continue</button></div>`;
     document.querySelectorAll('[data-obstat]').forEach(sel => {
       sel.onchange = () => {
         const k = sel.dataset.obstat;
@@ -1262,9 +1378,7 @@ function renderOnboarding(){
         render();
       };
     });
-    document.querySelector('[data-obtb]').onchange = e => {
-      onboardDraft.timeBudget = parseInt(e.target.value, 10);
-    };
+    document.querySelector('[data-obtb]').onchange = e => { onboardDraft.timeBudget = parseInt(e.target.value, 10); };
     document.getElementById('ob-back').onclick = () => { onboardStep = 1; render(); };
     document.getElementById('ob-next').onclick = () => { onboardStep = 3; render(); };
     return;
@@ -1274,75 +1388,36 @@ function renderOnboarding(){
     app.innerHTML = `
       <h1 style="margin-top:24px">Your skills</h1>
       <p class="dim" style="margin-top:12px">Pick what you want to level. Nothing forced.</p>
-      ${onboardDraft.skills.length ? `
-        <h2>Selected (${onboardDraft.skills.length})</h2>
-        <div class="card">
-          ${onboardDraft.skills.map((s, i) => `
-            <div class="skill-row" style="cursor:default">
-              <span>${esc(s.name)}</span>
-              <button class="sm ghost danger" data-obrm="${i}">Remove</button>
-            </div>
-          `).join('')}
-        </div>
-      ` : ''}
+      ${onboardDraft.skills.length ? `<h2>Selected (${onboardDraft.skills.length})</h2><div class="card">${onboardDraft.skills.map((s, i) => `<div class="skill-row" style="cursor:default"><span>${esc(s.name)}</span><button class="sm ghost danger" data-obrm="${i}">Remove</button></div>`).join('')}</div>` : ''}
       <h2>Add a skill</h2>
       <div>
-        ${SKILL_SUGGESTIONS.map(sug => `
-          <details>
-            <summary>${esc(sug.label)}</summary>
-            ${sug.options.map(opt => `
-              <div class="tier-row" data-obadd="${sug.id}|${esc(opt)}" style="cursor:pointer">
-                <div class="tier-desc">${esc(opt)}</div>
-              </div>
-            `).join('')}
-          </details>
-        `).join('')}
-        <details>
-          <summary>Custom skill</summary>
-          <div style="padding:10px">
-            <input id="ob-custom" placeholder="Skill name">
-            <button class="sm primary" id="ob-custom-add" style="margin-top:8px">Add</button>
-          </div>
-        </details>
+        ${SKILL_SUGGESTIONS.map(sug => `<details><summary>${esc(sug.label)}</summary>${sug.options.map(opt => `<div class="tier-row" data-obadd="${sug.id}|${esc(opt)}" style="cursor:pointer"><div class="tier-desc">${esc(opt)}</div></div>`).join('')}</details>`).join('')}
+        <details><summary>Custom skill</summary><div style="padding:10px"><input id="ob-custom" placeholder="Skill name"><button class="sm primary" id="ob-custom-add" style="margin-top:8px">Add</button></div></details>
       </div>
-      <div class="row" style="gap:8px;margin-top:16px">
-        <button class="ghost" id="ob-back" style="flex:1">Back</button>
-        <button class="primary" id="ob-next" style="flex:2">${onboardDraft.skills.length ? 'Continue' : 'Skip for now'}</button>
-      </div>
-    `;
+      <div class="row" style="gap:8px;margin-top:16px"><button class="ghost" id="ob-back" style="flex:1">Back</button><button class="primary" id="ob-next" style="flex:2">${onboardDraft.skills.length ? 'Continue' : 'Skip for now'}</button></div>`;
     document.querySelectorAll('[data-obadd]').forEach(el => {
       el.onclick = () => {
         const [sugId, opt] = el.dataset.obadd.split('|');
         const sug = SKILL_SUGGESTIONS.find(s => s.id === sugId);
         if (!sug) return;
-        if (onboardDraft.skills.some(s => s.name.toLowerCase() === smartSkillName(sug, opt).toLowerCase())){
-          return alert('That skill is already added.');
-        }
+        if (onboardDraft.skills.some(s => s.name.toLowerCase() === smartSkillName(sug, opt).toLowerCase())) return alert('That skill is already added.');
         onboardDraft.skills.push(makeSkillFromTemplate(sug, opt));
         render();
       };
     });
-    document.querySelectorAll('[data-obrm]').forEach(b => {
-      b.onclick = () => { onboardDraft.skills.splice(+b.dataset.obrm, 1); render(); };
-    });
+    document.querySelectorAll('[data-obrm]').forEach(b => { b.onclick = () => { onboardDraft.skills.splice(+b.dataset.obrm, 1); render(); }; });
     document.getElementById('ob-custom-add').onclick = () => {
       const name = document.getElementById('ob-custom').value.trim();
       if (!name) return;
-      if (onboardDraft.skills.some(s => s.name.toLowerCase() === name.toLowerCase())){
-        return alert('That skill is already added.');
-      }
+      if (onboardDraft.skills.some(s => s.name.toLowerCase() === name.toLowerCase())) return alert('That skill is already added.');
       onboardDraft.skills.push(makeSkillFromTemplate({ subtype: 'custom', label: name }, name));
       document.getElementById('ob-custom').value = '';
       render();
     };
     document.getElementById('ob-back').onclick = () => { onboardStep = 2; render(); };
     document.getElementById('ob-next').onclick = () => {
-      if (onboardDraft.skills.length === 0){
-        finishOnboarding();
-        return;
-      }
-      onboardStep = 4;
-      render();
+      if (onboardDraft.skills.length === 0){ finishOnboarding(); return; }
+      onboardStep = 4; render();
     };
     return;
   }
@@ -1353,11 +1428,7 @@ function renderOnboarding(){
 function renderProgressionStep(){
   const app = document.getElementById('app');
   const skills = onboardDraft.skills;
-
-  // Determine if any skill needs equipment
-  const anyFitnessNeedsEquip = skills.some(s =>
-    s.subtype === 'fitness' && s.type === 'workout' && fitnessNeedsEquipment(s.detail)
-  );
+  const anyFitnessNeedsEquip = skills.some(s => s.subtype === 'fitness' && s.type === 'workout' && fitnessNeedsEquipment(s.detail));
   const showEquipment = anyFitnessNeedsEquip && !state.equipmentConfigured;
 
   const body = skills.map((skill) => {
@@ -1365,65 +1436,26 @@ function renderProgressionStep(){
     const ans = onboardDraft.progression[skill.id] || {};
     const why = onboardDraft.why[skill.id] || '';
     const quit = onboardDraft.quit[skill.id] || '';
-
-    return `
-      <div class="prog-section">
-        <h3 style="margin-bottom:12px">${esc(skill.name)}</h3>
-        ${questions.map(q => {
-          if (q.type === 'days'){
-            const current = ans[q.id] !== undefined ? ans[q.id] : q.default;
-            return `
-              <div class="field">
-                <label>${esc(q.label)}</label>
-                <div class="day-picker">
-                  ${[0,1,2,3,4,5,6].map(d => {
-                    const on = q.multi ? current.includes(d) : current === d;
-                    return `<button type="button" class="${on?'primary':'ghost'}" data-obday="${skill.id}|${q.id}|${d}|${q.multi?'multi':'single'}">${dayShort(d)}</button>`;
-                  }).join('')}
-                </div>
-              </div>`;
-          }
-          const visible = !q.onlyIf || q.onlyIf(ans);
-          if (!visible) return '';
-          return `
-            <div class="field">
-              <label>${esc(q.label)}</label>
-              <select data-obq="${skill.id}|${q.id}">
-                <option value="">— Select —</option>
-                ${q.options.map(o =>
-                  `<option value="${esc(o.value)}" ${ans[q.id]===o.value?'selected':''}>${esc(o.label)}</option>`
-                ).join('')}
-              </select>
-            </div>`;
-        }).join('')}
-        <div class="field">
-          <label>Why does this matter to you?</label>
-          <input data-obwhy="${skill.id}" value="${esc(why)}" placeholder="One sentence. Be honest.">
-        </div>
-        <div class="field">
-          <label>I will drop this if…</label>
-          <input data-obquit="${skill.id}" value="${esc(quit)}" placeholder="e.g. not touched in 30 days">
-        </div>
-      </div>
-    `;
+    return `<div class="prog-section"><h3 style="margin-bottom:12px">${esc(skill.name)}</h3>
+      ${questions.map(q => {
+        if (q.type === 'days'){
+          const current = ans[q.id] !== undefined ? ans[q.id] : q.default;
+          return `<div class="field"><label>${esc(q.label)}</label><div class="day-picker">${[0,1,2,3,4,5,6].map(d => { const on = q.multi ? current.includes(d) : current === d; return `<button type="button" class="${on?'primary':'ghost'}" data-obday="${skill.id}|${q.id}|${d}|${q.multi?'multi':'single'}">${dayShort(d)}</button>`; }).join('')}</div></div>`;
+        }
+        const visible = !q.onlyIf || q.onlyIf(ans);
+        if (!visible) return '';
+        return `<div class="field"><label>${esc(q.label)}</label><select data-obq="${skill.id}|${q.id}"><option value="">— Select —</option>${q.options.map(o => `<option value="${esc(o.value)}" ${ans[q.id]===o.value?'selected':''}>${esc(o.label)}</option>`).join('')}</select></div>`;
+      }).join('')}
+      <div class="field"><label>Why does this matter to you?</label><input data-obwhy="${skill.id}" value="${esc(why)}" placeholder="One sentence."></div>
+      <div class="field"><label>I will drop this if…</label><input data-obquit="${skill.id}" value="${esc(quit)}" placeholder="e.g. not touched in 30 days"></div></div>`;
   }).join('');
 
   app.innerHTML = `
     <h1 style="margin-top:24px">Progression check</h1>
-    <p class="dim" style="margin-top:12px">A few questions per skill. Equipment is asked once, at the top.</p>
-    ${showEquipment ? `
-      <div class="card">
-        ${renderEquipmentSection()}
-      </div>
-    ` : ''}
+    ${showEquipment ? `<div class="card">${renderEquipmentSection()}</div>` : ''}
     ${body}
-    <div class="row" style="gap:8px;margin-top:16px">
-      <button class="ghost" id="ob-back" style="flex:1">Back</button>
-      <button class="primary" id="ob-next" style="flex:2">Start the System</button>
-    </div>
-  `;
+    <div class="row" style="gap:8px;margin-top:16px"><button class="ghost" id="ob-back" style="flex:1">Back</button><button class="primary" id="ob-next" style="flex:2">Start the System</button></div>`;
 
-  // Bind equipment controls (only if section shown)
   if (showEquipment){
     document.querySelectorAll('[data-eq]').forEach(el => {
       el.onchange = () => {
@@ -1436,16 +1468,10 @@ function renderProgressionStep(){
       };
     });
     document.querySelectorAll('[data-eqw]').forEach(el => {
-      el.onchange = () => {
-        state.equipmentWeights = state.equipmentWeights || { dumbbell: 0, barbell: 0, barbellPlates: false, kettlebell: 0 };
-        state.equipmentWeights[el.dataset.eqw] = parseFloat(el.value) || 0;
-      };
+      el.onchange = () => { state.equipmentWeights = state.equipmentWeights || {}; state.equipmentWeights[el.dataset.eqw] = parseFloat(el.value) || 0; };
     });
     document.querySelectorAll('[data-eqx]').forEach(el => {
-      el.onchange = () => {
-        state.equipmentWeights = state.equipmentWeights || {};
-        state.equipmentWeights[el.dataset.eqx] = el.checked;
-      };
+      el.onchange = () => { state.equipmentWeights = state.equipmentWeights || {}; state.equipmentWeights[el.dataset.eqx] = el.checked; };
     });
   }
 
@@ -1457,12 +1483,8 @@ function renderProgressionStep(){
       render();
     };
   });
-  document.querySelectorAll('[data-obwhy]').forEach(el => {
-    el.oninput = () => { onboardDraft.why[el.dataset.obwhy] = el.value; };
-  });
-  document.querySelectorAll('[data-obquit]').forEach(el => {
-    el.oninput = () => { onboardDraft.quit[el.dataset.obquit] = el.value; };
-  });
+  document.querySelectorAll('[data-obwhy]').forEach(el => { el.oninput = () => { onboardDraft.why[el.dataset.obwhy] = el.value; }; });
+  document.querySelectorAll('[data-obquit]').forEach(el => { el.oninput = () => { onboardDraft.quit[el.dataset.obquit] = el.value; }; });
   document.querySelectorAll('[data-obday]').forEach(btn => {
     btn.onclick = () => {
       const [skillId, qid, dStr, mode] = btn.dataset.obday.split('|');
@@ -1475,9 +1497,7 @@ function renderProgressionStep(){
         const idx = arr.indexOf(d);
         if (idx >= 0) arr.splice(idx, 1); else arr.push(d);
         onboardDraft.progression[skillId][qid] = arr;
-      } else {
-        onboardDraft.progression[skillId][qid] = d;
-      }
+      } else onboardDraft.progression[skillId][qid] = d;
       render();
     };
   });
@@ -1485,14 +1505,11 @@ function renderProgressionStep(){
   document.getElementById('ob-back').onclick = () => { onboardStep = 3; render(); };
   document.getElementById('ob-next').onclick = () => {
     if (showEquipment) state.equipmentConfigured = true;
-
     onboardDraft.skills.forEach(skill => {
       const ans = onboardDraft.progression[skill.id] || {};
       if (skill.subtype === 'fitness' && skill.type === 'workout'){
-        const questions = progressionFor(skill);
-        questions.forEach(q => {
-          if (q.type === 'days' && ans[q.id] === undefined) ans[q.id] = q.default;
-        });
+        const qs = progressionFor(skill);
+        qs.forEach(q => { if (q.type === 'days' && ans[q.id] === undefined) ans[q.id] = q.default; });
       }
       if (Object.keys(ans).length > 0) applyProgression(skill, ans);
       skill.why = onboardDraft.why[skill.id] || '';
@@ -1515,46 +1532,41 @@ function finishOnboarding(){
     ensureMilestoneQuests(s);
   });
 
-  const startLevel = computeStartingLevel(state.stats);
-  state.totalXP = xpForLevel(startLevel);
-  state.lastCelebratedLevel = startLevel;
-  state.lastCelebratedRank = rankOf(startLevel);
+  // totalXP starts at 0 — level is derived from stats + skills
+  state.totalXP = 0;
   state.startedAt = today();
-
   state.onboarded = true;
+  state.lastPlayerLevel = computePlayerLevel();
+  state.lastPlayerRank = rankOf(state.lastPlayerLevel);
+  checkSkillTitles();
   save(); tab = 'status';
 }
 
-/* ═════ MAIN RENDER ═════ */
+/* ═══════════════════════════════════════════
+   MAIN RENDER
+   ═══════════════════════════════════════════ */
 function render(){
   if (!state.onboarded){ renderOnboarding(); return; }
   document.getElementById('nav').classList.remove('hide');
   const app = document.getElementById('app');
-  document.querySelectorAll('#nav button').forEach(b =>
-    b.classList.toggle('active', b.dataset.tab === tab));
-
+  document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   if (tab === 'status')  app.innerHTML = viewStatus();
   if (tab === 'quests')  app.innerHTML = viewQuests();
   if (tab === 'skills')  app.innerHTML = viewSkills();
   if (tab === 'bench')   app.innerHTML = viewBench();
   if (tab === 'log')     app.innerHTML = viewLog();
   if (tab === 'more')    app.innerHTML = viewMore();
-
   bind();
 }
 function navTo(t){ tab = t; render(); window.scrollTo(0, 0); }
 
-function xpBar(){
-  const lvl = levelFromXP(state.totalXP);
-  const lo = xpForLevel(lvl);
-  const hi = xpForLevel(lvl + 1);
-  const pct = Math.min(100, ((state.totalXP - lo) / (hi - lo)) * 100);
-  return `
-    <div class="bar"><i style="width:${pct}%"></i></div>
-    <div class="row between small dim mono" style="margin-top:6px">
-      <span>${state.totalXP} / ${hi} XP</span>
-      <span>${hi - state.totalXP} to next</span>
-    </div>`;
+function powerBar(){
+  const power = computeTotalPower();
+  const level = computePlayerLevel();
+  const levelStart = (level - 1) * 10;
+  const levelEnd = level * 10;
+  const pct = Math.min(100, Math.max(0, ((power - levelStart) / Math.max(1, levelEnd - levelStart)) * 100));
+  return `<div class="bar"><i style="width:${pct}%"></i></div><div class="row between small dim mono" style="margin-top:6px"><span>Power ${power} / ${levelEnd}</span><span>${levelEnd - power} to next</span></div>`;
 }
 
 function activityCountForDate(key){
@@ -1562,140 +1574,68 @@ function activityCountForDate(key){
   const logForDate = state.log.filter(e => e.date === key && e.xp > 0);
   return Math.max(Object.keys(q).length, logForDate.length);
 }
-
 function last7Days(){
   const arr = [];
-  for (let i = 6; i >= 0; i--){
-    const key = dateOffset(-i);
-    const d = new Date(key + 'T00:00:00');
-    arr.push({ key, day: dayShort(d.getDay()), count: activityCountForDate(key) });
-  }
+  for (let i = 6; i >= 0; i--){ const key = dateOffset(-i); const d = new Date(key + 'T00:00:00'); arr.push({ key, day: dayShort(d.getDay()), count: activityCountForDate(key) }); }
   return arr;
 }
-
 function last30Days(){
   const arr = [];
-  for (let i = 29; i >= 0; i--){
-    const key = dateOffset(-i);
-    arr.push({ key, count: activityCountForDate(key) });
-  }
+  for (let i = 29; i >= 0; i--){ const key = dateOffset(-i); arr.push({ key, count: activityCountForDate(key) }); }
   return arr;
 }
-
 function hardRatio7Days(){
   const cutoff = dateOffset(-6);
   const recent = state.log.filter(e => e.date >= cutoff && e.xp > 0);
   if (!recent.length) return { pct: null, easy: 0, right: 0, hard: 0, total: 0 };
   const diffs = { easy: 0, right: 0, hard: 0 };
-  let diffsRecorded = 0;
-  recent.forEach(e => { if (e.difficulty) { diffs[e.difficulty]++; diffsRecorded++; } });
-  const pct = diffsRecorded ? Math.round((diffs.hard / diffsRecorded) * 100) : null;
-  return { pct, easy: diffs.easy, right: diffs.right, hard: diffs.hard, total: diffsRecorded };
+  let total = 0;
+  recent.forEach(e => { if (e.difficulty) { diffs[e.difficulty]++; total++; } });
+  return { pct: total ? Math.round((diffs.hard / total) * 100) : null, easy: diffs.easy, right: diffs.right, hard: diffs.hard, total };
 }
 
 function viewStatus(){
-  const lvl = levelFromXP(state.totalXP);
+  const lvl = computePlayerLevel();
+  const power = computeTotalPower();
   const days = last7Days();
-  const weekHtml = days.map(d => `
-    <div class="week-cell">
-      <div class="week-day">${d.day.slice(0,1)}</div>
-      <div class="week-box ${d.count > 0 ? 'filled' : ''}">${d.count > 0 ? d.count : ''}</div>
-    </div>
-  `).join('');
-
+  const weekHtml = days.map(d => `<div class="week-cell"><div class="week-day">${d.day.slice(0,1)}</div><div class="week-box ${d.count>0?'filled':''}">${d.count>0?d.count:''}</div></div>`).join('');
   const days30 = last30Days();
   const maxCount = Math.max(1, ...days30.map(d => d.count));
-  const heatHtml = days30.map(d => {
-    let cls = '';
-    if (d.count > 0){
-      const lvl = Math.min(4, Math.ceil((d.count / maxCount) * 4));
-      cls = 'lvl-' + lvl;
-    }
-    return `<div class="heat-cell ${cls}" title="${d.key}: ${d.count}"></div>`;
-  }).join('');
-
+  const heatHtml = days30.map(d => { let cls = ''; if (d.count > 0){ const l = Math.min(4, Math.ceil((d.count/maxCount)*4)); cls = 'lvl-'+l; } return `<div class="heat-cell ${cls}" title="${d.key}: ${d.count}"></div>`; }).join('');
   const hr = hardRatio7Days();
   let practiceHtml = '';
-  if (hr.pct === null){
-    practiceHtml = '<div class="small dim">No difficulty logged yet. After each quest, tap Easy / Right / Hard.</div>';
-  } else {
+  if (hr.pct === null) practiceHtml = '<div class="small dim">No difficulty logged yet. After each quest, tap Easy / Right / Hard.</div>';
+  else {
     let hint = '';
     if (hr.pct < 15) hint = ' · <span style="color:var(--gold)">mostly comfortable — try harder things</span>';
     else if (hr.pct > 60) hint = ' · <span style="color:var(--gold)">very hard — consider deloading</span>';
     else hint = ' · <span style="color:var(--ok)">healthy</span>';
     practiceHtml = `<div class="small">Hard: <b class="mono">${hr.pct}%</b> of ${hr.total} rated${hint}</div>`;
   }
-
   const stats = ['STR','AGI','VIT','INT','PER'].map(k => {
-    const date = state.statDates[k];
-    const days = daysSinceDate(date);
+    const days = daysSinceDate(state.statDates[k]);
     const isStale = days === null || days > 30;
-    const label = days === null ? 'untested'
-      : days === 0 ? 'today'
-      : `${days}d ago`;
-    return `
-      <div class="stat">
-        <div>
-          <div class="small">${k}</div>
-          <div class="small mono ${isStale ? 'stat-label-stale' : 'dim'}">${label}</div>
-        </div>
-        <div class="mono" style="font-size:19px;font-weight:600">${state.stats[k]}</div>
-      </div>`;
+    const label = days === null ? 'untested' : days === 0 ? 'today' : `${days}d ago`;
+    return `<div class="stat"><div><div class="small">${k}</div><div class="small mono ${isStale?'stat-label-stale':'dim'}">${label}</div></div><div class="mono" style="font-size:19px;font-weight:600">${state.stats[k]}</div></div>`;
   }).join('');
-
   const active = state.skills.filter(s => s.active);
-  const skillList = active.length
-    ? active.map(s => {
-        const idx = currentMilestoneIdx(s);
-        const milestone = (idx >= 0 && s.ladder) ? s.ladder[idx] : null;
-        return `
-          <div class="skill-row" style="cursor:pointer" data-skill-card="${s.id}">
-            <div style="min-width:0;flex:1">
-              <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.name)}</div>
-              ${milestone ? `<div class="small dim" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">→ ${esc(milestone)}</div>` : ''}
-            </div>
-            <span class="small mono dim" style="white-space:nowrap;margin-left:8px">${rankOf(s.level)} · Lv ${s.level}</span>
-          </div>`;
-      }).join('')
-    : '<div class="dim small">No active skills.</div>';
+  const skillList = active.length ? active.map(s => {
+    const idx = currentMilestoneIdx(s);
+    const milestone = (idx >= 0 && s.ladder) ? s.ladder[idx] : null;
+    const title = titleForSkill(s);
+    return `<div class="skill-row" style="cursor:pointer" data-skill-card="${s.id}"><div style="min-width:0;flex:1"><div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.name)} ${title ? `<span class="skill-title">${esc(title)}</span>` : ''}</div>${milestone ? `<div class="small dim" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">→ ${esc(milestone)}</div>` : ''}</div><span class="small mono dim" style="white-space:nowrap;margin-left:8px">${rankOf(s.level)} · Lv ${s.level}</span></div>`;
+  }).join('') : '<div class="dim small">No active skills.</div>';
+  const titleLine = state.titles.length ? state.titles.map(t => `<span class="skill-title" style="margin:2px">${esc(t)}</span>`).join('') : '<span class="dim small">None yet</span>';
 
   return `
-    <div class="row between" style="margin-bottom:16px">
-      <h1>The System</h1>
-      <button class="sm ghost" id="share-btn">Share ↗</button>
-    </div>
-    <div class="card">
-      <div class="row between">
-        <div>
-          <div class="dim small mono">${esc(state.name || 'PLAYER')}</div>
-          <div class="big mono">Lv ${lvl}</div>
-        </div>
-        <div style="text-align:right">
-          <div class="dim small mono">RANK</div>
-          <div class="big mono" style="color:var(--accent)">${rankOf(lvl)}</div>
-        </div>
-      </div>
-      ${xpBar()}
-    </div>
-    <div class="card">
-      <div class="row between">
-        <span class="dim small">STREAK</span>
-        <span class="mono" style="font-size:20px">${state.streak} <span class="dim small">days</span></span>
-      </div>
-      <div class="week-strip">${weekHtml}</div>
-      <div class="small dim" style="margin-top:14px;margin-bottom:6px">Last 30 days</div>
-      <div class="heatmap">${heatHtml}</div>
-    </div>
-    <div class="card">
-      <div class="row between">
-        <span class="dim small">DELIBERATE PRACTICE</span>
-      </div>
-      <div style="margin-top:8px">${practiceHtml}</div>
-    </div>
-    <h2>Stats</h2>
-    <div class="card">${stats}
-      <button class="ghost sm" data-nav="bench" style="width:100%;margin-top:12px">View benchmarks & test →</button>
-    </div>
+    <div class="row between" style="margin-bottom:16px"><h1>The System</h1><button class="sm ghost" id="share-btn">Share ↗</button></div>
+    <div class="card"><div class="row between"><div><div class="dim small mono">${esc(state.name || 'PLAYER')}</div><div class="big mono">Lv ${lvl}</div></div><div style="text-align:right"><div class="dim small mono">RANK</div><div class="big mono" style="color:var(--accent)">${rankOf(lvl)}</div></div></div>${powerBar()}</div>
+    <div class="card"><div class="row between"><span class="dim small">STREAK</span><span class="mono" style="font-size:20px">${state.streak} <span class="dim small">days</span></span></div><div class="week-strip">${weekHtml}</div><div class="small dim" style="margin-top:14px;margin-bottom:6px">Last 30 days</div><div class="heatmap">${heatHtml}</div></div>
+    <div class="card"><div class="row between"><span class="dim small">DELIBERATE PRACTICE</span></div><div style="margin-top:8px">${practiceHtml}</div></div>
+    <h2>Stats · ${power - (state.skills.reduce((a,s)=>a+s.level,0)*3)} power from stats</h2>
+    <div class="card">${stats}<button class="ghost sm" data-nav="bench" style="width:100%;margin-top:12px">View benchmarks & test →</button></div>
+    <h2>Titles</h2>
+    <div class="card">${titleLine}</div>
     <h2>Active skills</h2>
     <div class="card">${skillList}</div>
   `;
@@ -1706,49 +1646,14 @@ function viewQuests(){
   const day = new Date().getDay();
   const doneCount = list.filter(q => isQuestDone(q.id)).length;
   const deload = deloadWeekStatus();
-
-  const deloadHtml = deload.isDeload ? `
-    <div class="notice deload">
-      <b>Deload week ${deload.weekNum}.</b> Halve your workouts. Drop the coding/language quests to one. Keep the reading habit. Consistency now, intensity next week.
-    </div>
-  ` : '';
-
-  const nudges = state.skills.filter(s =>
-    s.active && s.type === 'workout' && s.subtype === 'fitness'
-    && s.plan && s.plan.attemptDay !== day
-    && (s.workoutsSinceAttempt || 0) >= 4
-  );
-  const nudgeHtml = nudges.map(s => `
-    <div class="notice warn">
-      <b>${esc(s.name)}</b>: ${s.workoutsSinceAttempt} workouts since last attempt. Ready to test?
-      <button class="sm primary" data-nudge-attempt="${s.id}" style="width:100%;margin-top:8px">Test my max now</button>
-    </div>
-  `).join('');
-
+  const deloadHtml = deload.isDeload ? `<div class="notice deload"><b>Deload week ${deload.weekNum}.</b> Halve your workouts. Drop the coding/language quests to one. Keep the reading habit.</div>` : '';
+  const nudges = state.skills.filter(s => s.active && s.type === 'workout' && s.subtype === 'fitness' && s.plan && s.plan.attemptDay !== day && (s.workoutsSinceAttempt||0) >= 4);
+  const nudgeHtml = nudges.map(s => `<div class="notice warn"><b>${esc(s.name)}</b>: ${s.workoutsSinceAttempt} workouts since last attempt. Ready to test?<button class="sm primary" data-nudge-attempt="${s.id}" style="width:100%;margin-top:8px">Test my max now</button></div>`).join('');
   const items = list.length ? list.map(q => {
     const done = isQuestDone(q.id);
-    const milestoneLine = q.milestone ? `<div class="small dim" style="margin-top:2px">Milestone: ${esc(q.milestone)}</div>` : '';
-    return `
-      <div class="quest" data-quest="${q.id}">
-        <div class="chk ${done ? 'done' : ''}">${done ? '✓' : ''}</div>
-        <div style="flex:1;${done ? 'opacity:.5' : ''}">
-          <div style="${done ? 'text-decoration:line-through' : ''}">${esc(q.text)}</div>
-          <div class="small dim mono">+${q.xp} XP${q.kind === 'cardio' ? ' · VIT training' : ''}${q.kind === 'attempt' ? ' · test your max' : ''}</div>
-          ${milestoneLine}
-        </div>
-      </div>`;
+    return `<div class="quest" data-quest="${q.id}"><div class="chk ${done?'done':''}">${done?'✓':''}</div><div style="flex:1;${done?'opacity:.5':''}"><div style="${done?'text-decoration:line-through':''}">${esc(q.text)}</div><div class="small dim mono">+${q.xp} XP${q.kind==='cardio'?' · VIT training':''}${q.kind==='attempt'?' · test your max':''}</div>${q.milestone?`<div class="small dim" style="margin-top:2px">Milestone: ${esc(q.milestone)}</div>`:''}</div></div>`;
   }).join('') : '<div class="dim small" style="padding:12px 0">No quests today. Add or activate a skill in Skills.</div>';
-
-  return `
-    <h2>Today · ${dayName(day)} ${today().slice(5)}</h2>
-    ${deloadHtml}
-    ${nudgeHtml}
-    <div class="card">${items}</div>
-    <div class="card row between">
-      <span class="small dim">${doneCount} / ${list.length} done</span>
-      <span class="small dim mono">${state.streak} day streak</span>
-    </div>
-  `;
+  return `<h2>Today · ${dayName(day)} ${today().slice(5)}</h2>${deloadHtml}${nudgeHtml}<div class="card">${items}</div><div class="card row between"><span class="small dim">${doneCount} / ${list.length} done</span><span class="small dim mono">${state.streak} day streak</span></div>`;
 }
 
 function viewSkills(){
@@ -1757,197 +1662,55 @@ function viewSkills(){
     const pct = s.level >= 50 ? 100 : (s.xp / need) * 100;
     const idx = currentMilestoneIdx(s);
     const milestone = (idx >= 0 && s.ladder) ? s.ladder[idx] : null;
-
-    const detail = s.type === 'workout' && s.plan
-      ? `${s.plan.exercises.length} exercises · ${s.plan.workoutDays.length} days/week`
-      : (s.milestoneQuests && idx >= 0 && s.milestoneQuests[idx])
-        ? `${s.milestoneQuests[idx].length} quest${s.milestoneQuests[idx].length === 1 ? '' : 's'} for current milestone`
-        : (s.quests ? `${s.quests.length} quest${s.quests.length === 1 ? '' : 's'}` : '');
-    const ladderInfo = s.ladder && s.ladder.length
-      ? `${(s.ladderDone || []).length}/${s.ladder.length} milestones`
-      : '';
-    let recalibrate = '';
+    const detail = s.type === 'workout' && s.plan ? `${s.plan.exercises.length} exercises · ${s.plan.workoutDays.length} days/week` : (s.milestoneQuests && idx >= 0 && s.milestoneQuests[idx]) ? `${s.milestoneQuests[idx].length} quest${s.milestoneQuests[idx].length===1?'':'s'} for current milestone` : (s.quests ? `${s.quests.length} quest${s.quests.length===1?'':'s'}` : '');
+    const ladderInfo = s.ladder && s.ladder.length ? `${(s.ladderDone||[]).length}/${s.ladder.length} milestones` : '';
+    let recal = '';
     if (s.type === 'workout' && s.subtype === 'fitness' && s.plan && s.plan.calibratedTo){
       const curW = JSON.stringify(state.equipmentWeights || {});
       const oldW = JSON.stringify(s.plan.calibratedTo.weights || {});
-      if (state.stats.STR !== s.plan.calibratedTo.STR || curW !== oldW){
-        recalibrate = ' · <span style="color:var(--gold)">recalibrate available</span>';
-      }
+      if (state.stats.STR !== s.plan.calibratedTo.STR || curW !== oldW) recal = ' · <span style="color:var(--gold)">recalibrate available</span>';
     }
-    return `
-      <div class="card" data-skill-card="${s.id}" style="cursor:pointer">
-        <div class="row between">
-          <div class="row" style="gap:8px;flex:1;min-width:0">
-            <h3 style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(s.name)}</h3>
-            <span class="tag ${s.active ? 'on rank-'+rankOf(s.level) : ''}">${s.active ? rankOf(s.level) : 'paused'}</span>
-          </div>
-          <span class="mono small dim" style="white-space:nowrap">Lv ${s.level}</span>
-        </div>
-        <div class="bar"><i style="width:${pct}%"></i></div>
-        <div class="small dim" style="margin-top:8px">${esc(detail)}${ladderInfo ? ` · ${ladderInfo}` : ''}${recalibrate}</div>
-        ${milestone ? `<div class="small dim" style="margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">→ ${esc(milestone)}</div>` : ''}
-        ${s.why ? `<div class="small dim" style="margin-top:4px;font-style:italic">"${esc(s.why)}"</div>` : ''}
-      </div>`;
+    const title = titleForSkill(s);
+    return `<div class="card" data-skill-card="${s.id}" style="cursor:pointer"><div class="row between"><div class="row" style="gap:8px;flex:1;min-width:0"><h3 style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(s.name)}</h3>${title?`<span class="skill-title">${esc(title)}</span>`:''}<span class="tag ${s.active?'on rank-'+rankOf(s.level):''}">${s.active?rankOf(s.level):'paused'}</span></div><span class="mono small dim" style="white-space:nowrap">Lv ${s.level}</span></div><div class="bar"><i style="width:${pct}%"></i></div><div class="small dim" style="margin-top:8px">${esc(detail)}${ladderInfo?` · ${ladderInfo}`:''}${recal}</div>${milestone?`<div class="small dim" style="margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">→ ${esc(milestone)}</div>`:''}${s.why?`<div class="small dim" style="margin-top:4px;font-style:italic">"${esc(s.why)}"</div>`:''}</div>`;
   }).join('');
-  return `
-    <h2>Skills · ${state.skills.filter(s=>s.active).length} active / ${state.skills.length} total</h2>
-    ${rows || '<div class="card dim small">No skills yet.</div>'}
-    <button class="primary" id="add-skill" style="width:100%;margin-top:12px">+ Add skill</button>
-  `;
+  return `<h2>Skills · ${state.skills.filter(s=>s.active).length} active / ${state.skills.length} total</h2>${rows || '<div class="card dim small">No skills yet.</div>'}<button class="primary" id="add-skill" style="width:100%;margin-top:12px">+ Add skill</button>`;
 }
 
 function viewBench(){
-  return `
-    <h1>Benchmarks</h1>
-    <div class="card" style="margin-top:16px">
-      <p class="small">Each stat is scored 1–100. Every tier is a concrete test you pass or fail in a single session.</p>
-      <p class="small dim" style="margin-top:8px">Tap a tier to log a test. <b style="color:var(--txt)">Higher</b> → stat rises, +50 XP. <b style="color:var(--txt)">Current</b> → refreshes date. <b style="color:var(--txt)">Lower</b> → demotes.</p>
-    </div>
-    ${['STR','AGI','VIT','INT','PER'].map(renderBenchCard).join('')}
-  `;
+  return `<h1>Benchmarks</h1><div class="card" style="margin-top:16px"><p class="small">Each stat is scored 1–100 and directly affects your player level. Every tier is a concrete test you pass or fail in a single session.</p><p class="small dim" style="margin-top:8px">Tap a tier to log a test. <b style="color:var(--txt)">Higher</b> → stat rises (level rises automatically). <b style="color:var(--txt)">Lower</b> → demotes (level drops accordingly). No XP is granted for stat changes — the stat change <i>is</i> the reward.</p></div>${['STR','AGI','VIT','INT','PER'].map(renderBenchCard).join('')}`;
 }
 function renderBenchCard(k){
   const b = BENCHMARKS[k];
   const cur = state.stats[k];
-  const curTier = b.tiers.reduce((a, t) => t[0] <= cur && t[0] > a ? t[0] : a, 0);
+  const curTier = b.tiers.reduce((a,t) => t[0]<=cur&&t[0]>a ? t[0] : a, 0);
   const days = daysSinceDate(state.statDates[k]);
-  const date = state.statDates[k] ? (days === 0 ? 'today' : `${days}d ago`) : 'untested';
+  const date = state.statDates[k] ? (days===0?'today':`${days}d ago`) : 'untested';
   const rows = b.tiers.map(([v, desc]) => {
-    const isCur = v === curTier;
-    const isBelow = v < curTier;
-    return `
-      <div class="tier-row ${isCur?'current':''} ${isBelow?'below':''}" data-tier="${k}:${v}">
-        <div class="tier-val">${v}</div>
-        <div class="tier-desc">${esc(desc)}</div>
-      </div>`;
+    const isCur = v === curTier, isBelow = v < curTier;
+    return `<div class="tier-row ${isCur?'current':''} ${isBelow?'below':''}" data-tier="${k}:${v}"><div class="tier-val">${v}</div><div class="tier-desc">${esc(desc)}</div></div>`;
   }).join('');
-  return `
-    <details>
-      <summary>
-        <span>${k} · ${b.label}</span>
-        <span class="small mono dim" style="font-weight:400;white-space:nowrap">${cur} · ${date}</span>
-      </summary>
-      <div class="tier-list">
-        <div class="small dim" style="padding:10px 8px">${b.note}</div>
-        ${rows}
-      </div>
-    </details>`;
+  return `<details><summary><span>${k} · ${b.label}</span><span class="small mono dim" style="font-weight:400;white-space:nowrap">${cur} · ${date}</span></summary><div class="tier-list"><div class="small dim" style="padding:10px 8px">${b.note}</div>${rows}</div></details>`;
 }
 
 function viewLog(){
-  const rows = state.log.length
-    ? state.log.map(e => {
-        const skill = e.skillId ? state.skills.find(s => s.id === e.skillId) : null;
-        const diffBadge = e.difficulty
-          ? `<span class="tag" style="background:${e.difficulty==='hard'?'rgba(255,92,92,.15);color:var(--danger)':e.difficulty==='easy'?'rgba(61,220,151,.15);color:var(--ok)':'#1d2836;color:var(--dim)'};margin-left:6px">${e.difficulty}</span>`
-          : '';
-        return `
-          <div class="logrow">
-            <span style="flex:1">
-              <span class="dim mono">${e.date.slice(5)}</span>
-              ${skill ? `<span class="dim" style="font-size:11px"> ${esc(skill.name)} · </span>` : ''}
-              ${esc(e.note)}${diffBadge}
-            </span>
-            <span class="xp">${e.xp > 0 ? '+' : ''}${e.xp}</span>
-          </div>`;
-      }).join('')
-    : '<div class="dim small">Nothing logged yet.</div>';
-  return `
-    <h2>Log date</h2>
-    <div class="card">
-      <input type="date" id="log-date" value="${logDate}" max="${today()}">
-      <div class="small dim" style="margin-top:8px">Applies to quick logs and adjustments below.</div>
-    </div>
-    <h2>Quick log</h2>
-    <div class="grid">
-      <button data-xp="15" data-note="Workout">Workout +15</button>
-      <button data-xp="5"  data-note="Reading">Reading +5</button>
-      <button data-xp="10" data-note="Deep work hour">Deep work +10</button>
-      <button data-xp="20" data-note="Book finished">Book +20</button>
-      <button data-xp="50" data-note="PR hit">PR +50</button>
-      <button data-xp="100" data-note="Milestone">Milestone +100</button>
-    </div>
-    <h2>Adjustment</h2>
-    <div class="card">
-      <div class="row" style="gap:8px">
-        <input type="number" id="adj" placeholder="±XP">
-        <input type="text" id="adjnote" placeholder="reason">
-        <button class="sm" id="adjgo">Add</button>
-      </div>
-    </div>
-    <h2>History</h2>
-    <div class="card">${rows}</div>
-  `;
+  const rows = state.log.length ? state.log.map(e => {
+    const skill = e.skillId ? state.skills.find(s => s.id === e.skillId) : null;
+    const diff = e.difficulty ? `<span class="tag" style="background:${e.difficulty==='hard'?'rgba(255,92,92,.15);color:var(--danger)':e.difficulty==='easy'?'rgba(61,220,151,.15);color:var(--ok)':'#1d2836;color:var(--dim)'};margin-left:6px">${e.difficulty}</span>` : '';
+    return `<div class="logrow"><span style="flex:1"><span class="dim mono">${e.date.slice(5)}</span>${skill?` <span class="dim" style="font-size:11px">${esc(skill.name)} · </span>`:''}${esc(e.note)}${diff}</span><span class="xp">${e.xp>0?'+':''}${e.xp}</span></div>`;
+  }).join('') : '<div class="dim small">Nothing logged yet.</div>';
+  return `<h2>Log date</h2><div class="card"><input type="date" id="log-date" value="${logDate}" max="${today()}"><div class="small dim" style="margin-top:8px">Applies to quick logs and adjustments below.</div></div><h2>Quick log</h2><div class="grid"><button data-xp="15" data-note="Workout">Workout +15</button><button data-xp="5" data-note="Reading">Reading +5</button><button data-xp="10" data-note="Deep work hour">Deep work +10</button><button data-xp="20" data-note="Book finished">Book +20</button><button data-xp="50" data-note="PR hit">PR +50</button><button data-xp="100" data-note="Milestone">Milestone +100</button></div><h2>Adjustment</h2><div class="card"><div class="row" style="gap:8px"><input type="number" id="adj" placeholder="±XP"><input type="text" id="adjnote" placeholder="reason"><button class="sm" id="adjgo">Add</button></div></div><h2>History <span class="dim small" style="text-transform:none;letter-spacing:0;margin-left:8px">Total earned: ${state.totalXP}</span></h2><div class="card">${rows}</div>`;
 }
 
 function viewMore(){
-  return `
-    <h2>Profile</h2>
-    <div class="card">
-      <div class="field">
-        <label>Name</label>
-        <input id="profile-name" value="${esc(state.name)}" maxlength="40">
-      </div>
-      <div class="field">
-        <label>Daily time budget</label>
-        <select id="profile-budget">
-          <option value="15" ${state.timeBudget===15?'selected':''}>15 min</option>
-          <option value="30" ${state.timeBudget===30?'selected':''}>30 min</option>
-          <option value="45" ${state.timeBudget===45?'selected':''}>45 min</option>
-          <option value="60" ${state.timeBudget===60?'selected':''}>60+ min</option>
-        </select>
-      </div>
-      <div class="field">
-        <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
-          <input type="checkbox" id="profile-deload" ${state.deloadEnabled?'checked':''}>
-          <span style="text-transform:none;letter-spacing:0;color:var(--txt);font-size:13px">Deload weeks every 5th week</span>
-        </label>
-        <div class="hint">${state.startedAt ? `Started ${state.startedAt}. Week ${deloadWeekStatus().weekNum} now.` : 'Not started yet.'}</div>
-      </div>
-      <button class="sm" id="profile-save">Save</button>
-    </div>
-    <h2>Equipment</h2>
-    <div class="card">
-      ${renderEquipmentSection()}
-    </div>
-    <h2>AI settings</h2>
-    <div class="card">
-      <div class="notice">The AI receives your last 30 days, stats, equipment weights and current milestone so it can coach rather than guess.</div>
-      <div class="field"><label>API key</label>
-        <input id="ai-key" type="password" value="${esc(state.settings.apiKey)}" placeholder="sk-...">
-      </div>
-      <div class="field"><label>Base URL</label>
-        <input id="ai-base" value="${esc(state.settings.apiBase)}">
-      </div>
-      <div class="field"><label>Model</label>
-        <input id="ai-model" value="${esc(state.settings.apiModel)}">
-      </div>
-      <button class="sm primary" id="ai-save">Save AI settings</button>
-    </div>
-    <h2>Backup</h2>
-    <div class="card">
-      <button class="primary" id="export" style="width:100%;margin-bottom:8px">Export backup</button>
-      <button id="import" style="width:100%;margin-bottom:8px">Import backup</button>
-      <button class="ghost danger" id="startover" style="width:100%">Start over (erase all)</button>
-    </div>
-    <h2>Rules</h2>
-    <div class="card small dim">
-      <p>XP for level n = 50 × n × (n−1). Skill XP for level L = 10 × L.</p>
-      <p>Starting level = round(sum(stats)/10).</p>
-      <p>Stats move only on a benchmark you pass.</p>
-      <p>Un-ticking a quest removes its XP from player and skill (with level-down handling) and deletes the log entry.</p>
-      <p>Deload week every 5th week — halve workouts, keep reading.</p>
-    </div>
-  `;
+  return `<h2>Profile</h2><div class="card"><div class="field"><label>Name</label><input id="profile-name" value="${esc(state.name)}" maxlength="40"></div><div class="field"><label>Daily time budget</label><select id="profile-budget"><option value="15" ${state.timeBudget===15?'selected':''}>15 min</option><option value="30" ${state.timeBudget===30?'selected':''}>30 min</option><option value="45" ${state.timeBudget===45?'selected':''}>45 min</option><option value="60" ${state.timeBudget===60?'selected':''}>60+ min</option></select></div><div class="field"><label style="display:flex;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" id="profile-deload" ${state.deloadEnabled?'checked':''}><span style="text-transform:none;letter-spacing:0;color:var(--txt);font-size:13px">Deload weeks every 5th week</span></label><div class="hint">${state.startedAt?`Started ${state.startedAt}. Week ${deloadWeekStatus().weekNum} now.`:'Not started yet.'}</div></div><button class="sm" id="profile-save">Save</button></div><h2>Equipment</h2><div class="card">${renderEquipmentSection()}</div><h2>AI settings</h2><div class="card"><div class="notice">The AI receives your last 30 days, stats, equipment weights and current milestone.</div><div class="field"><label>API key</label><input id="ai-key" type="password" value="${esc(state.settings.apiKey)}" placeholder="sk-..."></div><div class="field"><label>Base URL</label><input id="ai-base" value="${esc(state.settings.apiBase)}"></div><div class="field"><label>Model</label><input id="ai-model" value="${esc(state.settings.apiModel)}"></div><button class="sm primary" id="ai-save">Save AI settings</button></div><h2>Backup</h2><div class="card"><button class="primary" id="export" style="width:100%;margin-bottom:8px">Export backup</button><button id="import" style="width:100%;margin-bottom:8px">Import backup</button><button class="ghost danger" id="startover" style="width:100%">Start over (erase all)</button></div><h2>Rules</h2><div class="card small dim"><p><b>Level = round(power / 10)</b>, where power = sum(stats) + 3 × sum(skill levels).</p><p>Levels can't be farmed — only stats and skill levels raise them.</p><p>Stats move only on a benchmark you pass. Testing down removes the level the stat gave you.</p><p>Milestone XP scales with milestone position: milestone 1 = 100 skill XP, milestone 20 = 575 skill XP.</p><p>Un-ticking a quest removes its XP, skill XP and log entry, with level-down handling.</p></div>`;
 }
 
-/* ═════ MODALS ═════ */
+/* ═══════════════════════════════════════════
+   MODALS
+   ═══════════════════════════════════════════ */
 function closeModal(){ document.getElementById('modal').innerHTML = ''; }
 function openModal(html){
-  document.getElementById('modal').innerHTML = `
-    <div class="modal-bg" onclick="if(event.target===this)closeModal()">
-      <div class="modal">${html}</div>
-    </div>`;
+  document.getElementById('modal').innerHTML = `<div class="modal-bg" onclick="if(event.target===this)closeModal()"><div class="modal">${html}</div></div>`;
 }
 
 function shareProgress(){
@@ -1955,88 +1718,42 @@ function shareProgress(){
   const canvas = document.createElement('canvas');
   canvas.width = w; canvas.height = h;
   const ctx = canvas.getContext('2d');
-
-  const bg = '#0a0e14', line = '#1d2836';
-  const txt = '#c8d4e4', dim = '#6b7c93', accent = '#4da6ff';
-  const font = (weight, size, mono=false) =>
-    `${weight} ${size}px ${mono ? 'ui-monospace, "SF Mono", Menlo, monospace' : '-apple-system, system-ui, sans-serif'}`;
-
-  ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
-  ctx.strokeStyle = line; ctx.lineWidth = 1;
-  ctx.strokeRect(20, 20, w-40, h-40);
+  const bg = '#0a0e14', line = '#1d2836', txt = '#c8d4e4', dim = '#6b7c93', accent = '#4da6ff';
+  const font = (weight, size, mono=false) => `${weight} ${size}px ${mono ? 'ui-monospace, "SF Mono", Menlo, monospace' : '-apple-system, system-ui, sans-serif'}`;
+  ctx.fillStyle = bg; ctx.fillRect(0,0,w,h);
+  ctx.strokeStyle = line; ctx.strokeRect(20,20,w-40,h-40);
   ctx.textBaseline = 'top'; ctx.textAlign = 'left';
-
-  ctx.fillStyle = accent; ctx.font = font(600, 16);
-  ctx.fillText('THE SYSTEM', 60, 60);
-  ctx.fillStyle = dim; ctx.font = font(500, 13, true);
-  ctx.textAlign = 'right'; ctx.fillText(today(), w - 60, 60); ctx.textAlign = 'left';
-
-  ctx.fillStyle = txt; ctx.font = font(600, 30);
-  ctx.fillText(state.name || 'Player', 60, 90);
-
-  ctx.fillStyle = line; ctx.fillRect(60, 145, w - 120, 1);
-
-  const lvl = levelFromXP(state.totalXP);
-  const rank = rankOf(lvl);
-
-  ctx.fillStyle = dim; ctx.font = font(500, 12);
-  ctx.fillText('LEVEL', 60, 175);
-  ctx.fillText('RANK', 280, 175);
-  ctx.fillText('STREAK', 500, 175);
-
-  ctx.fillStyle = txt; ctx.font = font(700, 64, true);
-  ctx.fillText(String(lvl), 60, 195);
-  ctx.fillStyle = accent; ctx.fillText(rank, 280, 195);
-  ctx.fillStyle = txt; ctx.fillText(String(state.streak), 500, 195);
-
-  ctx.fillStyle = dim; ctx.font = font(500, 14);
-  ctx.fillText('days', 500 + ctx.measureText(String(state.streak)).width + (String(state.streak).length * 2), 245);
-
-  ctx.fillStyle = line; ctx.fillRect(60, 300, w - 120, 1);
-
-  ctx.fillStyle = dim; ctx.font = font(500, 12);
-  ctx.fillText('STATS', 60, 325);
-
-  ['STR','AGI','VIT','INT','PER'].forEach((k, i) => {
-    const y = 360 + i * 45;
-    ctx.fillStyle = dim; ctx.font = font(500, 14);
-    ctx.fillText(k, 60, y + 2);
-    const barX = 140, barW = 500, barH = 8;
-    ctx.fillStyle = '#0a0e14'; ctx.fillRect(barX, y + 5, barW, barH);
-    ctx.fillStyle = accent; ctx.fillRect(barX, y + 5, barW * (state.stats[k] / 100), barH);
-    ctx.fillStyle = txt; ctx.font = font(600, 18, true);
-    ctx.textAlign = 'right'; ctx.fillText(String(state.stats[k]), w - 60, y); ctx.textAlign = 'left';
+  ctx.fillStyle = accent; ctx.font = font(600,16); ctx.fillText('THE SYSTEM', 60, 60);
+  ctx.fillStyle = dim; ctx.font = font(500,13,true); ctx.textAlign = 'right'; ctx.fillText(today(), w-60, 60); ctx.textAlign = 'left';
+  ctx.fillStyle = txt; ctx.font = font(600,30); ctx.fillText(state.name || 'Player', 60, 90);
+  ctx.fillStyle = line; ctx.fillRect(60,145,w-120,1);
+  const lvl = computePlayerLevel();
+  const power = computeTotalPower();
+  ctx.fillStyle = dim; ctx.font = font(500,12); ctx.fillText('LEVEL', 60, 175); ctx.fillText('RANK', 280, 175); ctx.fillText('POWER', 500, 175);
+  ctx.fillStyle = txt; ctx.font = font(700,64,true); ctx.fillText(String(lvl), 60, 195);
+  ctx.fillStyle = accent; ctx.fillText(rankOf(lvl), 280, 195);
+  ctx.fillStyle = txt; ctx.fillText(String(power), 500, 195);
+  ctx.fillStyle = line; ctx.fillRect(60,300,w-120,1);
+  ctx.fillStyle = dim; ctx.font = font(500,12); ctx.fillText('STATS', 60, 325);
+  ['STR','AGI','VIT','INT','PER'].forEach((k,i) => {
+    const y = 360 + i*45;
+    ctx.fillStyle = dim; ctx.font = font(500,14); ctx.fillText(k, 60, y+2);
+    ctx.fillStyle = '#0a0e14'; ctx.fillRect(140, y+5, 500, 8);
+    ctx.fillStyle = accent; ctx.fillRect(140, y+5, 500*(state.stats[k]/100), 8);
+    ctx.fillStyle = txt; ctx.font = font(600,18,true); ctx.textAlign = 'right'; ctx.fillText(String(state.stats[k]), w-60, y); ctx.textAlign = 'left';
   });
-
-  ctx.fillStyle = line; ctx.fillRect(60, 600, w - 120, 1);
-
-  ctx.fillStyle = dim; ctx.font = font(500, 12);
-  ctx.fillText('ACTIVE SKILLS', 60, 625);
-
-  const active = state.skills.filter(s => s.active);
-  active.slice(0, 5).forEach((s, i) => {
-    const y = 660 + i * 40;
-    ctx.fillStyle = txt; ctx.font = font(500, 16);
-    ctx.fillText(s.name, 60, y);
-    ctx.fillStyle = dim; ctx.font = font(500, 14, true);
-    ctx.textAlign = 'right'; ctx.fillText(`${rankOf(s.level)} · Lv ${s.level}`, w - 60, y); ctx.textAlign = 'left';
+  ctx.fillStyle = line; ctx.fillRect(60,600,w-120,1);
+  ctx.fillStyle = dim; ctx.font = font(500,12); ctx.fillText('ACTIVE SKILLS', 60, 625);
+  state.skills.filter(s=>s.active).slice(0,5).forEach((s,i) => {
+    const y = 660 + i*40;
+    const title = titleForSkill(s);
+    ctx.fillStyle = txt; ctx.font = font(500,16); ctx.fillText(s.name + (title ? ' · ' + title : ''), 60, y);
+    ctx.fillStyle = dim; ctx.font = font(500,14,true); ctx.textAlign = 'right'; ctx.fillText(`${rankOf(s.level)} · Lv ${s.level}`, w-60, y); ctx.textAlign = 'left';
   });
-
-  ctx.fillStyle = dim; ctx.font = font(500, 12);
-  ctx.fillText('Honest logging. No inflated numbers.', 60, h - 60);
-
+  ctx.fillStyle = dim; ctx.font = font(500,12); ctx.fillText('Honest logging. No inflated numbers.', 60, h-60);
   canvas.toBlob(blob => {
     const url = URL.createObjectURL(blob);
-    openModal(`
-      <h2>Progress card</h2>
-      <img src="${url}" style="width:100%;border-radius:8px;border:1px solid var(--line);display:block">
-      <p class="small dim" style="margin-top:12px">Long-press the image to save it to photos. Or tap download.</p>
-      <a href="${url}" download="the-system-${today()}.png"
-         style="display:block;text-align:center;text-decoration:none;padding:12px;border-radius:8px;font-weight:600;color:#06121f;background:var(--accent);margin-top:12px">
-        Download
-      </a>
-      <button class="ghost" style="width:100%;margin-top:8px" onclick="closeModal()">Close</button>
-    `);
+    openModal(`<h2>Progress card</h2><img src="${url}" style="width:100%;border-radius:8px;border:1px solid var(--line);display:block"><p class="small dim" style="margin-top:12px">Long-press to save, or tap download.</p><a href="${url}" download="the-system-${today()}.png" style="display:block;text-align:center;text-decoration:none;padding:12px;border-radius:8px;font-weight:600;color:#06121f;background:var(--accent);margin-top:12px">Download</a><button class="ghost" style="width:100%;margin-top:8px" onclick="closeModal()">Close</button>`);
     setTimeout(() => URL.revokeObjectURL(url), 60000);
   }, 'image/png');
 }
@@ -2044,290 +1761,93 @@ function shareProgress(){
 function openSkillDetail(skillId){
   const skill = state.skills.find(s => s.id === skillId);
   if (!skill) return;
-
   function renderDetail(){
-    const ladder = skill.ladder || [];
-    const done = skill.ladderDone || [];
+    const ladder = skill.ladder || [], done = skill.ladderDone || [];
     const nextIdx = currentMilestoneIdx(skill);
     const nextMilestone = (nextIdx >= 0) ? ladder[nextIdx] : null;
-
-    const ladderHtml = ladder.length ? ladder.map((m, i) => {
+    const title = titleForSkill(skill);
+    const ladderHtml = ladder.length ? ladder.map((m,i) => {
       const isDone = done.includes(i);
       const isNext = i === nextIdx;
-      return `
-        <div class="tier-row ${isNext?'current':''} ${isDone?'below':''}" data-ladder="${i}">
-          <div class="tier-val">${isDone ? '✓' : (isNext ? '›' : '·')}</div>
-          <div class="tier-desc">${esc(m)}</div>
-        </div>`;
+      const willGive = milestoneSkillXP(i);
+      return `<div class="tier-row ${isNext?'current':''} ${isDone?'below':''}" data-ladder="${i}"><div class="tier-val">${isDone?'✓':(isNext?'›':'·')}</div><div class="tier-desc">${esc(m)}${!isDone?`<div class="small dim mono">+${willGive} skill XP</div>`:''}</div></div>`;
     }).join('') : '<div class="dim small" style="padding:12px">No ladder set.</div>';
-
     const status = skill.status ? esc(skill.status) : '<span class="dim">Not set</span>';
     const isBusinessUndecided = skill.subtype === 'business' && /not decided/i.test(skill.detail || '');
-
-    let needsRecalibrate = false;
+    let needsRecal = false;
     if (skill.type === 'workout' && skill.plan && skill.plan.calibratedTo){
       const curW = JSON.stringify(state.equipmentWeights || {});
       const oldW = JSON.stringify(skill.plan.calibratedTo.weights || {});
-      needsRecalibrate = state.stats.STR !== skill.plan.calibratedTo.STR || curW !== oldW;
+      needsRecal = state.stats.STR !== skill.plan.calibratedTo.STR || curW !== oldW;
     }
-
-    const currentQuests = (nextIdx >= 0 && skill.milestoneQuests && skill.milestoneQuests[nextIdx])
-      ? skill.milestoneQuests[nextIdx]
-      : (skill.quests || []);
-
+    const currentQuests = (nextIdx >= 0 && skill.milestoneQuests && skill.milestoneQuests[nextIdx]) ? skill.milestoneQuests[nextIdx] : (skill.quests || []);
     openModal(`
-      <div class="row between" style="margin-bottom:16px">
-        <h2 style="margin:0">${esc(skill.name)}</h2>
-        <button class="sm ghost" id="sd-close">×</button>
-      </div>
-
-      ${needsRecalibrate ? `
-        <div class="notice warn">
-          <b>Your STR or equipment has changed since this plan was built.</b>
-          <button class="sm primary" id="sd-recalibrate" style="width:100%;margin-top:8px">Recalculate from stats</button>
-        </div>
-      ` : ''}
-
-      ${skill.why ? `<div class="notice" style="font-style:italic">"${esc(skill.why)}"</div>` : ''}
-
-      ${nextMilestone ? `<div class="milestone-focus"><b>Current focus:</b> ${esc(nextMilestone)}</div>` : ''}
-
-      <div class="card">
-        <div class="row between">
-          <span class="dim small">STATUS</span>
-          <button class="sm ghost" id="sd-progress">Update</button>
-        </div>
-        <div style="margin-top:6px">${status}</div>
-        ${skill.type === 'workout' && skill.subtype === 'fitness' ? `
-          <div class="small dim" style="margin-top:8px">Workouts since attempt: ${skill.workoutsSinceAttempt || 0}</div>
-        ` : ''}
-        ${skill.quitCriteria ? `<div class="small dim" style="margin-top:8px">Drop criteria: ${esc(skill.quitCriteria)}</div>` : ''}
-      </div>
-
-      ${currentQuests.length > 0 ? `
-        <div class="row between" style="margin:16px 0 8px">
-          <span class="dim small">DAILY QUESTS FOR CURRENT MILESTONE</span>
-        </div>
-        <div class="card">
-          ${currentQuests.map(q => `<div class="logrow"><span>${esc(q.text)}</span><span class="xp">+${q.xp}</span></div>`).join('')}
-        </div>
-      ` : ''}
-
-      ${isBusinessUndecided ? `
-        <div class="notice"><b>You haven't decided on your business yet.</b> Tap <b>Regenerate</b> — the AI will suggest 3 ideas and build the ladder for the most promising one.</div>
-      ` : ''}
-
-      <div class="row between" style="margin:16px 0 8px">
-        <span class="dim small">PROGRESSION LADDER</span>
-        <button class="sm ghost" id="sd-regen-ai">✨ Regenerate</button>
-      </div>
-      <div style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:4px">
-        ${ladderHtml}
-      </div>
-
-      ${nextIdx >= 0 ? `
-        <div class="notice" style="margin-top:16px"><b>Next step:</b> ${esc(ladder[nextIdx])}</div>
-      ` : (ladder.length ? `
-        <div class="notice ok" style="margin-top:16px"><b>Ladder complete.</b></div>
-      ` : '')}
-
-      <div class="row" style="gap:8px;margin-top:16px">
-        <button class="ghost" id="sd-pause" style="flex:1">${skill.active ? 'Pause' : 'Activate'}</button>
-        <button class="ghost" id="sd-edit" style="flex:1">Edit</button>
-        <button class="ghost danger" id="sd-del" style="flex:1">Delete</button>
-      </div>
-    `);
-
+      <div class="row between" style="margin-bottom:16px"><div><h2 style="margin:0">${esc(skill.name)}</h2>${title?`<div class="skill-title" style="margin-top:6px">${esc(title)}</div>`:''}</div><button class="sm ghost" id="sd-close">×</button></div>
+      ${needsRecal?`<div class="notice warn"><b>Your STR or equipment has changed since this plan was built.</b><button class="sm primary" id="sd-recalibrate" style="width:100%;margin-top:8px">Recalculate from stats</button></div>`:''}
+      ${skill.why?`<div class="notice" style="font-style:italic">"${esc(skill.why)}"</div>`:''}
+      ${nextMilestone?`<div class="milestone-focus"><b>Current focus:</b> ${esc(nextMilestone)}</div>`:''}
+      <div class="card"><div class="row between"><span class="dim small">STATUS</span><button class="sm ghost" id="sd-progress">Update</button></div><div style="margin-top:6px">${status}</div>${skill.type==='workout'&&skill.subtype==='fitness'?`<div class="small dim" style="margin-top:8px">Workouts since attempt: ${skill.workoutsSinceAttempt||0}</div>`:''}${skill.quitCriteria?`<div class="small dim" style="margin-top:8px">Drop criteria: ${esc(skill.quitCriteria)}</div>`:''}</div>
+      ${currentQuests.length>0?`<div class="row between" style="margin:16px 0 8px"><span class="dim small">DAILY QUESTS FOR CURRENT MILESTONE</span></div><div class="card">${currentQuests.map(q => `<div class="logrow"><span>${esc(q.text)}</span><span class="xp">+${q.xp}</span></div>`).join('')}</div>`:''}
+      ${isBusinessUndecided?`<div class="notice"><b>You haven't decided on your business yet.</b> Tap Regenerate — the AI will suggest 3 ideas and build the ladder.</div>`:''}
+      <div class="row between" style="margin:16px 0 8px"><span class="dim small">PROGRESSION LADDER (${done.length}/${ladder.length})</span><button class="sm ghost" id="sd-regen-ai">✨ Regenerate</button></div>
+      <div style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:4px">${ladderHtml}</div>
+      ${nextIdx>=0?`<div class="notice" style="margin-top:16px"><b>Next step:</b> ${esc(ladder[nextIdx])}</div>`:(ladder.length?`<div class="notice ok" style="margin-top:16px"><b>Ladder complete.</b></div>`:'')}
+      <div class="row" style="gap:8px;margin-top:16px"><button class="ghost" id="sd-pause" style="flex:1">${skill.active?'Pause':'Activate'}</button><button class="ghost" id="sd-edit" style="flex:1">Edit</button><button class="ghost danger" id="sd-del" style="flex:1">Delete</button></div>`);
     document.getElementById('sd-close').onclick = closeModal;
     document.getElementById('sd-progress').onclick = () => openProgressionModal(skill, renderDetail);
     document.getElementById('sd-regen-ai').onclick = () => openLadderAI(skill, renderDetail);
-    document.getElementById('sd-pause').onclick = () => {
-      skill.active = !skill.active; save(); renderDetail();
-    };
+    document.getElementById('sd-pause').onclick = () => { skill.active = !skill.active; save(); renderDetail(); };
     document.getElementById('sd-edit').onclick = () => { closeModal(); openSkillEditor(skill.id); };
-    document.getElementById('sd-del').onclick = () => {
-      if (!confirm(`Delete "${skill.name}"?`)) return;
-      state.skills = state.skills.filter(s => s.id !== skill.id);
-      save(); closeModal();
-    };
+    document.getElementById('sd-del').onclick = () => { if (!confirm(`Delete "${skill.name}"?`)) return; state.skills = state.skills.filter(s => s.id !== skill.id); save(); closeModal(); };
     const rec = document.getElementById('sd-recalibrate');
-    if (rec) rec.onclick = () => {
-      skill.plan.exercises = deriveExercisesFromStats();
-      skill.plan.calibratedTo = { STR: state.stats.STR, equipment: [...(state.equipment||[])], weights: { ...(state.equipmentWeights||{}) } };
-      delete skill.plan.userEdited;
-      save(); renderDetail();
-    };
+    if (rec) rec.onclick = () => { skill.plan.exercises = deriveExercisesFromStats(); skill.plan.calibratedTo = { STR: state.stats.STR, equipment: [...(state.equipment||[])], weights: { ...(state.equipmentWeights||{}) } }; delete skill.plan.userEdited; save(); renderDetail(); };
     document.querySelectorAll('[data-ladder]').forEach(el => {
-      el.onclick = () => {
-        const i = +el.dataset.ladder;
-        if (skill.ladderDone && skill.ladderDone.includes(i)) untickMilestone(skill, i);
-        else tickMilestone(skill, i);
-        save(); renderDetail();
-      };
+      el.onclick = () => { const i = +el.dataset.ladder; if (skill.ladderDone && skill.ladderDone.includes(i)) untickMilestone(skill, i); else tickMilestone(skill, i); save(); renderDetail(); };
     });
   }
-
   renderDetail();
 }
 
 function openProgressionModal(skill, back){
   const questions = progressionFor(skill);
   const answers = {};
-  questions.forEach(q => {
-    if (q.type === 'days' || q.onlyIf) return;
-    const match = q.options.find(o => o.label === skill.status || skill.status?.startsWith(o.label));
-    if (match) answers[q.id] = match.value;
-  });
-  if (skill.type === 'workout' && skill.plan){
-    answers.workoutDays = [...(skill.plan.workoutDays || [1,3,5])];
-    answers.attemptDay = skill.plan.attemptDay || 0;
-  }
-
-  const showEquipment = skill.subtype === 'fitness' && skill.type === 'workout'
-    && fitnessNeedsEquipment(skill.detail) && !state.equipmentConfigured;
-
+  questions.forEach(q => { if (q.type==='days'||q.onlyIf) return; const m = q.options.find(o => o.label === skill.status || skill.status?.startsWith(o.label)); if (m) answers[q.id] = m.value; });
+  if (skill.type === 'workout' && skill.plan){ answers.workoutDays = [...(skill.plan.workoutDays || [1,3,5])]; answers.attemptDay = skill.plan.attemptDay || 0; }
+  const showEquipment = skill.subtype === 'fitness' && skill.type === 'workout' && fitnessNeedsEquipment(skill.detail) && !state.equipmentConfigured;
   function renderProg(){
-    openModal(`
-      <h2>${esc(skill.name)} — progression</h2>
-      ${showEquipment ? `<div class="card">${renderEquipmentSection()}</div>` : ''}
-      ${questions.map(q => {
-        if (q.type === 'days'){
-          const current = answers[q.id] !== undefined ? answers[q.id] : q.default;
-          return `
-            <div class="field">
-              <label>${esc(q.label)}</label>
-              <div class="day-picker">
-                ${[0,1,2,3,4,5,6].map(d => {
-                  const on = q.multi ? current.includes(d) : current === d;
-                  return `<button type="button" class="${on?'primary':'ghost'}" data-pday="${q.id}|${d}|${q.multi?'multi':'single'}">${dayShort(d)}</button>`;
-                }).join('')}
-              </div>
-            </div>`;
-        }
-        const visible = !q.onlyIf || q.onlyIf(answers);
-        if (!visible) return '';
-        return `
-          <div class="field">
-            <label>${esc(q.label)}</label>
-            <select data-pq="${q.id}">
-              <option value="">— Select —</option>
-              ${q.options.map(o =>
-                `<option value="${esc(o.value)}" ${answers[q.id]===o.value?'selected':''}>${esc(o.label)}</option>`
-              ).join('')}
-            </select>
-          </div>`;
-      }).join('')}
-      <div class="row" style="gap:8px;margin-top:16px">
-        <button class="ghost" id="pm-cancel" style="flex:1">Cancel</button>
-        <button class="primary" id="pm-save" style="flex:2">Save</button>
-      </div>
-    `);
+    openModal(`<h2>${esc(skill.name)} — progression</h2>${showEquipment?`<div class="card">${renderEquipmentSection()}</div>`:''}${questions.map(q => {
+      if (q.type === 'days'){ const current = answers[q.id] !== undefined ? answers[q.id] : q.default; return `<div class="field"><label>${esc(q.label)}</label><div class="day-picker">${[0,1,2,3,4,5,6].map(d => { const on = q.multi ? current.includes(d) : current === d; return `<button type="button" class="${on?'primary':'ghost'}" data-pday="${q.id}|${d}|${q.multi?'multi':'single'}">${dayShort(d)}</button>`; }).join('')}</div></div>`; }
+      const visible = !q.onlyIf || q.onlyIf(answers);
+      if (!visible) return '';
+      return `<div class="field"><label>${esc(q.label)}</label><select data-pq="${q.id}"><option value="">— Select —</option>${q.options.map(o => `<option value="${esc(o.value)}" ${answers[q.id]===o.value?'selected':''}>${esc(o.label)}</option>`).join('')}</select></div>`;
+    }).join('')}<div class="row" style="gap:8px;margin-top:16px"><button class="ghost" id="pm-cancel" style="flex:1">Cancel</button><button class="primary" id="pm-save" style="flex:2">Save</button></div>`);
     if (showEquipment){
-      document.querySelectorAll('[data-eq]').forEach(el => {
-        el.onchange = () => {
-          state.equipment = state.equipment || [];
-          const id = el.dataset.eq;
-          const idx = state.equipment.indexOf(id);
-          if (el.checked && idx < 0) state.equipment.push(id);
-          if (!el.checked && idx >= 0) state.equipment.splice(idx, 1);
-          renderProg();
-        };
-      });
-      document.querySelectorAll('[data-eqw]').forEach(el => {
-        el.onchange = () => {
-          state.equipmentWeights = state.equipmentWeights || { dumbbell: 0, barbell: 0, barbellPlates: false, kettlebell: 0 };
-          state.equipmentWeights[el.dataset.eqw] = parseFloat(el.value) || 0;
-        };
-      });
-      document.querySelectorAll('[data-eqx]').forEach(el => {
-        el.onchange = () => {
-          state.equipmentWeights = state.equipmentWeights || {};
-          state.equipmentWeights[el.dataset.eqx] = el.checked;
-        };
-      });
+      document.querySelectorAll('[data-eq]').forEach(el => { el.onchange = () => { state.equipment = state.equipment || []; const id = el.dataset.eq; const idx = state.equipment.indexOf(id); if (el.checked && idx < 0) state.equipment.push(id); if (!el.checked && idx >= 0) state.equipment.splice(idx, 1); renderProg(); }; });
+      document.querySelectorAll('[data-eqw]').forEach(el => { el.onchange = () => { state.equipmentWeights = state.equipmentWeights || {}; state.equipmentWeights[el.dataset.eqw] = parseFloat(el.value) || 0; }; });
+      document.querySelectorAll('[data-eqx]').forEach(el => { el.onchange = () => { state.equipmentWeights = state.equipmentWeights || {}; state.equipmentWeights[el.dataset.eqx] = el.checked; }; });
     }
-    document.querySelectorAll('[data-pq]').forEach(sel => {
-      sel.onchange = () => { answers[sel.dataset.pq] = sel.value; renderProg(); };
-    });
-    document.querySelectorAll('[data-pday]').forEach(btn => {
-      btn.onclick = () => {
-        const [qid, dStr, mode] = btn.dataset.pday.split('|');
-        const d = parseInt(dStr, 10);
-        const q = questions.find(x => x.id === qid);
-        if (mode === 'multi'){
-          const arr = Array.isArray(answers[qid]) ? [...answers[qid]] : [...(q.default || [])];
-          const idx = arr.indexOf(d);
-          if (idx >= 0) arr.splice(idx, 1); else arr.push(d);
-          answers[qid] = arr;
-        } else { answers[qid] = d; }
-        renderProg();
-      };
-    });
+    document.querySelectorAll('[data-pq]').forEach(sel => { sel.onchange = () => { answers[sel.dataset.pq] = sel.value; renderProg(); }; });
+    document.querySelectorAll('[data-pday]').forEach(btn => { btn.onclick = () => { const [qid, dStr, mode] = btn.dataset.pday.split('|'); const d = parseInt(dStr, 10); const q = questions.find(x => x.id === qid); if (mode==='multi'){ const arr = Array.isArray(answers[qid]) ? [...answers[qid]] : [...(q.default||[])]; const idx = arr.indexOf(d); if (idx>=0) arr.splice(idx,1); else arr.push(d); answers[qid] = arr; } else answers[qid] = d; renderProg(); }; });
     document.getElementById('pm-cancel').onclick = () => { closeModal(); back && back(); };
-    document.getElementById('pm-save').onclick = () => {
-      if (showEquipment) state.equipmentConfigured = true;
-      applyProgression(skill, answers);
-      save(); closeModal(); back && back();
-    };
+    document.getElementById('pm-save').onclick = () => { if (showEquipment) state.equipmentConfigured = true; applyProgression(skill, answers); save(); closeModal(); back && back(); };
   }
   renderProg();
 }
 
 function openLadderAI(skill, back){
   const prompt = buildLadderAIPrompt(skill);
-  const key = state.settings.apiKey;
-  const base = state.settings.apiBase;
-  const model = state.settings.apiModel;
-
-  openModal(`
-    <h2>Regenerate ladder</h2>
-    <div class="notice"><b>The AI will see your last 30 days, stats, equipment and current milestone.</b><br><br><b>Route 1 — API.</b> If you've saved a key, tap Generate.<br><b>Route 2 — manual.</b> Copy prompt → paste into ChatGPT → paste JSON back.</div>
-    <div class="field">
-      <label>Prompt</label>
-      <textarea id="la-prompt" rows="10" readonly>${esc(prompt)}</textarea>
-      <button class="sm" id="la-copy" style="margin-top:8px">Copy prompt</button>
-    </div>
-    ${key ? `<button class="primary" id="la-run" style="width:100%">Generate via API (${esc(model)})</button>
-             <div id="la-status" class="small dim" style="margin-top:8px;text-align:center"></div>` : ''}
-    <div class="field" style="margin-top:16px">
-      <label>Result</label>
-      <textarea id="la-result" rows="6" placeholder='["Milestone 1","Milestone 2",...]'></textarea>
-    </div>
-    <div class="row" style="gap:8px">
-      <button class="ghost" id="la-cancel" style="flex:1">Cancel</button>
-      <button class="primary" id="la-save" style="flex:2">Replace ladder</button>
-    </div>
-  `);
+  const key = state.settings.apiKey, base = state.settings.apiBase, model = state.settings.apiModel;
+  openModal(`<h2>Regenerate ladder</h2><div class="notice"><b>The AI will see your last 30 days, stats, equipment and current milestone.</b><br><br><b>Route 1 — API.</b> If you've saved a key, tap Generate.<br><b>Route 2 — manual.</b> Copy prompt → paste into ChatGPT → paste JSON back.</div><div class="field"><label>Prompt</label><textarea id="la-prompt" rows="10" readonly>${esc(prompt)}</textarea><button class="sm" id="la-copy" style="margin-top:8px">Copy prompt</button></div>${key?`<button class="primary" id="la-run" style="width:100%">Generate via API (${esc(model)})</button><div id="la-status" class="small dim" style="margin-top:8px;text-align:center"></div>`:''}<div class="field" style="margin-top:16px"><label>Result</label><textarea id="la-result" rows="6" placeholder='["Milestone 1","Milestone 2",...]'></textarea></div><div class="row" style="gap:8px"><button class="ghost" id="la-cancel" style="flex:1">Cancel</button><button class="primary" id="la-save" style="flex:2">Replace ladder</button></div>`);
   document.getElementById('la-cancel').onclick = closeModal;
-  document.getElementById('la-copy').onclick = () => {
-    const el = document.getElementById('la-prompt');
-    el.select(); document.execCommand('copy');
-    const b = document.getElementById('la-copy');
-    b.textContent = 'Copied ✓';
-    setTimeout(() => { b.textContent = 'Copy prompt'; }, 1500);
-  };
+  document.getElementById('la-copy').onclick = () => { const el = document.getElementById('la-prompt'); el.select(); document.execCommand('copy'); const b = document.getElementById('la-copy'); b.textContent = 'Copied ✓'; setTimeout(() => { b.textContent = 'Copy prompt'; }, 1500); };
   const runBtn = document.getElementById('la-run');
-  if (runBtn) runBtn.onclick = async () => {
-    const status = document.getElementById('la-status');
-    status.textContent = 'Generating…';
-    try {
-      const arr = await callAI(prompt, key, base, model);
-      document.getElementById('la-result').value = JSON.stringify(arr, null, 2);
-      status.textContent = `Got ${arr.length} milestones.`;
-    } catch(e){ status.textContent = 'Failed: ' + e.message; status.style.color = 'var(--danger)'; }
-  };
+  if (runBtn) runBtn.onclick = async () => { const status = document.getElementById('la-status'); status.textContent = 'Generating…'; try { const arr = await callAI(prompt, key, base, model); document.getElementById('la-result').value = JSON.stringify(arr, null, 2); status.textContent = `Got ${arr.length} milestones.`; } catch(e){ status.textContent = 'Failed: ' + e.message; status.style.color = 'var(--danger)'; } };
   document.getElementById('la-save').onclick = () => {
-    const text = document.getElementById('la-result').value.trim();
-    if (!text) return alert('Paste or generate milestones first.');
-    let arr;
-    try {
-      arr = text.startsWith('[') ? JSON.parse(text)
-        : text.split('\n').map(l => l.trim()).filter(Boolean);
-    } catch(e){ return alert('Could not parse.'); }
+    const text = document.getElementById('la-result').value.trim(); if (!text) return alert('Paste or generate first.');
+    let arr; try { arr = text.startsWith('[') ? JSON.parse(text) : text.split('\n').map(l => l.trim()).filter(Boolean); } catch(e){ return alert('Could not parse.'); }
     if (!Array.isArray(arr) || !arr.length) return alert('No milestones found.');
     skill.ladder = arr.map(String);
-    skill.ladderDone = []; skill.ladderEarned = [];
-    skill.ladderXpLogs = {}; skill.ladderPreticked = [];
+    skill.ladderDone = []; skill.ladderEarned = []; skill.ladderXpLogs = {}; skill.ladderPreticked = [];
     skill.milestoneQuests = {};
     ensureMilestoneQuests(skill);
     save(); closeModal(); back();
@@ -2338,287 +1858,67 @@ function openSkillEditor(skillId){
   const skill = skillId ? state.skills.find(s => s.id === skillId) : null;
   const isNew = !skill;
   const draft = skill ? JSON.parse(JSON.stringify(skill)) : makeSkillFromTemplate({ subtype: 'custom', label: 'New skill' }, 'New skill');
-  draft.ladderDone = draft.ladderDone || [];
-  draft.ladderEarned = draft.ladderEarned || [];
-  draft.ladderXpLogs = draft.ladderXpLogs || {};
-  draft.ladderPreticked = draft.ladderPreticked || [];
-  draft.milestoneQuests = draft.milestoneQuests || {};
-  draft.why = draft.why || '';
-  draft.quitCriteria = draft.quitCriteria || '';
+  draft.ladderDone = draft.ladderDone || []; draft.ladderEarned = draft.ladderEarned || [];
+  draft.ladderXpLogs = draft.ladderXpLogs || {}; draft.ladderPreticked = draft.ladderPreticked || [];
+  draft.milestoneQuests = draft.milestoneQuests || {}; draft.why = draft.why || ''; draft.quitCriteria = draft.quitCriteria || '';
   renderEditor();
-
   function renderEditor(){
     const isWorkout = draft.type === 'workout';
     const showCardio = isWorkout && draft.subtype === 'fitness';
     const idx = currentMilestoneIdx(draft);
     const currentMilestone = (idx >= 0 && draft.ladder) ? draft.ladder[idx] : null;
-
     let questsToEdit = [];
-    if (isWorkout){
-      questsToEdit = draft.plan?.exercises || [];
-    } else if (idx >= 0 && draft.milestoneQuests[idx]){
-      questsToEdit = draft.milestoneQuests[idx];
-    } else if (draft.quests){
-      questsToEdit = draft.quests;
-    }
-
-    const questSection = isWorkout ? `
-      <div class="field">
-        <label>Exercises</label>
-        <div id="exercises">
-          ${draft.plan.exercises.map((e, i) => `
-            <div class="exercise-row">
-              <input placeholder="Name" value="${esc(e.name)}" data-ex="${i}" data-key="name">
-              <input type="number" min="1" placeholder="Sets" value="${e.sets}" data-ex="${i}" data-key="sets">
-              <input type="number" min="1" placeholder="Reps" value="${e.reps}" data-ex="${i}" data-key="reps">
-              <button class="sm ghost danger" data-remove-ex="${i}">×</button>
-            </div>
-          `).join('')}
-        </div>
-        <button class="sm" id="add-ex" style="margin-top:8px">+ Add exercise</button>
-      </div>
-      <div class="field">
-        <label>Workout days</label>
-        <div class="day-picker">
-          ${[0,1,2,3,4,5,6].map(d => `
-            <button type="button" class="${draft.plan.workoutDays.includes(d)?'primary':'ghost'}" data-wday="${d}">${dayShort(d)}</button>
-          `).join('')}
-        </div>
-      </div>
-      <div class="field">
-        <label>Attempt day</label>
-        <div class="day-picker">
-          ${[0,1,2,3,4,5,6].map(d => `
-            <button type="button" class="${draft.plan.attemptDay === d?'primary':'ghost'}" data-aday="${d}">${dayShort(d)}</button>
-          `).join('')}
-        </div>
-      </div>
-      ${showCardio ? `
-        <div class="field">
-          <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
-            <input type="checkbox" id="sk-cardio" ${draft.cardioEnabled !== false ? 'checked' : ''}>
-            <span style="text-transform:none;letter-spacing:0;color:var(--txt);font-size:13px">Add a cardio quest on rest days (VIT training)</span>
-          </label>
-        </div>
-      ` : ''}
-    ` : `
-      ${currentMilestone ? `<div class="milestone-focus"><b>Editing quests for:</b> ${esc(currentMilestone)}</div>` : ''}
-      <div class="field">
-        <label>Daily quests${currentMilestone ? ' (for current milestone)' : ''}</label>
-        <div id="quests">
-          ${questsToEdit.map((q, i) => `
-            <div class="exercise-row" style="grid-template-columns:1fr 70px 30px">
-              <input value="${esc(q.text)}" data-q="${i}" data-key="text">
-              <input type="number" min="1" value="${q.xp}" data-q="${i}" data-key="xp">
-              <button class="sm ghost danger" data-remove-q="${i}">×</button>
-            </div>
-          `).join('')}
-        </div>
-        <button class="sm" id="add-q" style="margin-top:8px">+ Add quest</button>
-        <div class="hint">These swap automatically when you tick the current milestone.</div>
-      </div>
-      <button class="sm ghost" id="gen-ai" style="width:100%;margin-top:8px">✨ Generate quests with AI</button>
-    `;
-
-    openModal(`
-      <h2>${isNew ? 'New skill' : 'Edit skill'}</h2>
-      <div class="field">
-        <label>Name</label>
-        <input id="sk-name" value="${esc(draft.name)}" maxlength="40">
-      </div>
-      <div class="field">
-        <label>Why this matters</label>
-        <input id="sk-why" value="${esc(draft.why)}" placeholder="One sentence. Be honest.">
-      </div>
-      <div class="field">
-        <label>Drop criteria</label>
-        <input id="sk-quit" value="${esc(draft.quitCriteria)}" placeholder="e.g. not touched in 30 days">
-      </div>
-      <div class="field">
-        <label>Status</label>
-        <input id="sk-status" value="${esc(draft.status || '')}" placeholder="e.g. Complete beginner">
-      </div>
-      ${!isNew ? `
-        <div class="field">
-          <label>Type</label>
-          <div class="row" style="gap:8px">
-            <button class="sm ${draft.type==='standard'?'primary':'ghost'}" id="type-std" style="flex:1">Standard</button>
-            <button class="sm ${draft.type==='workout'?'primary':'ghost'}" id="type-wk" style="flex:1">Workout plan</button>
-          </div>
-        </div>
-      ` : ''}
-      ${questSection}
-      <div class="row" style="gap:8px;margin-top:16px">
-        <button class="ghost" id="cancel" style="flex:1">Cancel</button>
-        <button class="primary" id="save" style="flex:2">${isNew ? 'Create' : 'Save'}</button>
-      </div>
-    `);
-
+    if (isWorkout) questsToEdit = draft.plan?.exercises || [];
+    else if (idx >= 0 && draft.milestoneQuests[idx]) questsToEdit = draft.milestoneQuests[idx];
+    else if (draft.quests) questsToEdit = draft.quests;
+    const questSection = isWorkout ? `<div class="field"><label>Exercises</label><div id="exercises">${draft.plan.exercises.map((e,i) => `<div class="exercise-row"><input placeholder="Name" value="${esc(e.name)}" data-ex="${i}" data-key="name"><input type="number" min="1" placeholder="Sets" value="${e.sets}" data-ex="${i}" data-key="sets"><input type="number" min="1" placeholder="Reps" value="${e.reps}" data-ex="${i}" data-key="reps"><button class="sm ghost danger" data-remove-ex="${i}">×</button></div>`).join('')}</div><button class="sm" id="add-ex" style="margin-top:8px">+ Add exercise</button></div><div class="field"><label>Workout days</label><div class="day-picker">${[0,1,2,3,4,5,6].map(d => `<button type="button" class="${draft.plan.workoutDays.includes(d)?'primary':'ghost'}" data-wday="${d}">${dayShort(d)}</button>`).join('')}</div></div><div class="field"><label>Attempt day</label><div class="day-picker">${[0,1,2,3,4,5,6].map(d => `<button type="button" class="${draft.plan.attemptDay===d?'primary':'ghost'}" data-aday="${d}">${dayShort(d)}</button>`).join('')}</div></div>${showCardio?`<div class="field"><label style="display:flex;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" id="sk-cardio" ${draft.cardioEnabled!==false?'checked':''}><span style="text-transform:none;letter-spacing:0;color:var(--txt);font-size:13px">Add a cardio quest on rest days (VIT training)</span></label></div>`:''}` : `${currentMilestone?`<div class="milestone-focus"><b>Editing quests for:</b> ${esc(currentMilestone)}</div>`:''}<div class="field"><label>Daily quests${currentMilestone?' (for current milestone)':''}</label><div id="quests">${questsToEdit.map((q,i) => `<div class="exercise-row" style="grid-template-columns:1fr 70px 30px"><input value="${esc(q.text)}" data-q="${i}" data-key="text"><input type="number" min="1" value="${q.xp}" data-q="${i}" data-key="xp"><button class="sm ghost danger" data-remove-q="${i}">×</button></div>`).join('')}</div><button class="sm" id="add-q" style="margin-top:8px">+ Add quest</button><div class="hint">These swap automatically when you tick the current milestone.</div></div><button class="sm ghost" id="gen-ai" style="width:100%;margin-top:8px">✨ Generate quests with AI</button>`;
+    openModal(`<h2>${isNew?'New skill':'Edit skill'}</h2><div class="field"><label>Name</label><input id="sk-name" value="${esc(draft.name)}" maxlength="40"></div><div class="field"><label>Why this matters</label><input id="sk-why" value="${esc(draft.why)}" placeholder="One sentence."></div><div class="field"><label>Drop criteria</label><input id="sk-quit" value="${esc(draft.quitCriteria)}" placeholder="e.g. not touched in 30 days"></div><div class="field"><label>Status</label><input id="sk-status" value="${esc(draft.status||'')}" placeholder="e.g. Complete beginner"></div>${!isNew?`<div class="field"><label>Type</label><div class="row" style="gap:8px"><button class="sm ${draft.type==='standard'?'primary':'ghost'}" id="type-std" style="flex:1">Standard</button><button class="sm ${draft.type==='workout'?'primary':'ghost'}" id="type-wk" style="flex:1">Workout plan</button></div></div>`:''}${questSection}<div class="row" style="gap:8px;margin-top:16px"><button class="ghost" id="cancel" style="flex:1">Cancel</button><button class="primary" id="save" style="flex:2">${isNew?'Create':'Save'}</button></div>`);
     document.getElementById('cancel').onclick = closeModal;
     document.getElementById('sk-name').oninput = e => { draft.name = e.target.value; };
     document.getElementById('sk-why').oninput = e => { draft.why = e.target.value; };
     document.getElementById('sk-quit').oninput = e => { draft.quitCriteria = e.target.value; };
     document.getElementById('sk-status').oninput = e => { draft.status = e.target.value; };
-
-    const typeStd = document.getElementById('type-std');
-    const typeWk = document.getElementById('type-wk');
-    if (typeStd) typeStd.onclick = () => {
-      if (draft.type === 'standard') return;
-      draft.type = 'standard';
-      draft.quests = defaultQuestsForSkill(draft);
-      delete draft.plan; renderEditor();
-    };
-    if (typeWk) typeWk.onclick = () => {
-      if (draft.type === 'workout') return;
-      draft.type = 'workout';
-      draft.plan = {
-        exercises: deriveExercisesFromStats(),
-        workoutDays: [1,3,5], attemptDay: 0,
-        calibratedTo: { STR: state.stats.STR, equipment: [...(state.equipment||[])], weights: { ...(state.equipmentWeights||{}) } }
-      };
-      delete draft.quests; renderEditor();
-    };
-
+    const typeStd = document.getElementById('type-std'), typeWk = document.getElementById('type-wk');
+    if (typeStd) typeStd.onclick = () => { if (draft.type==='standard') return; draft.type = 'standard'; draft.quests = defaultQuestsForSkill(draft); delete draft.plan; renderEditor(); };
+    if (typeWk) typeWk.onclick = () => { if (draft.type==='workout') return; draft.type = 'workout'; draft.plan = { exercises: deriveExercisesFromStats(), workoutDays:[1,3,5], attemptDay:0, calibratedTo:{ STR: state.stats.STR, equipment: [...(state.equipment||[])], weights: { ...(state.equipmentWeights||{}) } } }; delete draft.quests; renderEditor(); };
     document.getElementById('save').onclick = () => {
       if (!draft.name.trim()) return alert('Name required.');
-      const cardioEl = document.getElementById('sk-cardio');
-      if (cardioEl) draft.cardioEnabled = cardioEl.checked;
-
-      if (isNew){
-        draft.id = newId();
-        draft.level = 1; draft.xp = 0; draft.active = true;
-        if (!draft.ladder) draft.ladder = defaultLadderFor(draft.subtype || 'custom');
-        if (draft.workoutsSinceAttempt === undefined) draft.workoutsSinceAttempt = 0;
-        if (draft.cardioEnabled === undefined) draft.cardioEnabled = true;
-        state.skills.push(draft);
-      } else {
-        const i = state.skills.findIndex(s => s.id === draft.id);
-        state.skills[i] = draft;
-      }
-      ensureMilestoneQuests(draft);
-      save(); closeModal();
+      const cardioEl = document.getElementById('sk-cardio'); if (cardioEl) draft.cardioEnabled = cardioEl.checked;
+      if (isNew){ draft.id = newId(); draft.level = 1; draft.xp = 0; draft.active = true; if (!draft.ladder) draft.ladder = defaultLadderFor(draft.subtype || 'custom'); if (draft.workoutsSinceAttempt === undefined) draft.workoutsSinceAttempt = 0; if (draft.cardioEnabled === undefined) draft.cardioEnabled = true; state.skills.push(draft); }
+      else { const i = state.skills.findIndex(s => s.id === draft.id); state.skills[i] = draft; }
+      ensureMilestoneQuests(draft); save(); closeModal();
     };
-
     if (draft.type === 'standard'){
-      document.getElementById('add-q').onclick = () => {
-        if (idx >= 0){
-          if (!draft.milestoneQuests[idx]) draft.milestoneQuests[idx] = [];
-          draft.milestoneQuests[idx].push({ id: newId(), text: '', xp: 5 });
-        } else {
-          draft.quests = draft.quests || [];
-          draft.quests.push({ id: newId(), text: '', xp: 5 });
-        }
-        renderEditor();
-      };
-      document.querySelectorAll('[data-remove-q]').forEach(b => {
-        b.onclick = () => {
-          const i = +b.dataset.removeQ;
-          if (idx >= 0 && draft.milestoneQuests[idx]) draft.milestoneQuests[idx].splice(i, 1);
-          else if (draft.quests) draft.quests.splice(i, 1);
-          renderEditor();
-        };
-      });
-      document.querySelectorAll('[data-q]').forEach(el => {
-        el.oninput = () => {
-          const i = +el.dataset.q, k = el.dataset.key;
-          const v = k === 'xp' ? parseInt(el.value, 10) || 1 : el.value;
-          if (idx >= 0 && draft.milestoneQuests[idx]) draft.milestoneQuests[idx][i][k] = v;
-          else if (draft.quests) draft.quests[i][k] = v;
-        };
-      });
+      document.getElementById('add-q').onclick = () => { if (idx >= 0){ if (!draft.milestoneQuests[idx]) draft.milestoneQuests[idx] = []; draft.milestoneQuests[idx].push({ id: newId(), text:'', xp:5 }); } else { draft.quests = draft.quests || []; draft.quests.push({ id:newId(), text:'', xp:5 }); } renderEditor(); };
+      document.querySelectorAll('[data-remove-q]').forEach(b => { b.onclick = () => { const i = +b.dataset.removeQ; if (idx >= 0 && draft.milestoneQuests[idx]) draft.milestoneQuests[idx].splice(i,1); else if (draft.quests) draft.quests.splice(i,1); renderEditor(); }; });
+      document.querySelectorAll('[data-q]').forEach(el => { el.oninput = () => { const i = +el.dataset.q, k = el.dataset.key; const v = k==='xp'?parseInt(el.value,10)||1:el.value; if (idx >= 0 && draft.milestoneQuests[idx]) draft.milestoneQuests[idx][i][k] = v; else if (draft.quests) draft.quests[i][k] = v; }; });
       document.getElementById('gen-ai').onclick = () => openAIGenerator(draft, renderEditor);
     } else {
-      document.getElementById('add-ex').onclick = () => {
-        draft.plan.exercises.push({ name: '', sets: 3, reps: 10, unit: 'reps' });
-        draft.plan.userEdited = true;
-        renderEditor();
-      };
-      document.querySelectorAll('[data-remove-ex]').forEach(b => {
-        b.onclick = () => { draft.plan.exercises.splice(+b.dataset.removeEx, 1); draft.plan.userEdited = true; renderEditor(); };
-      });
-      document.querySelectorAll('[data-ex]').forEach(el => {
-        el.oninput = () => {
-          const i = +el.dataset.ex, k = el.dataset.key;
-          draft.plan.exercises[i][k] = (k === 'sets' || k === 'reps') ? parseInt(el.value, 10) || 1 : el.value;
-          draft.plan.userEdited = true;
-        };
-      });
-      document.querySelectorAll('[data-wday]').forEach(b => {
-        b.onclick = () => {
-          const d = +b.dataset.wday;
-          const i = draft.plan.workoutDays.indexOf(d);
-          if (i >= 0) draft.plan.workoutDays.splice(i, 1); else draft.plan.workoutDays.push(d);
-          renderEditor();
-        };
-      });
-      document.querySelectorAll('[data-aday]').forEach(b => {
-        b.onclick = () => { draft.plan.attemptDay = +b.dataset.aday; renderEditor(); };
-      });
+      document.getElementById('add-ex').onclick = () => { draft.plan.exercises.push({ name:'', sets:3, reps:10, unit:'reps' }); draft.plan.userEdited = true; renderEditor(); };
+      document.querySelectorAll('[data-remove-ex]').forEach(b => { b.onclick = () => { draft.plan.exercises.splice(+b.dataset.removeEx, 1); draft.plan.userEdited = true; renderEditor(); }; });
+      document.querySelectorAll('[data-ex]').forEach(el => { el.oninput = () => { const i = +el.dataset.ex, k = el.dataset.key; draft.plan.exercises[i][k] = (k==='sets'||k==='reps')?parseInt(el.value,10)||1:el.value; draft.plan.userEdited = true; }; });
+      document.querySelectorAll('[data-wday]').forEach(b => { b.onclick = () => { const d = +b.dataset.wday; const i = draft.plan.workoutDays.indexOf(d); if (i>=0) draft.plan.workoutDays.splice(i,1); else draft.plan.workoutDays.push(d); renderEditor(); }; });
+      document.querySelectorAll('[data-aday]').forEach(b => { b.onclick = () => { draft.plan.attemptDay = +b.dataset.aday; renderEditor(); }; });
     }
   }
 }
 
 function openAIGenerator(draft, back){
   const prompt = buildQuestAIPrompt(draft);
-  const key = state.settings.apiKey;
-  const base = state.settings.apiBase;
-  const model = state.settings.apiModel;
-
-  openModal(`
-    <h2>Generate quests</h2>
-    <div class="notice"><b>The AI will see your last 30 days, current milestone, and equipment.</b><br><br><b>Route 1 — API.</b> If you've saved a key, tap Generate.<br><b>Route 2 — manual.</b> Copy prompt → paste into ChatGPT → paste JSON back.</div>
-    <div class="field">
-      <label>Prompt</label>
-      <textarea id="ai-prompt" rows="10" readonly>${esc(prompt)}</textarea>
-      <button class="sm" id="copy-prompt" style="margin-top:8px">Copy prompt</button>
-    </div>
-    ${key ? `<button class="primary" id="ai-run" style="width:100%">Generate via API</button>
-             <div id="ai-status" class="small dim" style="margin-top:8px;text-align:center"></div>` : ''}
-    <div class="field" style="margin-top:16px">
-      <label>Result</label>
-      <textarea id="ai-result" rows="6" placeholder='["Quest 1","Quest 2",...]'></textarea>
-    </div>
-    <div class="row" style="gap:8px">
-      <button class="ghost" id="ai-cancel" style="flex:1">Cancel</button>
-      <button class="primary" id="ai-add" style="flex:2">Add quests</button>
-    </div>
-  `);
+  const key = state.settings.apiKey, base = state.settings.apiBase, model = state.settings.apiModel;
+  openModal(`<h2>Generate quests</h2><div class="notice"><b>The AI will see your last 30 days, current milestone and equipment.</b><br><br><b>Route 1 — API.</b> If you've saved a key, tap Generate.<br><b>Route 2 — manual.</b> Copy prompt → paste into ChatGPT → paste JSON back.</div><div class="field"><label>Prompt</label><textarea id="ai-prompt" rows="10" readonly>${esc(prompt)}</textarea><button class="sm" id="copy-prompt" style="margin-top:8px">Copy prompt</button></div>${key?`<button class="primary" id="ai-run" style="width:100%">Generate via API</button><div id="ai-status" class="small dim" style="margin-top:8px;text-align:center"></div>`:''}<div class="field" style="margin-top:16px"><label>Result</label><textarea id="ai-result" rows="6" placeholder='["Quest 1","Quest 2",...]'></textarea></div><div class="row" style="gap:8px"><button class="ghost" id="ai-cancel" style="flex:1">Cancel</button><button class="primary" id="ai-add" style="flex:2">Add quests</button></div>`);
   document.getElementById('ai-cancel').onclick = closeModal;
-  document.getElementById('copy-prompt').onclick = () => {
-    const el = document.getElementById('ai-prompt');
-    el.select(); document.execCommand('copy');
-    const b = document.getElementById('copy-prompt');
-    b.textContent = 'Copied ✓';
-    setTimeout(() => { b.textContent = 'Copy prompt'; }, 1500);
-  };
+  document.getElementById('copy-prompt').onclick = () => { const el = document.getElementById('ai-prompt'); el.select(); document.execCommand('copy'); const b = document.getElementById('copy-prompt'); b.textContent = 'Copied ✓'; setTimeout(() => { b.textContent = 'Copy prompt'; }, 1500); };
   const runBtn = document.getElementById('ai-run');
-  if (runBtn) runBtn.onclick = async () => {
-    const status = document.getElementById('ai-status');
-    status.textContent = 'Generating…';
-    try {
-      const arr = await callAI(prompt, key, base, model);
-      document.getElementById('ai-result').value = JSON.stringify(arr, null, 2);
-      status.textContent = `Got ${arr.length} quests.`;
-    } catch(e){ status.textContent = 'Failed: ' + e.message; status.style.color = 'var(--danger)'; }
-  };
+  if (runBtn) runBtn.onclick = async () => { const status = document.getElementById('ai-status'); status.textContent = 'Generating…'; try { const arr = await callAI(prompt, key, base, model); document.getElementById('ai-result').value = JSON.stringify(arr, null, 2); status.textContent = `Got ${arr.length} quests.`; } catch(e){ status.textContent = 'Failed: ' + e.message; status.style.color = 'var(--danger)'; } };
   document.getElementById('ai-add').onclick = () => {
-    const text = document.getElementById('ai-result').value.trim();
-    if (!text) return alert('Paste or generate quests first.');
-    let arr;
-    try {
-      arr = text.startsWith('[') ? JSON.parse(text)
-        : text.split('\n').map(l => l.trim()).filter(Boolean);
-    } catch(e){ return alert('Could not parse.'); }
+    const text = document.getElementById('ai-result').value.trim(); if (!text) return alert('Paste or generate first.');
+    let arr; try { arr = text.startsWith('[') ? JSON.parse(text) : text.split('\n').map(l => l.trim()).filter(Boolean); } catch(e){ return alert('Could not parse.'); }
     if (!Array.isArray(arr) || !arr.length) return alert('No quests found.');
-
     const idx = currentMilestoneIdx(draft);
     if (!draft.milestoneQuests) draft.milestoneQuests = {};
-    if (idx >= 0){
-      draft.milestoneQuests[idx] = arr.map(q => ({ id: newId(), text: String(q), xp: 5 }));
-    } else {
-      draft.quests = draft.quests || [];
-      arr.forEach(q => draft.quests.push({ id: newId(), text: String(q), xp: 5 }));
-    }
+    if (idx >= 0) draft.milestoneQuests[idx] = arr.map(q => ({ id: newId(), text: String(q), xp: 5 }));
+    else { draft.quests = draft.quests || []; arr.forEach(q => draft.quests.push({ id: newId(), text: String(q), xp: 5 })); }
     closeModal(); back();
   };
 }
@@ -2626,37 +1926,15 @@ function openAIGenerator(draft, back){
 function openAttemptDay(skillId){
   const skill = state.skills.find(s => s.id === skillId);
   if (!skill || skill.type !== 'workout') return;
-
-  openModal(`
-    <h2>${esc(skill.name)} — Attempt day</h2>
-    <p class="small dim">Enter your max for each exercise. Next week's working sets become ~60% of max.</p>
-    ${skill.plan.exercises.map((e, i) => `
-      <div class="field">
-        <label>${esc(e.name)} · current ${e.sets}×${e.reps}${e.unit === 'sec' ? 's' : ''}</label>
-        <input type="number" min="0" data-max="${i}" placeholder="max ${e.unit}">
-      </div>
-    `).join('')}
-    <div class="row" style="gap:8px;margin-top:12px">
-      <button class="ghost" id="at-cancel" style="flex:1">Cancel</button>
-      <button class="primary" id="at-save" style="flex:2">Save & update plan</button>
-    </div>
-  `);
+  openModal(`<h2>${esc(skill.name)} — Attempt day</h2><p class="small dim">Enter your max for each exercise. Next week's working sets become ~60% of max.</p>${skill.plan.exercises.map((e,i) => `<div class="field"><label>${esc(e.name)} · current ${e.sets}×${e.reps}${e.unit==='sec'?'s':''}</label><input type="number" min="0" data-max="${i}" placeholder="max ${e.unit}"></div>`).join('')}<div class="row" style="gap:8px;margin-top:12px"><button class="ghost" id="at-cancel" style="flex:1">Cancel</button><button class="primary" id="at-save" style="flex:2">Save & update plan</button></div>`);
   document.getElementById('at-cancel').onclick = closeModal;
   document.getElementById('at-save').onclick = () => {
     let changed = false;
-    skill.plan.exercises.forEach((e, i) => {
-      const input = document.querySelector(`[data-max="${i}"]`);
-      const max = parseInt(input.value, 10);
-      if (!isNaN(max) && max > 0){
-        e.reps = Math.max(2, Math.round(max * 0.6));
-        changed = true;
-      }
-    });
+    skill.plan.exercises.forEach((e,i) => { const input = document.querySelector(`[data-max="${i}"]`); const max = parseInt(input.value,10); if (!isNaN(max) && max > 0){ e.reps = Math.max(2, Math.round(max*0.6)); changed = true; } });
     if (changed){
       skill.plan.userEdited = true;
       skill.workoutsSinceAttempt = 0;
-      const qid = `${skill.id}:attempt`;
-      const t = today();
+      const qid = `${skill.id}:attempt`, t = today();
       state.quests[t] = state.quests[t] || {};
       if (!state.quests[t][qid]){
         const logId = addXP(50, `${skill.name} attempt day`, null, null, skill.id);
@@ -2664,9 +1942,7 @@ function openAttemptDay(skillId){
         addSkillXP(skill, 50);
         const extraLogIds = [];
         const newRank = rankOf(skill.level);
-        if (newRank !== oldRank){
-          extraLogIds.push(addXP(0, `${skill.name} — Rank ${newRank}`, null, null, skill.id));
-        }
+        if (newRank !== oldRank) extraLogIds.push(addXP(0, `${skill.name} — Rank ${newRank}`, null, null, skill.id));
         state.quests[t][qid] = { logId, extraLogIds, xp: 50, skillXp: 50 };
         state.benchmarks.unshift(`${skill.name} attempt — ${t}`);
         updateStreak();
@@ -2679,76 +1955,23 @@ function openAttemptDay(skillId){
 
 function openSkillPicker(onCreated){
   let selected = null;
-
   function renderPicker(){
     if (!selected){
-      openModal(`
-        <h2>Add a skill</h2>
-        <div style="margin-top:12px">
-          ${SKILL_SUGGESTIONS.map(sug => `
-            <div class="skill-row" data-pick-cat="${sug.id}">
-              <span>${esc(sug.label)}</span><span class="dim">›</span>
-            </div>
-          `).join('')}
-          <div class="skill-row" data-pick-custom="1">
-            <span>Custom skill</span><span class="dim">›</span>
-          </div>
-        </div>
-        <div class="row" style="gap:8px;margin-top:16px">
-          <button class="ghost" id="sp-cancel" style="width:100%">Cancel</button>
-        </div>
-      `);
+      openModal(`<h2>Add a skill</h2><div style="margin-top:12px">${SKILL_SUGGESTIONS.map(sug => `<div class="skill-row" data-pick-cat="${sug.id}"><span>${esc(sug.label)}</span><span class="dim">›</span></div>`).join('')}<div class="skill-row" data-pick-custom="1"><span>Custom skill</span><span class="dim">›</span></div></div><div class="row" style="gap:8px;margin-top:16px"><button class="ghost" id="sp-cancel" style="width:100%">Cancel</button></div>`);
       document.getElementById('sp-cancel').onclick = closeModal;
-      document.querySelectorAll('[data-pick-cat]').forEach(el => {
-        el.onclick = () => { selected = SKILL_SUGGESTIONS.find(s => s.id === el.dataset.pickCat); renderPicker(); };
-      });
+      document.querySelectorAll('[data-pick-cat]').forEach(el => { el.onclick = () => { selected = SKILL_SUGGESTIONS.find(s => s.id === el.dataset.pickCat); renderPicker(); }; });
       document.querySelector('[data-pick-custom]').onclick = () => { selected = { custom: true }; renderPicker(); };
       return;
     }
     if (selected.custom){
-      openModal(`
-        <h2>Custom skill</h2>
-        <div class="field">
-          <label>Name</label>
-          <input id="sp-name" placeholder="e.g., Chess, Pottery">
-        </div>
-        <div class="row" style="gap:8px">
-          <button class="ghost" id="sp-back" style="flex:1">Back</button>
-          <button class="primary" id="sp-create" style="flex:2">Add</button>
-        </div>
-      `);
+      openModal(`<h2>Custom skill</h2><div class="field"><label>Name</label><input id="sp-name" placeholder="e.g., Chess, Pottery"></div><div class="row" style="gap:8px"><button class="ghost" id="sp-back" style="flex:1">Back</button><button class="primary" id="sp-create" style="flex:2">Add</button></div>`);
       document.getElementById('sp-back').onclick = () => { selected = null; renderPicker(); };
-      document.getElementById('sp-create').onclick = () => {
-        const name = document.getElementById('sp-name').value.trim();
-        if (!name) return alert('Name required.');
-        const skill = makeSkillFromTemplate({ subtype: 'custom', label: name }, name);
-        closeModal();
-        openProgressionModal(skill, () => onCreated(skill));
-      };
+      document.getElementById('sp-create').onclick = () => { const name = document.getElementById('sp-name').value.trim(); if (!name) return alert('Name required.'); const skill = makeSkillFromTemplate({ subtype: 'custom', label: name }, name); closeModal(); openProgressionModal(skill, () => onCreated(skill)); };
       return;
     }
-    openModal(`
-      <h2>${esc(selected.label)}</h2>
-      <p class="small dim">${esc(selected.ask)}</p>
-      <div style="margin-top:12px">
-        ${selected.options.map(opt => `
-          <div class="skill-row" data-pick-opt="${esc(opt)}">
-            <span>${esc(opt)}</span><span class="dim">›</span>
-          </div>
-        `).join('')}
-      </div>
-      <div class="row" style="gap:8px;margin-top:16px">
-        <button class="ghost" id="sp-back" style="width:100%">Back</button>
-      </div>
-    `);
+    openModal(`<h2>${esc(selected.label)}</h2><p class="small dim">${esc(selected.ask)}</p><div style="margin-top:12px">${selected.options.map(opt => `<div class="skill-row" data-pick-opt="${esc(opt)}"><span>${esc(opt)}</span><span class="dim">›</span></div>`).join('')}</div><div class="row" style="gap:8px;margin-top:16px"><button class="ghost" id="sp-back" style="width:100%">Back</button></div>`);
     document.getElementById('sp-back').onclick = () => { selected = null; renderPicker(); };
-    document.querySelectorAll('[data-pick-opt]').forEach(el => {
-      el.onclick = () => {
-        const skill = makeSkillFromTemplate(selected, el.dataset.pickOpt);
-        closeModal();
-        openProgressionModal(skill, () => onCreated(skill));
-      };
-    });
+    document.querySelectorAll('[data-pick-opt]').forEach(el => { el.onclick = () => { const skill = makeSkillFromTemplate(selected, el.dataset.pickOpt); closeModal(); openProgressionModal(skill, () => onCreated(skill)); }; });
   }
   renderPicker();
 }
@@ -2768,8 +1991,8 @@ function importBackup(){
         if (state.equipmentConfigured === undefined) state.equipmentConfigured = false;
         if (!state.timeBudget) state.timeBudget = 30;
         if (state.deloadEnabled === undefined) state.deloadEnabled = true;
-        state.lastCelebratedLevel = levelFromXP(state.totalXP || 0);
-        state.lastCelebratedRank = rankOf(state.lastCelebratedLevel);
+        state.lastPlayerLevel = computePlayerLevel();
+        state.lastPlayerRank = rankOf(state.lastPlayerLevel);
         save();
       } catch(e){ alert('Could not read that file.'); }
     };
@@ -2778,14 +2001,12 @@ function importBackup(){
   input.click();
 }
 
-/* ═════ BIND ═════ */
+/* ═══════════════════════════════════════════
+   BIND
+   ═══════════════════════════════════════════ */
 function bind(){
-  document.querySelectorAll('[data-nav]').forEach(el => {
-    el.onclick = () => navTo(el.dataset.nav);
-  });
-  document.querySelectorAll('[data-skill-card]').forEach(el => {
-    el.onclick = () => openSkillDetail(el.dataset.skillCard);
-  });
+  document.querySelectorAll('[data-nav]').forEach(el => { el.onclick = () => navTo(el.dataset.nav); });
+  document.querySelectorAll('[data-skill-card]').forEach(el => { el.onclick = () => openSkillDetail(el.dataset.skillCard); });
   document.querySelectorAll('[data-quest]').forEach(el => {
     el.onclick = () => {
       const qid = el.dataset.quest;
@@ -2794,155 +2015,75 @@ function bind(){
       if (quest.kind === 'attempt'){
         const current = state.quests[today()] && state.quests[today()][qid];
         if (current){
-          // Untick attempt — remove everything it added
-          if (confirm('Undo this attempt? XP will be reverted and the log entry removed.')){
+          if (confirm('Undo this attempt?')){
             const data = (typeof current === 'object') ? current : null;
             if (data && data.logId){
               state.log = state.log.filter(e => e.id !== data.logId);
-              if (data.extraLogIds && data.extraLogIds.length){
-                const extras = new Set(data.extraLogIds);
-                state.log = state.log.filter(e => !extras.has(e.id));
-              }
+              if (data.extraLogIds && data.extraLogIds.length){ const ex = new Set(data.extraLogIds); state.log = state.log.filter(e => !ex.has(e.id)); }
               state.totalXP = Math.max(0, state.totalXP - (data.xp || 0));
               const skill = state.skills.find(s => s.id === quest.skillId);
               if (skill && data.skillXp) subtractSkillXP(skill, data.skillXp);
             }
-            delete state.quests[today()][qid];
-            save();
+            delete state.quests[today()][qid]; save();
           }
           return;
         }
-        openAttemptDay(quest.skillId);
-        return;
+        openAttemptDay(quest.skillId); return;
       }
       toggleQuest(quest);
     };
   });
-  document.querySelectorAll('[data-nudge-attempt]').forEach(el => {
-    el.onclick = () => openAttemptDay(el.dataset.nudgeAttempt);
-  });
+  document.querySelectorAll('[data-nudge-attempt]').forEach(el => { el.onclick = () => openAttemptDay(el.dataset.nudgeAttempt); });
   document.querySelectorAll('[data-tier]').forEach(el => {
     el.onclick = () => {
       const [stat, vStr] = el.dataset.tier.split(':');
-      const v = parseInt(vStr, 10);
-      const cur = state.stats[stat];
+      const v = parseInt(vStr, 10), cur = state.stats[stat];
       const desc = BENCHMARKS[stat].tiers.find(t => t[0] === v)?.[1] || '';
-      if (v === cur){
-        if (confirm(`Re-test ${stat} at ${v} today?\n\n${desc}\n\nNo XP.`)){
-          state.statDates[stat] = today(); save();
-        }
-      } else if (v > cur){
-        if (confirm(`Pass ${stat} tier ${v}?\n\n${desc}\n\n${stat}: ${cur} → ${v}. +50 XP.`)){
-          state.stats[stat] = v;
-          state.statDates[stat] = today();
+      const oldLevel = computePlayerLevel();
+      if (v === cur){ if (confirm(`Re-test ${stat} at ${v} today?\n\n${desc}\n\nNo change to stat.`)){ state.statDates[stat] = today(); save(); } }
+      else if (v > cur){
+        if (confirm(`Pass ${stat} tier ${v}?\n\n${desc}\n\n${stat}: ${cur} → ${v}. Your player level will rise automatically.`)){
+          state.stats[stat] = v; state.statDates[stat] = today();
           state.benchmarks.unshift(`${stat} ${v} — ${today()}`);
-          addXP(50, `Benchmark: ${stat} ${v}`);
           save();
         }
       } else {
-        if (confirm(`Demote ${stat} to tier ${v}?\n\n${desc}\n\nNo XP.`)){
-          state.stats[stat] = v;
-          state.statDates[stat] = today();
+        if (confirm(`Demote ${stat} to tier ${v}?\n\n${desc}\n\nYour player level will drop accordingly.`)){
+          state.stats[stat] = v; state.statDates[stat] = today();
           save();
         }
       }
     };
   });
-  document.querySelectorAll('[data-xp]').forEach(el => {
-    el.onclick = () => {
-      addXP(+el.dataset.xp, el.dataset.note, null, logDate);
-      save();
-    };
-  });
-  const logDateInput = document.getElementById('log-date');
-  if (logDateInput) logDateInput.onchange = () => { logDate = logDateInput.value || today(); };
-
-  const addSkill = document.getElementById('add-skill');
-  if (addSkill) addSkill.onclick = () => {
-    openSkillPicker(skill => { state.skills.push(skill); save(); });
-  };
-  const adjgo = document.getElementById('adjgo');
-  if (adjgo) adjgo.onclick = () => {
-    const xp = parseInt(document.getElementById('adj').value, 10);
-    const note = document.getElementById('adjnote').value || 'Adjustment';
-    if (!xp) return;
-    addXP(xp, note, null, logDate); save();
-  };
+  document.querySelectorAll('[data-xp]').forEach(el => { el.onclick = () => { addXP(+el.dataset.xp, el.dataset.note, null, logDate); save(); }; });
+  const logDateInput = document.getElementById('log-date'); if (logDateInput) logDateInput.onchange = () => { logDate = logDateInput.value || today(); };
+  const addSkill = document.getElementById('add-skill'); if (addSkill) addSkill.onclick = () => openSkillPicker(skill => { state.skills.push(skill); save(); });
+  const adjgo = document.getElementById('adjgo'); if (adjgo) adjgo.onclick = () => { const xp = parseInt(document.getElementById('adj').value, 10); const note = document.getElementById('adjnote').value || 'Adjustment'; if (!xp) return; addXP(xp, note, null, logDate); save(); };
   const pSave = document.getElementById('profile-save');
-  if (pSave) pSave.onclick = () => {
-    state.name = document.getElementById('profile-name').value.trim();
-    const b = document.getElementById('profile-budget').value;
-    state.timeBudget = parseInt(b, 10) || 30;
-    const deload = document.getElementById('profile-deload');
-    if (deload) state.deloadEnabled = deload.checked;
-    save();
-  };
-  document.querySelectorAll('[data-eq]').forEach(el => {
-    el.onchange = () => {
-      state.equipment = state.equipment || [];
-      const id = el.dataset.eq;
-      const idx = state.equipment.indexOf(id);
-      if (el.checked && idx < 0) state.equipment.push(id);
-      if (!el.checked && idx >= 0) state.equipment.splice(idx, 1);
-      save();
-    };
-  });
-  document.querySelectorAll('[data-eqw]').forEach(el => {
-    el.onchange = () => {
-      state.equipmentWeights = state.equipmentWeights || { dumbbell: 0, barbell: 0, barbellPlates: false, kettlebell: 0 };
-      state.equipmentWeights[el.dataset.eqw] = parseFloat(el.value) || 0;
-      save();
-    };
-  });
-  document.querySelectorAll('[data-eqx]').forEach(el => {
-    el.onchange = () => {
-      state.equipmentWeights = state.equipmentWeights || {};
-      state.equipmentWeights[el.dataset.eqx] = el.checked;
-      save();
-    };
-  });
-  const aiSave = document.getElementById('ai-save');
-  if (aiSave) aiSave.onclick = () => {
-    state.settings.apiKey = document.getElementById('ai-key').value.trim();
-    state.settings.apiBase = document.getElementById('ai-base').value.trim() || 'https://api.openai.com/v1';
-    state.settings.apiModel = document.getElementById('ai-model').value.trim() || 'gpt-4o-mini';
-    save();
-  };
-  const exp = document.getElementById('export');
-  if (exp) exp.onclick = () => {
-    const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `system-backup-${today()}.json`;
-    a.click();
-  };
-  const imp = document.getElementById('import');
-  if (imp) imp.onclick = importBackup;
+  if (pSave) pSave.onclick = () => { state.name = document.getElementById('profile-name').value.trim(); state.timeBudget = parseInt(document.getElementById('profile-budget').value, 10) || 30; const d = document.getElementById('profile-deload'); if (d) state.deloadEnabled = d.checked; save(); };
+  document.querySelectorAll('[data-eq]').forEach(el => { el.onchange = () => { state.equipment = state.equipment || []; const id = el.dataset.eq; const idx = state.equipment.indexOf(id); if (el.checked && idx < 0) state.equipment.push(id); if (!el.checked && idx >= 0) state.equipment.splice(idx, 1); save(); }; });
+  document.querySelectorAll('[data-eqw]').forEach(el => { el.onchange = () => { state.equipmentWeights = state.equipmentWeights || {}; state.equipmentWeights[el.dataset.eqw] = parseFloat(el.value) || 0; save(); }; });
+  document.querySelectorAll('[data-eqx]').forEach(el => { el.onchange = () => { state.equipmentWeights = state.equipmentWeights || {}; state.equipmentWeights[el.dataset.eqx] = el.checked; save(); }; });
+  const aiSave = document.getElementById('ai-save'); if (aiSave) aiSave.onclick = () => { state.settings.apiKey = document.getElementById('ai-key').value.trim(); state.settings.apiBase = document.getElementById('ai-base').value.trim() || 'https://api.openai.com/v1'; state.settings.apiModel = document.getElementById('ai-model').value.trim() || 'gpt-4o-mini'; save(); };
+  const exp = document.getElementById('export'); if (exp) exp.onclick = () => { const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `system-backup-${today()}.json`; a.click(); };
+  const imp = document.getElementById('import'); if (imp) imp.onclick = importBackup;
   const startOver = document.getElementById('startover');
   if (startOver) startOver.onclick = () => {
-    if (!confirm('Erase everything? Export first if unsure.')) return;
+    if (!confirm('Erase everything?')) return;
     if (!confirm('Really erase all progress?')) return;
     localStorage.removeItem(KEY);
     state = defaultState();
-    onboardStep = 1;
-    onboardDraft.name = '';
-    onboardDraft.stats = { ...DEFAULT_STATS };
-    onboardDraft.timeBudget = 30;
-    onboardDraft.skills = [];
-    onboardDraft.progression = {};
-    onboardDraft.why = {};
-    onboardDraft.quit = {};
+    onboardStep = 1; onboardDraft.name = ''; onboardDraft.stats = { ...DEFAULT_STATS }; onboardDraft.timeBudget = 30; onboardDraft.skills = []; onboardDraft.progression = {}; onboardDraft.why = {}; onboardDraft.quit = {};
     save();
   };
-  const shareBtn = document.getElementById('share-btn');
-  if (shareBtn) shareBtn.onclick = shareProgress;
+  const shareBtn = document.getElementById('share-btn'); if (shareBtn) shareBtn.onclick = shareProgress;
 }
 
-document.querySelectorAll('#nav button').forEach(b => {
-  b.onclick = () => { tab = b.dataset.tab; render(); window.scrollTo(0, 0); };
-});
+document.querySelectorAll('#nav button').forEach(b => { b.onclick = () => { tab = b.dataset.tab; render(); window.scrollTo(0, 0); }; });
 
 render();
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
 </script>
 </body>
 </html>

@@ -204,39 +204,55 @@ function subtractSkillXP(skill, amount){
 /* ═══════════════════════════════════════════
    PLAYER LEVEL — derived from stats + skills
    ═══════════════════════════════════════════ */
-function computeTotalPower(){
-  const statSum = Object.values(state.stats || {}).reduce((a,b) => a + (b||0), 0);
-  const skillSum = (state.skills || []).reduce((a,s) => a + (s.level||1), 0);
+function computePowerFrom(stats, skills){
+  const statSum = Object.values(stats || {}).reduce((a,b) => a + (b||0), 0);
+  const skillSum = (skills || []).reduce((a,s) => a + (s.level||1), 0);
   return statSum + skillSum * 3;
 }
-function computePlayerLevel(){
-  const power = computeTotalPower();
-  return Math.max(1, Math.min(100, Math.round(power / 10)));
+function computeLevelFrom(stats, skills){
+  const power = computePowerFrom(stats, skills);
+  return Math.max(1, Math.min(100, Math.floor(power / 10) + 1));
 }
-function powerForLevel(n){ return Math.max(0, n * 10); }
+function computeTotalPower(){ return computePowerFrom(state.stats, state.skills); }
+function computePlayerLevel(){ return computeLevelFrom(state.stats, state.skills); }
+function powerForLevel(n){ return Math.max(0, (n - 1) * 10); }
 
 /* ═══════════════════════════════════════════
-   SKILL TITLES (per rank, per subtype)
+   SKILL TITLES — RPG styled, per subtype
    ═══════════════════════════════════════════ */
 const SKILL_TITLES = {
-  language:      { D:'The Student', C:'The Conversationalist', B:'The Fluent', A:'The Bilingual', S:'The Polyglot' },
-  coding:        { D:'The Scriptor', C:'The Developer', B:'The Engineer', A:'The Architect', S:'The Master' },
-  business:      { D:'The Founder', C:'The Operator', B:'The Builder', A:'The Magnate', S:'The Mogul' },
-  fitness:       { D:'The Iron', C:'The Steel', B:'The Peak', A:'The Apex', S:'The Legend' },
-  reading:       { D:'The Reader', C:'The Scholar', B:'The Sage', A:'The Oracle', S:'The Library' },
-  writing:       { D:'The Scribe', C:'The Author', B:'The Novelist', A:'The Voice', S:'The Laureate' },
-  engineering:   { D:'The Tinkerer', C:'The Builder', B:'The Engineer', A:'The Architect', S:'The Master Builder' },
-  instrument:    { D:'The Beginner', C:'The Player', B:'The Musician', A:'The Virtuoso', S:'The Maestro' },
-  art:           { D:'The Sketcher', C:'The Artist', B:'The Painter', A:'The Master', S:'The Old Master' },
-  mind:          { D:'The Calm', C:'The Focused', B:'The Centered', A:'The Wise', S:'The Enlightened' },
-  publicspeaking:{ D:'The Voice', C:'The Speaker', B:'The Orator', A:'The Rhetorician', S:'The Legend' },
-  cooking:       { D:'The Cook', C:'The Chef', B:'The Master Chef', A:'The Maestro', S:'The Legend' },
-  custom:        { D:'Adept', C:'Skilled', B:'Proficient', A:'Expert', S:'Master' }
+  language:       { D:'Tongue-Kin',         C:'Wordspeaker',      B:'Linguist',       A:'Master of Tongues', S:'Living Lexicon' },
+  coding:         { D:'Tinkerer',           C:'Coder',            B:'Engineer',       A:'Architect',         S:'Systems Sage' },
+  business:       { D:'Venturer',           C:'Founder',          B:'Operator',       A:'Magnate',           S:'Sovereign' },
+  reading:        { D:'Bibliophile',        C:'Scholar',          B:'Sage',           A:'Loremaster',        S:'Oracle' },
+  writing:        { D:'Scribe',             C:'Wordsmith',        B:'Author',         A:'Lorekeeper',        S:'Laureate' },
+  engineering:    { D:'Gearhand',           C:'Tinkerer',         B:'Engineer',       A:'Master Builder',    S:'Artificer' },
+  instrument:     { D:'Apprentice',         C:'Performer',        B:'Musician',       A:'Virtuoso',          S:'Maestro' },
+  art:            { D:'Sketcher',           C:'Illustrator',      B:'Artist',         A:'Master Painter',    S:'Old Master' },
+  mind:           { D:'Wanderer',           C:'Monk',             B:'Zen Adept',      A:'Sage',              S:'Enlightened' },
+  publicspeaking: { D:'Novice Speaker',     C:'Speaker',          B:'Orator',         A:'Silver-Tongue',     S:'Golden-Tongue' },
+  cooking:        { D:'Line Cook',          C:'Chef',             B:'Master Chef',    A:'Culinary Master',   S:'Legend of the Table' },
+  custom:         { D:'Adept',              C:'Skilled',          B:'Proficient',     A:'Expert',            S:'Master' }
 };
+
+const FITNESS_TITLES = {
+  'Running':       { D:'Jogger',            C:'Runner',           B:'Distance Runner', A:'Marathoner',       S:'Windwalker' },
+  'Yoga':          { D:'Yogi Initiate',     C:'Yogi',             B:'Yoga Adept',      A:'Yoga Master',      S:'Body Sage' },
+  'Pilates':       { D:'Pilates Beginner',  C:'Pilates Student',  B:'Pilates Adept',   A:'Core Master',      S:'Pilates Sage' },
+  'Weightlifting': { D:'Lifter',            C:'Strongman',        B:'Powerlifter',     A:'Iron Master',      S:'Titan' },
+  'Calisthenics':  { D:'Calisthene',        C:'Barathlete',       B:'Bodyweight Master', A:'Iron Body',      S:'Living Statue' },
+  'Mixed fitness': { D:'Trainee',           C:'Athlete',          B:'Fighter',         A:'Champion',         S:'Legend' },
+  default:         { D:'Trainee',           C:'Athlete',          B:'Fighter',         A:'Champion',         S:'Legend' }
+};
+
 function titleForSkill(skill){
   if (!skill) return null;
   const rank = rankOf(skill.level);
   if (rank === 'E') return null;
+  if (skill.subtype === 'fitness'){
+    const set = FITNESS_TITLES[skill.detail] || FITNESS_TITLES.default;
+    return set[rank] || null;
+  }
   const titles = SKILL_TITLES[skill.subtype] || SKILL_TITLES.custom;
   return titles[rank] || null;
 }
@@ -754,7 +770,7 @@ let logDate = today();
 
 function defaultState(){
   return {
-    v: 9, onboarded: false, name: '', totalXP: 0,
+    v: 10, onboarded: false, name: '', totalXP: 0,
     stats: { ...DEFAULT_STATS }, statDates: {},
     skills: [], streak: 0, lastComplete: null,
     quests: {}, log: [], benchmarks: [], titles: [],
@@ -817,8 +833,8 @@ function load(){
     if (parsed.equipmentConfigured === undefined) parsed.equipmentConfigured = false;
     if (!parsed.timeBudget) parsed.timeBudget = 30;
     if (parsed.deloadEnabled === undefined) parsed.deloadEnabled = true;
-    if (!parsed.lastPlayerLevel) parsed.lastPlayerLevel = 1;
-    if (!parsed.lastPlayerRank) parsed.lastPlayerRank = 'E';
+    parsed.lastPlayerLevel = computeLevelFrom(parsed.stats, parsed.skills);
+    parsed.lastPlayerRank = rankOf(parsed.lastPlayerLevel);
     return parsed;
   } catch(e){ return defaultState(); }
 }
@@ -858,7 +874,6 @@ function checkLevelUp(){
       else showLevelUp(current);
     }, 120);
   } else if (current < prev){
-    // Silent level down
     const old = prev;
     state.lastPlayerLevel = current;
     state.lastPlayerRank = rankOf(current);
@@ -934,7 +949,6 @@ function tickMilestone(skill, i){
 
   const ref = skill.ladderXpLogs[i];
   if (ref){
-    // Restore
     const logXp = ref.logXp || ref.xp || milestoneLogXP(i);
     const skillXp = ref.skillXp !== undefined ? ref.skillXp : (ref.xp || 20);
     const mainId = addXP(logXp, ref.note, null, null, skill.id);
@@ -1186,7 +1200,6 @@ function toggleQuest(quest){
   const current = state.quests[t][quest.id];
 
   if (current){
-    // UNCHECK — full revert
     const data = (typeof current === 'object' && current !== null) ? current : null;
     if (data && data.logId){
       state.log = state.log.filter(e => e.id !== data.logId);
@@ -1205,7 +1218,6 @@ function toggleQuest(quest){
     return;
   }
 
-  // CHECK
   const logId = addXP(quest.xp, quest.text, null, null, quest.skillId);
   const extraLogIds = [];
   let skillXp = 0;
@@ -1337,10 +1349,10 @@ function renderOnboarding(){
   }
 
   if (onboardStep === 2){
-    const preview = { stats: onboardDraft.stats };
     const statSum = Object.values(onboardDraft.stats).reduce((a,b) => a+b, 0);
-    const estimatedPower = statSum;
-    const estimatedLevel = Math.max(1, Math.min(100, Math.round(estimatedPower / 10)));
+    const skillPower = 3 * onboardDraft.skills.length;
+    const estimatedPower = statSum + skillPower;
+    const estimatedLevel = Math.max(1, Math.min(100, Math.floor(estimatedPower / 10) + 1));
     app.innerHTML = `
       <h1 style="margin-top:24px">Starting stats</h1>
       <p class="dim" style="margin-top:12px">Pick the highest tier you can <b>pass today</b>. Your starting level is derived from these stats — a strong start means a high starting level.</p>
@@ -1354,7 +1366,7 @@ function renderOnboarding(){
       </div>
       <div class="card" style="background:rgba(77,166,255,.06);border-color:rgba(77,166,255,.3)">
         <div class="row between"><span class="dim small">ESTIMATED STARTING LEVEL</span><span class="mono" style="font-size:22px;font-weight:700;color:var(--accent)">Lv ${estimatedLevel}</span></div>
-        <div class="small dim" style="margin-top:8px">Based on stats alone. Adding skills at level 1 will nudge it slightly higher.</div>
+        <div class="small dim" style="margin-top:8px">Power = sum of stats + 3 × each skill's level. Preview includes your ${onboardDraft.skills.length} skill(s) at level 1.</div>
       </div>
       <div class="card">
         <div class="field">
@@ -1532,7 +1544,6 @@ function finishOnboarding(){
     ensureMilestoneQuests(s);
   });
 
-  // totalXP starts at 0 — level is derived from stats + skills
   state.totalXP = 0;
   state.startedAt = today();
   state.onboarded = true;
@@ -1563,10 +1574,14 @@ function navTo(t){ tab = t; render(); window.scrollTo(0, 0); }
 function powerBar(){
   const power = computeTotalPower();
   const level = computePlayerLevel();
+  if (level >= 100){
+    return `<div class="bar"><i style="width:100%"></i></div><div class="row between small dim mono" style="margin-top:6px"><span>Power ${power}</span><span>MAX LEVEL</span></div>`;
+  }
   const levelStart = (level - 1) * 10;
   const levelEnd = level * 10;
-  const pct = Math.min(100, Math.max(0, ((power - levelStart) / Math.max(1, levelEnd - levelStart)) * 100));
-  return `<div class="bar"><i style="width:${pct}%"></i></div><div class="row between small dim mono" style="margin-top:6px"><span>Power ${power} / ${levelEnd}</span><span>${levelEnd - power} to next</span></div>`;
+  const pct = Math.min(100, Math.max(0, ((power - levelStart) / 10) * 100));
+  const toNext = Math.max(0, levelEnd - power);
+  return `<div class="bar"><i style="width:${pct}%"></i></div><div class="row between small dim mono" style="margin-top:6px"><span>Power ${power} / ${levelEnd}</span><span>${toNext} to next</span></div>`;
 }
 
 function activityCountForDate(key){
@@ -1632,7 +1647,7 @@ function viewStatus(){
     <div class="card"><div class="row between"><div><div class="dim small mono">${esc(state.name || 'PLAYER')}</div><div class="big mono">Lv ${lvl}</div></div><div style="text-align:right"><div class="dim small mono">RANK</div><div class="big mono" style="color:var(--accent)">${rankOf(lvl)}</div></div></div>${powerBar()}</div>
     <div class="card"><div class="row between"><span class="dim small">STREAK</span><span class="mono" style="font-size:20px">${state.streak} <span class="dim small">days</span></span></div><div class="week-strip">${weekHtml}</div><div class="small dim" style="margin-top:14px;margin-bottom:6px">Last 30 days</div><div class="heatmap">${heatHtml}</div></div>
     <div class="card"><div class="row between"><span class="dim small">DELIBERATE PRACTICE</span></div><div style="margin-top:8px">${practiceHtml}</div></div>
-    <h2>Stats · ${power - (state.skills.reduce((a,s)=>a+s.level,0)*3)} power from stats</h2>
+    <h2>Stats</h2>
     <div class="card">${stats}<button class="ghost sm" data-nav="bench" style="width:100%;margin-top:12px">View benchmarks & test →</button></div>
     <h2>Titles</h2>
     <div class="card">${titleLine}</div>
@@ -1702,7 +1717,7 @@ function viewLog(){
 }
 
 function viewMore(){
-  return `<h2>Profile</h2><div class="card"><div class="field"><label>Name</label><input id="profile-name" value="${esc(state.name)}" maxlength="40"></div><div class="field"><label>Daily time budget</label><select id="profile-budget"><option value="15" ${state.timeBudget===15?'selected':''}>15 min</option><option value="30" ${state.timeBudget===30?'selected':''}>30 min</option><option value="45" ${state.timeBudget===45?'selected':''}>45 min</option><option value="60" ${state.timeBudget===60?'selected':''}>60+ min</option></select></div><div class="field"><label style="display:flex;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" id="profile-deload" ${state.deloadEnabled?'checked':''}><span style="text-transform:none;letter-spacing:0;color:var(--txt);font-size:13px">Deload weeks every 5th week</span></label><div class="hint">${state.startedAt?`Started ${state.startedAt}. Week ${deloadWeekStatus().weekNum} now.`:'Not started yet.'}</div></div><button class="sm" id="profile-save">Save</button></div><h2>Equipment</h2><div class="card">${renderEquipmentSection()}</div><h2>AI settings</h2><div class="card"><div class="notice">The AI receives your last 30 days, stats, equipment weights and current milestone.</div><div class="field"><label>API key</label><input id="ai-key" type="password" value="${esc(state.settings.apiKey)}" placeholder="sk-..."></div><div class="field"><label>Base URL</label><input id="ai-base" value="${esc(state.settings.apiBase)}"></div><div class="field"><label>Model</label><input id="ai-model" value="${esc(state.settings.apiModel)}"></div><button class="sm primary" id="ai-save">Save AI settings</button></div><h2>Backup</h2><div class="card"><button class="primary" id="export" style="width:100%;margin-bottom:8px">Export backup</button><button id="import" style="width:100%;margin-bottom:8px">Import backup</button><button class="ghost danger" id="startover" style="width:100%">Start over (erase all)</button></div><h2>Rules</h2><div class="card small dim"><p><b>Level = round(power / 10)</b>, where power = sum(stats) + 3 × sum(skill levels).</p><p>Levels can't be farmed — only stats and skill levels raise them.</p><p>Stats move only on a benchmark you pass. Testing down removes the level the stat gave you.</p><p>Milestone XP scales with milestone position: milestone 1 = 100 skill XP, milestone 20 = 575 skill XP.</p><p>Un-ticking a quest removes its XP, skill XP and log entry, with level-down handling.</p></div>`;
+  return `<h2>Profile</h2><div class="card"><div class="field"><label>Name</label><input id="profile-name" value="${esc(state.name)}" maxlength="40"></div><div class="field"><label>Daily time budget</label><select id="profile-budget"><option value="15" ${state.timeBudget===15?'selected':''}>15 min</option><option value="30" ${state.timeBudget===30?'selected':''}>30 min</option><option value="45" ${state.timeBudget===45?'selected':''}>45 min</option><option value="60" ${state.timeBudget===60?'selected':''}>60+ min</option></select></div><div class="field"><label style="display:flex;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" id="profile-deload" ${state.deloadEnabled?'checked':''}><span style="text-transform:none;letter-spacing:0;color:var(--txt);font-size:13px">Deload weeks every 5th week</span></label><div class="hint">${state.startedAt?`Started ${state.startedAt}. Week ${deloadWeekStatus().weekNum} now.`:'Not started yet.'}</div></div><button class="sm" id="profile-save">Save</button></div><h2>Equipment</h2><div class="card">${renderEquipmentSection()}</div><h2>AI settings</h2><div class="card"><div class="notice">The AI receives your last 30 days, stats, equipment weights and current milestone.</div><div class="field"><label>API key</label><input id="ai-key" type="password" value="${esc(state.settings.apiKey)}" placeholder="sk-..."></div><div class="field"><label>Base URL</label><input id="ai-base" value="${esc(state.settings.apiBase)}"></div><div class="field"><label>Model</label><input id="ai-model" value="${esc(state.settings.apiModel)}"></div><button class="sm primary" id="ai-save">Save AI settings</button></div><h2>Backup</h2><div class="card"><button class="primary" id="export" style="width:100%;margin-bottom:8px">Export backup</button><button id="import" style="width:100%;margin-bottom:8px">Import backup</button><button class="ghost danger" id="startover" style="width:100%">Start over (erase all)</button></div><h2>Rules</h2><div class="card small dim"><p><b>Level = floor(power / 10) + 1</b>, where power = sum(stats) + 3 × sum(skill levels).</p><p>Levels can't be farmed — only stats and skill levels raise them.</p><p>Stats move only on a benchmark you pass. Testing down removes the level the stat gave you.</p><p>Milestone XP scales with milestone position: milestone 1 = 100 skill XP, milestone 20 = 575 skill XP.</p><p>Un-ticking a quest removes its XP, skill XP and log entry, with level-down handling.</p></div>`;
 }
 
 /* ═══════════════════════════════════════════
@@ -2039,7 +2054,6 @@ function bind(){
       const [stat, vStr] = el.dataset.tier.split(':');
       const v = parseInt(vStr, 10), cur = state.stats[stat];
       const desc = BENCHMARKS[stat].tiers.find(t => t[0] === v)?.[1] || '';
-      const oldLevel = computePlayerLevel();
       if (v === cur){ if (confirm(`Re-test ${stat} at ${v} today?\n\n${desc}\n\nNo change to stat.`)){ state.statDates[stat] = today(); save(); } }
       else if (v > cur){
         if (confirm(`Pass ${stat} tier ${v}?\n\n${desc}\n\n${stat}: ${cur} → ${v}. Your player level will rise automatically.`)){

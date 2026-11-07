@@ -37,10 +37,9 @@ button.ghost{background:transparent}
 button.danger{color:var(--danger)}
 button.sm{padding:6px 10px;min-height:34px;font-size:13px}
 button.tiny{padding:3px 8px;min-height:26px;font-size:11px;letter-spacing:.05em}
-button:disabled{opacity:.4;cursor:not-allowed}
 input,select,textarea{font:inherit;color:var(--txt);background:#0a0e14;border:1px solid var(--line);
   border-radius:8px;padding:10px;width:100%;min-height:42px;font-family:inherit}
-textarea{resize:vertical;min-height:80px}
+textarea{resize:vertical;min-height:60px}
 input[type=checkbox]{width:auto;min-height:auto}
 .big{font-size:38px;font-weight:700;letter-spacing:-.02em;line-height:1}
 .dim{color:var(--dim)}
@@ -115,13 +114,12 @@ details>summary:active{background:#16202e}
   display:flex;align-items:center;justify-content:center;
   font-family:ui-monospace,monospace;font-size:13px;color:var(--dim)}
 .week-box.filled{background:rgba(77,166,255,.15);border-color:rgba(77,166,255,.5);color:var(--accent);font-weight:600}
-.heatmap{display:grid;grid-template-columns:repeat(30,1fr);gap:2px;margin-top:10px}
+.heatmap-year{display:grid;grid-template-columns:repeat(30,1fr);gap:2px;margin-top:10px}
 .heat-cell{aspect-ratio:1;border-radius:2px;background:#0a0e14;border:1px solid var(--line)}
 .heat-cell.lvl-1{background:rgba(77,166,255,.2);border-color:rgba(77,166,255,.35)}
 .heat-cell.lvl-2{background:rgba(77,166,255,.4);border-color:rgba(77,166,255,.55)}
 .heat-cell.lvl-3{background:rgba(77,166,255,.65);border-color:rgba(77,166,255,.8)}
 .heat-cell.lvl-4{background:var(--accent);border-color:var(--accent)}
-.heatmap-year{display:grid;grid-template-columns:repeat(30,1fr);gap:2px;margin-top:10px}
 .stat-label-stale{color:var(--gold)}
 .milestone-focus{background:rgba(77,166,255,.06);border-left:3px solid var(--accent);
   padding:8px 12px;border-radius:4px;font-size:13px;margin:10px 0}
@@ -133,8 +131,6 @@ details>summary:active{background:#16202e}
   color:var(--gold);padding:1px 5px;border-radius:3px;background:rgba(255,200,87,.15);margin-left:6px}
 .partial-badge{display:inline-block;font-size:10px;letter-spacing:.1em;text-transform:uppercase;
   color:var(--dim);padding:1px 5px;border-radius:3px;background:#1d2836;margin-left:6px}
-.difficulty-toast{position:fixed;bottom:90px;left:0;right:0;display:flex;justify-content:center;z-index:90;pointer-events:none}
-.difficulty-toast>div{pointer-events:auto}
 .levelup-toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:190;
   padding:10px 18px;border-radius:10px;background:#111823;border:1px solid var(--line);
   box-shadow:0 8px 24px rgba(0,0,0,.5);font-size:13px;animation:fadeIn .3s ease;max-width:92vw;text-align:center}
@@ -175,7 +171,6 @@ details>summary:active{background:#16202e}
   font-weight:700;text-shadow:0 0 8px rgba(255,200,87,.5);
   box-shadow:0 0 10px rgba(255,200,87,.5);animation:sGlow 2.5s ease-in-out infinite}
 @keyframes sGlow{0%,100%{box-shadow:0 0 8px rgba(255,200,87,.4)}50%{box-shadow:0 0 16px rgba(255,200,87,.8)}}
-.paused-tag{display:inline-block;padding:2px 8px;border-radius:4px;background:rgba(255,200,87,.15);color:var(--gold);font-size:11px;letter-spacing:.1em;text-transform:uppercase}
 </style>
 </head>
 <body>
@@ -233,10 +228,7 @@ function computeLevelFrom(stats, skills){
 }
 function computeTotalPower(){ return computePowerFrom(state.stats, state.skills); }
 function computePlayerLevel(){ return computeLevelFrom(state.stats, state.skills); }
-function powerForLevel(n){
-  // inverse: power = (n/2)^2
-  return Math.round(Math.pow(n / 2, 2));
-}
+function powerForLevel(n){ return Math.round(Math.pow(n / 2, 2)); }
 
 /* ═══════════════════════════════════════════
    SKILL CALIBRATION
@@ -584,7 +576,7 @@ function ensureMilestoneQuests(skill){
 }
 
 /* ═══════════════════════════════════════════
-   DELOAD (now every 10th week, not 5th)
+   DELOAD (every 10th week)
    ═══════════════════════════════════════════ */
 function deloadWeekStatus(){
   if (!state.deloadEnabled || !state.startedAt) return { isDeload: false, weekNum: 0 };
@@ -604,7 +596,7 @@ let levelChangeReason = '';
 
 function defaultState(){
   return {
-    v: 12, onboarded: false, name: '', totalXP: 0,
+    v: 13, onboarded: false, name: '', totalXP: 0,
     telos: '', telosDate: '',
     stats: { ...DEFAULT_STATS }, statDates: {},
     skills: [], streak: 0, lastComplete: null,
@@ -615,7 +607,6 @@ function defaultState(){
     timeBudget: 30,
     startedAt: null, deloadEnabled: true,
     paused: false, pausedUntil: '',
-    committedUntil: '',
     lastOpenedDate: '',
     dailyBasics: {},
     firsts: [],
@@ -1089,7 +1080,6 @@ function toggleQuest(quest){
     return;
   }
 
-  // First-time check
   const isFirst = !(state.firsts || []).includes(quest.id);
   const mult = isFirst ? 2 : 1;
   const awardedXp = quest.xp * mult;
@@ -1112,24 +1102,22 @@ function toggleQuest(quest){
   }
   state.quests[t][quest.id] = { logId, extraLogIds, xp: awardedXp, skillXp, isFirst };
   save();
-
-  // Post-log: ask objective questions (Full / Partial). Default = Full.
   showObjectiveModal(quest, logId, skill, skillXp, isFirst);
 }
 
 function showObjectiveModal(quest, logId, skill, skillXp, isFirst){
   const question = isFirst
-    ? `<div class="notice" style="background:rgba(255,200,87,.08);border-color:rgba(255,200,87,.3)"><b>First time.</b> 2× XP awarded. This is the moment the skill begins. Remember it.</div>`
+    ? `<div class="notice" style="background:rgba(255,200,87,.08);border-color:rgba(255,200,87,.3)"><b>First time.</b> 2× XP awarded.</div>`
     : '';
   openModal(`
     <h2>${esc(quest.text)}</h2>
     ${question}
-    <p class="small dim">Did you complete the full quest, or only part of it?</p>
+    <p class="small dim">Did you complete the full quest, or only part?</p>
     <div class="row" style="gap:8px;margin-top:12px">
       <button class="primary" id="obj-full" style="flex:1">Full</button>
       <button class="ghost" id="obj-partial" style="flex:1">Partial</button>
     </div>
-    <p class="small dim" style="margin-top:16px">Was it harder than last time?</p>
+    <p class="small dim" style="margin-top:16px">Harder than last time?</p>
     <div class="row" style="gap:8px;margin-top:12px">
       <button class="ghost" id="obj-harder" style="flex:1">Harder</button>
       <button class="ghost" id="obj-same" style="flex:1">Same</button>
@@ -1140,10 +1128,7 @@ function showObjectiveModal(quest, logId, skill, skillXp, isFirst){
     </div>
   `);
 
-  let difficulty = null;
-
   const finishPartial = () => {
-    // Refund 50% of awarded XP
     const entry = state.log.find(e => e.id === logId);
     if (!entry) return;
     const refund = Math.round(entry.xp / 2);
@@ -1164,11 +1149,10 @@ function showObjectiveModal(quest, logId, skill, skillXp, isFirst){
     document.getElementById('obj-partial').className = 'ghost';
   };
 
-  document.getElementById('obj-full').onclick = () => finishFull();
-  document.getElementById('obj-partial').onclick = () => finishPartial();
+  document.getElementById('obj-full').onclick = finishFull;
+  document.getElementById('obj-partial').onclick = finishPartial;
 
   const setDifficulty = (val, btnId) => {
-    difficulty = val;
     const entry = state.log.find(e => e.id === logId);
     if (entry) entry.difficulty = val;
     ['obj-harder','obj-same','obj-easier'].forEach(id => {
@@ -1186,15 +1170,13 @@ function showObjectiveModal(quest, logId, skill, skillXp, isFirst){
   document.getElementById('obj-close').onclick = () => { closeModal(); save(); };
 }
 
-function updateStreak(){}  // legacy no-op; markActivity handles it
-
 /* ═══════════════════════════════════════════
    AI
    ═══════════════════════════════════════════ */
 function buildAIContext(skill){
   const lines = [];
   lines.push(`Player: ${state.name || 'unnamed'}. Player level ${computePlayerLevel()}. Streak: ${state.streak} days.`);
-  lines.push(`Telos: ${state.telos || 'not set'}.`);
+  if (state.telos) lines.push(`Telos: ${state.telos}.`);
   lines.push(`Stats: STR ${state.stats.STR}, AGI ${state.stats.AGI}, VIT ${state.stats.VIT}, INT ${state.stats.INT}, PER ${state.stats.PER}.`);
   const cutoff = dateOffset(-30);
   const recent = state.log.filter(e => e.date >= cutoff && e.xp > 0);
@@ -1262,68 +1244,45 @@ function makeSkillFromTemplate(sug, detail){
 }
 
 /* ═══════════════════════════════════════════
-   ONBOARDING
+   ONBOARDING — 3 steps
    ═══════════════════════════════════════════ */
 let tab = 'status';
 let onboardStep = 1;
-const onboardDraft = { name: '', telos: '', stats: { ...DEFAULT_STATS }, timeBudget: 30, skills: [], progression: {}, why: {}, identity: {}, quit: {} };
+const onboardDraft = { name: '', stats: { ...DEFAULT_STATS }, timeBudget: 30, skills: [], progression: {} };
 
 function renderOnboarding(){
   document.getElementById('nav').classList.add('hide');
   const app = document.getElementById('app');
 
   if (onboardStep === 1){
-    app.innerHTML = `<h1 style="margin-top:24px">The System</h1><p class="dim" style="margin-top:12px">A personal level-up tracker. Stored on this device only.</p><div class="card" style="margin-top:24px"><div class="field"><label>What should I call you?</label><input id="ob-name" placeholder="Name" value="${esc(onboardDraft.name)}" maxlength="40"></div><button class="primary" id="ob-next" style="width:100%">Continue</button></div><p class="small dim">Already have a backup? <a href="#" id="ob-import" style="color:var(--accent)">Import it instead</a></p>`;
-    document.getElementById('ob-next').onclick = () => {
-      const v = document.getElementById('ob-name').value.trim();
-      if (!v) return alert('Enter a name to continue.');
-      onboardDraft.name = v; onboardStep = 2; render();
-    };
-    document.getElementById('ob-import').onclick = (e) => { e.preventDefault(); importBackup(); };
-    return;
-  }
-
-  if (onboardStep === 2){
-    app.innerHTML = `
-      <h1 style="margin-top:24px">Your telos</h1>
-      <p class="dim" style="margin-top:12px">One sentence. This System exists to get you from where you are to somewhere specific by a specific date. Without this, it's a treadmill.</p>
-      <div class="card" style="margin-top:16px">
-        <div class="field">
-          <label>The sentence</label>
-          <textarea id="ob-telos" rows="3" placeholder="This System exists to get me from ___ to ___ by ___.">${esc(onboardDraft.telos)}</textarea>
-          <div class="hint">Honest, not aspirational. If you can't write it today, write "I don't yet know — I'll answer in 30 days" and continue.</div>
-        </div>
-        <button class="primary" id="ob-next" style="width:100%">Continue</button>
-      </div>
-      <div class="row" style="gap:8px"><button class="ghost" id="ob-back" style="flex:1">Back</button></div>`;
-    document.getElementById('ob-next').onclick = () => {
-      onboardDraft.telos = document.getElementById('ob-telos').value.trim();
-      onboardStep = 3; render();
-    };
-    document.getElementById('ob-back').onclick = () => { onboardStep = 1; render(); };
-    return;
-  }
-
-  if (onboardStep === 3){
     const statSum = Object.values(onboardDraft.stats).reduce((a,b) => a+b, 0);
-    const skillPower = 0; // level-1 skills contribute 0
-    const estimatedPower = statSum + skillPower;
-    const estimatedLevel = estimatedPower <= 0 ? 1 : Math.min(100, Math.max(1, Math.round(Math.sqrt(estimatedPower) * 2)));
+    const estimatedLevel = statSum <= 0 ? 1 : Math.min(100, Math.max(1, Math.round(Math.sqrt(statSum) * 2)));
     app.innerHTML = `
-      <h1 style="margin-top:24px">Starting stats</h1>
-      <p class="dim" style="margin-top:12px">Pick the highest tier you can <b>pass today</b>. Your starting level comes from these stats. Level 100 needs about 2,500 power — a decade goal, not a sprint.</p>
-      <div class="card" style="margin-top:16px">
+      <h1 style="margin-top:24px">The System</h1>
+      <p class="dim" style="margin-top:8px">A personal tracker. Three steps, then you're in.</p>
+
+      <div class="card" style="margin-top:20px">
+        <div class="field">
+          <label>Your name <span class="dim" style="text-transform:none;letter-spacing:0">(optional)</span></label>
+          <input id="ob-name" placeholder="Name" value="${esc(onboardDraft.name)}" maxlength="40">
+        </div>
+      </div>
+
+      <h2>Starting stats</h2>
+      <p class="small dim" style="margin-top:-4px;margin-bottom:12px">Pick the highest tier you can pass today. You can retest any time.</p>
+      <div class="card">
         ${['STR','AGI','VIT','INT','PER'].map(k => {
           const b = BENCHMARKS[k];
           const cur = onboardDraft.stats[k];
-          const curDesc = (b.tiers.find(t => t[0] === cur) || b.tiers[0])[1];
-          return `<div class="field"><label>${k} · ${b.label}</label><select data-obstat="${k}">${b.tiers.map(([v, desc]) => `<option value="${v}" ${v===cur?'selected':''}>${v} — ${esc(desc)}</option>`).join('')}</select><div class="hint" id="ob-hint-${k}">${esc(curDesc)}</div></div>`;
+          return `<div class="field"><label>${k} · ${b.label}</label><select data-obstat="${k}">${b.tiers.map(([v, desc]) => `<option value="${v}" ${v===cur?'selected':''}>${v} — ${esc(desc)}</option>`).join('')}</select></div>`;
         }).join('')}
       </div>
+
       <div class="card" style="background:rgba(77,166,255,.06);border-color:rgba(77,166,255,.3)">
-        <div class="row between"><span class="dim small">ESTIMATED STARTING LEVEL</span><span class="mono" style="font-size:22px;font-weight:700;color:var(--accent)">Lv ${estimatedLevel}</span></div>
-        <div class="small dim" style="margin-top:8px">Power = sum of stats + 3 × (skill level − 1) per skill. Level-1 skills contribute 0 — no free levels from adding skills. Level 100 ≈ 2,500 power.</div>
+        <div class="row between"><span class="dim small">STARTING LEVEL</span><span class="mono" style="font-size:22px;font-weight:700;color:var(--accent)">Lv ${estimatedLevel}</span></div>
+        <div class="small dim" style="margin-top:6px">From your stats alone. Adding skills won't change it until you level them.</div>
       </div>
+
       <div class="card">
         <div class="field">
           <label>Daily time budget</label>
@@ -1335,40 +1294,46 @@ function renderOnboarding(){
           </select>
         </div>
       </div>
-      <div class="row" style="gap:8px"><button class="ghost" id="ob-back" style="flex:1">Back</button><button class="primary" id="ob-next" style="flex:2">Continue</button></div>`;
+
+      <button class="primary" id="ob-next" style="width:100%;margin-bottom:12px">Continue</button>
+      <p class="small dim" style="text-align:center">Already have a backup? <a href="#" id="ob-import" style="color:var(--accent)">Import it</a></p>
+    `;
     document.querySelectorAll('[data-obstat]').forEach(sel => {
       sel.onchange = () => {
-        const k = sel.dataset.obstat;
-        onboardDraft.stats[k] = parseInt(sel.value, 10);
-        const b = BENCHMARKS[k];
-        const desc = (b.tiers.find(t => t[0] === onboardDraft.stats[k]) || b.tiers[0])[1];
-        document.getElementById(`ob-hint-${k}`).textContent = desc;
+        onboardDraft.stats[sel.dataset.obstat] = parseInt(sel.value, 10);
         render();
       };
     });
     document.querySelector('[data-obtb]').onchange = e => { onboardDraft.timeBudget = parseInt(e.target.value, 10); };
-    document.getElementById('ob-back').onclick = () => { onboardStep = 2; render(); };
-    document.getElementById('ob-next').onclick = () => { onboardStep = 4; render(); };
+    document.getElementById('ob-next').onclick = () => {
+      onboardDraft.name = document.getElementById('ob-name').value.trim();
+      onboardStep = 2; render();
+    };
+    document.getElementById('ob-import').onclick = (e) => { e.preventDefault(); importBackup(); };
     return;
   }
 
-  if (onboardStep === 4){
+  if (onboardStep === 2){
     app.innerHTML = `
       <h1 style="margin-top:24px">Your skills</h1>
-      <p class="dim" style="margin-top:12px">Pick what you want to level.</p>
-      ${onboardDraft.skills.length ? `<h2>Selected (${onboardDraft.skills.length})</h2><div class="card">${onboardDraft.skills.map((s, i) => `<div class="skill-row" style="cursor:default"><span>${esc(s.name)}</span><button class="sm ghost danger" data-obrm="${i}">Remove</button></div>`).join('')}</div>` : ''}
+      <p class="dim" style="margin-top:8px">Pick what you want to level. You can add or remove any skill later.</p>
+      ${onboardDraft.skills.length ? `<div class="card">${onboardDraft.skills.map((s, i) => `<div class="skill-row" style="cursor:default"><span>${esc(s.name)}</span><button class="sm ghost danger" data-obrm="${i}">Remove</button></div>`).join('')}</div>` : ''}
       <h2>Add a skill</h2>
       <div>
         ${SKILL_SUGGESTIONS.map(sug => `<details><summary>${esc(sug.label)}</summary>${sug.options.map(opt => `<div class="tier-row" data-obadd="${sug.id}|${esc(opt)}" style="cursor:pointer"><div class="tier-desc">${esc(opt)}</div></div>`).join('')}</details>`).join('')}
         <details><summary>Custom skill</summary><div style="padding:10px"><input id="ob-custom" placeholder="Skill name"><button class="sm primary" id="ob-custom-add" style="margin-top:8px">Add</button></div></details>
       </div>
-      <div class="row" style="gap:8px;margin-top:16px"><button class="ghost" id="ob-back" style="flex:1">Back</button><button class="primary" id="ob-next" style="flex:2">${onboardDraft.skills.length ? 'Continue' : 'Skip for now'}</button></div>`;
+      <div class="row" style="gap:8px;margin-top:16px">
+        <button class="ghost" id="ob-back" style="flex:1">Back</button>
+        <button class="primary" id="ob-next" style="flex:2">${onboardDraft.skills.length ? 'Continue' : 'Skip'}</button>
+      </div>
+    `;
     document.querySelectorAll('[data-obadd]').forEach(el => {
       el.onclick = () => {
         const [sugId, opt] = el.dataset.obadd.split('|');
         const sug = SKILL_SUGGESTIONS.find(s => s.id === sugId);
         if (!sug) return;
-        if (onboardDraft.skills.some(s => s.name.toLowerCase() === smartSkillName(sug, opt).toLowerCase())) return alert('That skill is already added.');
+        if (onboardDraft.skills.some(s => s.name.toLowerCase() === smartSkillName(sug, opt).toLowerCase())) return alert('Already added.');
         onboardDraft.skills.push(makeSkillFromTemplate(sug, opt));
         render();
       };
@@ -1377,20 +1342,20 @@ function renderOnboarding(){
     document.getElementById('ob-custom-add').onclick = () => {
       const name = document.getElementById('ob-custom').value.trim();
       if (!name) return;
-      if (onboardDraft.skills.some(s => s.name.toLowerCase() === name.toLowerCase())) return alert('That skill is already added.');
+      if (onboardDraft.skills.some(s => s.name.toLowerCase() === name.toLowerCase())) return alert('Already added.');
       onboardDraft.skills.push(makeSkillFromTemplate({ subtype: 'custom', label: name }, name));
       document.getElementById('ob-custom').value = '';
       render();
     };
-    document.getElementById('ob-back').onclick = () => { onboardStep = 3; render(); };
+    document.getElementById('ob-back').onclick = () => { onboardStep = 1; render(); };
     document.getElementById('ob-next').onclick = () => {
       if (onboardDraft.skills.length === 0){ finishOnboarding(); return; }
-      onboardStep = 5; render();
+      onboardStep = 3; render();
     };
     return;
   }
 
-  if (onboardStep === 5) renderProgressionStep();
+  if (onboardStep === 3) renderProgressionStep();
 }
 
 function renderProgressionStep(){
@@ -1402,9 +1367,6 @@ function renderProgressionStep(){
   const body = skills.map((skill) => {
     const questions = progressionFor(skill);
     const ans = onboardDraft.progression[skill.id] || {};
-    const why = onboardDraft.why[skill.id] || '';
-    const identity = onboardDraft.identity[skill.id] || '';
-    const quit = onboardDraft.quit[skill.id] || '';
     return `<div class="prog-section"><h3 style="margin-bottom:12px">${esc(skill.name)}</h3>
       ${questions.map(q => {
         if (q.type === 'days'){
@@ -1415,17 +1377,20 @@ function renderProgressionStep(){
         if (!visible) return '';
         return `<div class="field"><label>${esc(q.label)}</label><select data-obq="${skill.id}|${q.id}"><option value="">— Select —</option>${q.options.map(o => `<option value="${esc(o.value)}" ${ans[q.id]===o.value?'selected':''}>${esc(o.label)}</option>`).join('')}</select></div>`;
       }).join('')}
-      <div class="field"><label>Why does this matter?</label><input data-obwhy="${skill.id}" value="${esc(why)}" placeholder="One sentence."></div>
-      <div class="field"><label>Identity claim</label><input data-obidentity="${skill.id}" value="${esc(identity)}" placeholder="I am someone who..."></div>
-      <div class="field"><label>I will drop this if…</label><input data-obquit="${skill.id}" value="${esc(quit)}" placeholder="e.g. not touched in 30 days"></div></div>`;
+    </div>`;
   }).join('');
 
   app.innerHTML = `
-    <h1 style="margin-top:24px">Progression check</h1>
-    <p class="dim" style="margin-top:12px">Your answers calibrate each skill's starting level and generate its daily quests.</p>
+    <h1 style="margin-top:24px">Calibration</h1>
+    <p class="dim" style="margin-top:8px">Answer where you're at for each skill. This sets your starting level — a business with a domain and bank starts higher than one with just an idea. Skip if you'd rather start everything at Lv 1.</p>
     ${showEquipment ? `<div class="card">${renderEquipmentSection()}</div>` : ''}
     ${body}
-    <div class="row" style="gap:8px;margin-top:16px"><button class="ghost" id="ob-back" style="flex:1">Back</button><button class="primary" id="ob-next" style="flex:2">Start the System</button></div>`;
+    <div class="row" style="gap:8px;margin-top:16px">
+      <button class="ghost" id="ob-back" style="flex:1">Back</button>
+      <button class="ghost" id="ob-skip" style="flex:1">Skip</button>
+      <button class="primary" id="ob-next" style="flex:2">Start</button>
+    </div>
+  `;
 
   if (showEquipment){
     document.querySelectorAll('[data-eq]').forEach(el => {
@@ -1454,9 +1419,6 @@ function renderProgressionStep(){
       render();
     };
   });
-  document.querySelectorAll('[data-obwhy]').forEach(el => { el.oninput = () => { onboardDraft.why[el.dataset.obwhy] = el.value; }; });
-  document.querySelectorAll('[data-obidentity]').forEach(el => { el.oninput = () => { onboardDraft.identity[el.dataset.obidentity] = el.value; }; });
-  document.querySelectorAll('[data-obquit]').forEach(el => { el.oninput = () => { onboardDraft.quit[el.dataset.obquit] = el.value; }; });
   document.querySelectorAll('[data-obday]').forEach(btn => {
     btn.onclick = () => {
       const [skillId, qid, dStr, mode] = btn.dataset.obday.split('|');
@@ -1474,7 +1436,8 @@ function renderProgressionStep(){
     };
   });
 
-  document.getElementById('ob-back').onclick = () => { onboardStep = 4; render(); };
+  document.getElementById('ob-back').onclick = () => { onboardStep = 2; render(); };
+  document.getElementById('ob-skip').onclick = () => finishOnboarding();
   document.getElementById('ob-next').onclick = () => {
     if (showEquipment) state.equipmentConfigured = true;
     onboardDraft.skills.forEach(skill => {
@@ -1484,9 +1447,6 @@ function renderProgressionStep(){
         qs.forEach(q => { if (q.type === 'days' && ans[q.id] === undefined) ans[q.id] = q.default; });
       }
       if (Object.keys(ans).length > 0) applyProgression(skill, ans);
-      skill.why = onboardDraft.why[skill.id] || '';
-      skill.identity = onboardDraft.identity[skill.id] || '';
-      skill.quitCriteria = onboardDraft.quit[skill.id] || '';
     });
     finishOnboarding();
   };
@@ -1494,8 +1454,6 @@ function renderProgressionStep(){
 
 function finishOnboarding(){
   state.name = onboardDraft.name;
-  state.telos = onboardDraft.telos;
-  state.telosDate = today();
   state.stats = { ...onboardDraft.stats };
   state.timeBudget = onboardDraft.timeBudget;
   state.skills = onboardDraft.skills;
@@ -1514,30 +1472,7 @@ function finishOnboarding(){
   state.lastPlayerLevel = computePlayerLevel();
   state.lastPlayerRank = rankOf(state.lastPlayerLevel);
   checkSkillTitles();
-  // 30-day commit lock
-  state.committedUntil = dateOffset(30);
   save(); tab = 'status';
-  setTimeout(() => {
-    openModal(`
-      <h2>30-day commitment</h2>
-      <div class="notice"><b>You've just committed to 30 days of use.</b> Editing skills, changing settings, and tweaking formulas are locked until ${state.committedUntil}. Daily quests, logging, and stat tests all work.</div>
-      <p class="small dim">This is the whole point. If you can't make 30 days without opening the code, no feature will save you. Come back on day 30 and evaluate.</p>
-      <button class="primary" style="width:100%;margin-top:12px" onclick="closeModal()">I'm in</button>
-    `);
-  }, 400);
-}
-
-/* ═══════════════════════════════════════════
-   COMMIT LOCK HELPERS
-   ═══════════════════════════════════════════ */
-function isCommitted(){
-  if (!state.committedUntil) return false;
-  return state.committedUntil >= today();
-}
-function commitRemainingDays(){
-  if (!state.committedUntil) return 0;
-  const d = daysSinceDate(state.committedUntil);
-  return d === null ? 0 : Math.max(0, -d);
 }
 
 /* ═══════════════════════════════════════════
@@ -1551,8 +1486,8 @@ function checkWelcomeBack(){
     setTimeout(() => {
       openModal(`
         <h2>Welcome back</h2>
-        <p class="small dim">You've been away ${gap} days. Your skills are still here. Your streak is reset but your progress isn't.</p>
-        <p class="small dim" style="margin-top:12px">Pick one thing today — a 5-minute version of any quest. That's the whole ask.</p>
+        <p class="small dim">You've been away ${gap} days. Your progress is intact. Streak reset but everything else is here.</p>
+        <p class="small dim" style="margin-top:12px">One thing today — a 5-minute version of any quest. That's the whole ask.</p>
         <div style="margin-top:16px">
           <button class="primary" style="width:100%" onclick="closeModal()">OK</button>
         </div>
@@ -1642,17 +1577,18 @@ function viewStatus(){
       <label class="${basics.veg?'checked':''}"><input type="checkbox" data-basic="veg" ${basics.veg?'checked':''}><span>Vegetables</span></label>
     </div>`;
 
-  const pauseBanner = state.paused ? `<div class="notice pause"><b>Paused.</b> Streak frozen. No penalty. Unpause in More when you're ready.</div>` : '';
-  const commitBanner = isCommitted() ? `<div class="notice" style="background:rgba(77,166,255,.06);border-color:rgba(77,166,255,.3)"><b>Committed for ${commitRemainingDays()} more days.</b> Skills and settings are locked. Use the System.</div>` : '';
+  const pauseBanner = state.paused ? `<div class="notice pause"><b>Paused.</b> Streak frozen. Unpause in More when ready.</div>` : '';
+  const telosHtml = state.telos
+    ? `<div class="card"><div class="small dim" style="font-style:italic">"${esc(state.telos)}"</div></div>`
+    : `<div class="card"><div class="row between"><div class="small dim" style="flex:1">What is this System for? One sentence.</div><button class="sm ghost" id="add-telos">Add</button></div></div>`;
 
   return `
     <div class="row between" style="margin-bottom:16px"><h1>The System</h1><button class="sm ghost" id="share-btn">Share ↗</button></div>
     ${pauseBanner}
-    ${commitBanner}
     <div class="card"><div class="row between"><div><div class="dim small mono">${esc(state.name || 'PLAYER')}</div><div class="big mono">Lv ${lvl}</div></div><div style="text-align:right"><div class="dim small mono">RANK</div><div class="big mono" style="color:var(--accent)">${rankOf(lvl)}</div></div></div>${powerBar()}</div>
-    ${state.telos ? `<div class="card"><div class="small dim" style="font-style:italic">"${esc(state.telos)}"</div></div>` : ''}
+    ${telosHtml}
     <div class="card"><div class="row between"><span class="dim small">STREAK</span><span class="mono" style="font-size:20px">${state.streak} <span class="dim small">days</span></span></div><div class="week-strip">${weekHtml}</div><div class="small dim" style="margin-top:14px;margin-bottom:6px">Year</div><div class="heatmap-year">${yearHtml}</div></div>
-    <div class="card"><div class="dim small" style="margin-bottom:2px">TODAY'S BASICS</div>${basicsHtml}<div class="small dim" style="margin-top:8px">No XP. Visible data.</div></div>
+    <div class="card"><div class="dim small" style="margin-bottom:2px">TODAY'S BASICS</div>${basicsHtml}</div>
     <h2>Stats</h2>
     <div class="card">${stats}<button class="ghost sm" data-nav="bench" style="width:100%;margin-top:12px">View benchmarks & test →</button></div>
     <h2>Titles</h2>
@@ -1667,43 +1603,41 @@ function viewQuests(){
   const day = new Date().getDay();
   const doneCount = list.filter(q => isQuestDone(q.id)).length;
   const deload = deloadWeekStatus();
-  const deloadHtml = deload.isDeload ? `<div class="notice deload"><b>Deload week ${deload.weekNum}.</b> Halve your workouts. Drop the coding/language quests to one. Keep the reading habit.</div>` : '';
-  const pauseHtml = state.paused ? `<div class="notice pause"><b>Paused.</b> Quests won't count toward your streak until you unpause in More.</div>` : '';
+  const deloadHtml = deload.isDeload ? `<div class="notice deload"><b>Deload week ${deload.weekNum}.</b> Halve your workouts. Keep the reading habit.</div>` : '';
+  const pauseHtml = state.paused ? `<div class="notice pause"><b>Paused.</b> Quests won't count toward streak until you unpause.</div>` : '';
   const nudges = state.skills.filter(s => s.active && s.type === 'workout' && s.subtype === 'fitness' && s.plan && s.plan.attemptDay !== day && (s.workoutsSinceAttempt||0) >= 4);
   const nudgeHtml = nudges.map(s => `<div class="notice warn"><b>${esc(s.name)}</b>: ${s.workoutsSinceAttempt} workouts since last attempt. Ready to test?<button class="sm primary" data-nudge-attempt="${s.id}" style="width:100%;margin-top:8px">Test my max now</button></div>`).join('');
   const items = list.length ? list.map(q => {
     const done = isQuestDone(q.id);
     return `<div class="quest" data-quest="${q.id}"><div class="chk ${done?'done':''}">${done?'✓':''}</div><div style="flex:1;${done?'opacity:.5':''}"><div style="${done?'text-decoration:line-through':''}">${esc(q.text)}</div><div class="small dim mono">+${q.xp} XP${q.kind==='cardio'?' · VIT training':''}${q.kind==='attempt'?' · test your max':''}</div>${q.milestone?`<div class="small dim" style="margin-top:2px">Milestone: ${esc(q.milestone)}</div>`:''}</div></div>`;
-  }).join('') : '<div class="dim small" style="padding:12px 0">No quests today. Add or activate a skill in Skills.</div>';
+  }).join('') : '<div class="dim small" style="padding:12px 0">No quests today. Add a skill in Skills tab.</div>';
   return `<h2>Today · ${dayName(day)} ${today().slice(5)}</h2>${pauseHtml}${deloadHtml}${nudgeHtml}<div class="card">${items}</div><div class="card row between"><span class="small dim">${doneCount} / ${list.length} done</span><span class="small dim mono">${state.streak} day streak</span></div>`;
 }
 
 function viewSkills(){
-  const locked = isCommitted();
   const rows = state.skills.map(s => {
     const need = skillXpForLevel(s.level);
     const pct = s.level >= 50 ? 100 : (s.xp / need) * 100;
     const idx = currentMilestoneIdx(s);
     const milestone = (idx >= 0 && s.ladder) ? s.ladder[idx] : null;
-    const detail = s.type === 'workout' && s.plan ? `${s.plan.exercises.length} exercises · ${s.plan.workoutDays.length} days/week` : (s.milestoneQuests && idx >= 0 && s.milestoneQuests[idx]) ? `${s.milestoneQuests[idx].length} quest${s.milestoneQuests[idx].length===1?'':'s'} for current milestone` : (s.quests ? `${s.quests.length} quest${s.quests.length===1?'':'s'}` : '');
+    const detail = s.type === 'workout' && s.plan ? `${s.plan.exercises.length} exercises · ${s.plan.workoutDays.length} days/week` : (s.milestoneQuests && idx >= 0 && s.milestoneQuests[idx]) ? `${s.milestoneQuests[idx].length} quest${s.milestoneQuests[idx].length===1?'':'s'}` : (s.quests ? `${s.quests.length} quest${s.quests.length===1?'':'s'}` : '');
     const ladderInfo = s.ladder && s.ladder.length ? `${(s.ladderDone||[]).length}/${s.ladder.length} milestones` : '';
     let recal = '';
     if (s.type === 'workout' && s.subtype === 'fitness' && s.plan && s.plan.calibratedTo){
       const curW = JSON.stringify(state.equipmentWeights || {});
       const oldW = JSON.stringify(s.plan.calibratedTo.weights || {});
-      if (state.stats.STR !== s.plan.calibratedTo.STR || curW !== oldW) recal = ' · <span style="color:var(--gold)">recalibrate available</span>';
+      if (state.stats.STR !== s.plan.calibratedTo.STR || curW !== oldW) recal = ' · <span style="color:var(--gold)">recalibrate</span>';
     }
     const title = titleForSkill(s);
     const calibrated = s.calibratedLevel && s.calibratedLevel > 1;
     const identity = s.identity ? `<div class="small dim" style="margin-top:4px;font-style:italic">"${esc(s.identity)}"</div>` : '';
-    return `<div class="card" data-skill-card="${s.id}" style="cursor:pointer"><div class="row between"><div class="row" style="gap:8px;flex:1;min-width:0"><h3 style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(s.name)}</h3>${title?`<span class="skill-title">${esc(title)}</span>`:''}<span class="tag ${s.active?'on rank-'+rankOf(s.level):''}">${s.active?rankOf(s.level):'paused'}</span></div><span class="mono small dim" style="white-space:nowrap">Lv ${s.level}</span></div><div class="bar"><i style="width:${pct}%"></i></div><div class="small dim" style="margin-top:8px">${esc(detail)}${ladderInfo?` · ${ladderInfo}`:''}${recal}</div>${milestone?`<div class="small dim" style="margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">→ ${esc(milestone)}</div>`:''}${identity}${s.why?`<div class="small dim" style="margin-top:4px;font-style:italic">"${esc(s.why)}"</div>`:''}${calibrated?`<div style="margin-top:6px"><span class="calibrated-tag">Calibrated Lv ${s.calibratedLevel}</span></div>`:''}</div>`;
+    return `<div class="card" data-skill-card="${s.id}" style="cursor:pointer"><div class="row between"><div class="row" style="gap:8px;flex:1;min-width:0"><h3 style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(s.name)}</h3>${title?`<span class="skill-title">${esc(title)}</span>`:''}<span class="tag ${s.active?'on rank-'+rankOf(s.level):''}">${s.active?rankOf(s.level):'paused'}</span></div><span class="mono small dim" style="white-space:nowrap">Lv ${s.level}</span></div><div class="bar"><i style="width:${pct}%"></i></div><div class="small dim" style="margin-top:8px">${esc(detail)}${ladderInfo?` · ${ladderInfo}`:''}${recal}</div>${milestone?`<div class="small dim" style="margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">→ ${esc(milestone)}</div>`:''}${identity}${calibrated?`<div style="margin-top:6px"><span class="calibrated-tag">Calibrated Lv ${s.calibratedLevel}</span></div>`:''}</div>`;
   }).join('');
-  const addBtn = locked ? '' : `<button class="primary" id="add-skill" style="width:100%;margin-top:12px">+ Add skill</button>`;
-  return `<h2>Skills · ${state.skills.filter(s=>s.active).length} active / ${state.skills.length} total</h2>${rows || '<div class="card dim small">No skills yet.</div>'}${addBtn}`;
+  return `<h2>Skills · ${state.skills.filter(s=>s.active).length} active / ${state.skills.length} total</h2>${rows || '<div class="card dim small">No skills yet.</div>'}<button class="primary" id="add-skill" style="width:100%;margin-top:12px">+ Add skill</button>`;
 }
 
 function viewBench(){
-  return `<h1>Benchmarks</h1><div class="card" style="margin-top:16px"><p class="small">Each stat is scored 1–100 and directly affects your player level. Tap a tier to log a test. Higher → stat rises. Lower → demotes (level drops accordingly). No XP for stat changes — the stat change <i>is</i> the reward.</p></div>${['STR','AGI','VIT','INT','PER'].map(renderBenchCard).join('')}`;
+  return `<h1>Benchmarks</h1><div class="card" style="margin-top:16px"><p class="small">Each stat is scored 1–100 and directly affects your player level. Tap a tier to log a test.</p></div>${['STR','AGI','VIT','INT','PER'].map(renderBenchCard).join('')}`;
 }
 function renderBenchCard(k){
   const b = BENCHMARKS[k];
@@ -1726,16 +1660,13 @@ function viewLog(){
     const partial = e.finished === false ? `<span class="partial-badge">partial</span>` : '';
     return `<div class="logrow"><span style="flex:1"><span class="dim mono">${e.date.slice(5)}</span>${skill?` <span class="dim" style="font-size:11px">${esc(skill.name)} · </span>`:''}${esc(e.note)}${first}${partial}${diff}</span><span class="xp">${e.xp>0?'+':''}${e.xp}</span></div>`;
   }).join('') : '<div class="dim small">Nothing logged yet.</div>';
-  return `<h2>Log date</h2><div class="card"><input type="date" id="log-date" value="${logDate}" max="${today()}"><div class="small dim" style="margin-top:8px">Applies to quick logs and adjustments below.</div></div><h2>Quick log</h2><div class="grid"><button data-xp="15" data-note="Workout">Workout +15</button><button data-xp="5" data-note="Reading">Reading +5</button><button data-xp="10" data-note="Deep work hour">Deep work +10</button><button data-xp="20" data-note="Book finished">Book +20</button><button data-xp="50" data-note="PR hit">PR +50</button><button data-xp="100" data-note="Milestone">Milestone +100</button></div><h2>Adjustment</h2><div class="card"><div class="row" style="gap:8px"><input type="number" id="adj" placeholder="±XP"><input type="text" id="adjnote" placeholder="reason"><button class="sm" id="adjgo">Add</button></div></div><h2>History <span class="dim small" style="text-transform:none;letter-spacing:0;margin-left:8px">Total earned: ${state.totalXP}</span></h2><div class="card">${rows}</div>`;
+  return `<h2>Log date</h2><div class="card"><input type="date" id="log-date" value="${logDate}" max="${today()}"></div><h2>Quick log</h2><div class="grid"><button data-xp="15" data-note="Workout">Workout +15</button><button data-xp="5" data-note="Reading">Reading +5</button><button data-xp="10" data-note="Deep work hour">Deep work +10</button><button data-xp="20" data-note="Book finished">Book +20</button><button data-xp="50" data-note="PR hit">PR +50</button><button data-xp="100" data-note="Milestone">Milestone +100</button></div><h2>Adjustment</h2><div class="card"><div class="row" style="gap:8px"><input type="number" id="adj" placeholder="±XP"><input type="text" id="adjnote" placeholder="reason"><button class="sm" id="adjgo">Add</button></div></div><h2>History <span class="dim small" style="text-transform:none;letter-spacing:0;margin-left:8px">Total earned: ${state.totalXP}</span></h2><div class="card">${rows}</div>`;
 }
 
 function viewMore(){
-  const locked = isCommitted();
-  const lockNote = locked ? `<div class="notice warn"><b>Committed for ${commitRemainingDays()} more days.</b> Settings and skills are locked. You can still pause, log, test stats, and adjust XP.</div>` : '';
-
-  const telosField = `<div class="field"><label>Telos</label><textarea id="telos-input" rows="3" ${locked?'disabled':''}>${esc(state.telos)}</textarea></div>`;
-  const nameField = `<div class="field"><label>Name</label><input id="profile-name" value="${esc(state.name)}" maxlength="40" ${locked?'disabled':''}></div>`;
-  const budgetField = `<div class="field"><label>Daily time budget</label><select id="profile-budget" ${locked?'disabled':''}><option value="15" ${state.timeBudget===15?'selected':''}>15 min</option><option value="30" ${state.timeBudget===30?'selected':''}>30 min</option><option value="45" ${state.timeBudget===45?'selected':''}>45 min</option><option value="60" ${state.timeBudget===60?'selected':''}>60+ min</option></select></div>`;
+  const telosField = `<div class="field"><label>Telos <span class="dim" style="text-transform:none;letter-spacing:0">(optional)</span></label><textarea id="telos-input" rows="2" placeholder="What is this System for? One sentence.">${esc(state.telos)}</textarea></div>`;
+  const nameField = `<div class="field"><label>Name</label><input id="profile-name" value="${esc(state.name)}" maxlength="40"></div>`;
+  const budgetField = `<div class="field"><label>Daily time budget</label><select id="profile-budget"><option value="15" ${state.timeBudget===15?'selected':''}>15 min</option><option value="30" ${state.timeBudget===30?'selected':''}>30 min</option><option value="45" ${state.timeBudget===45?'selected':''}>45 min</option><option value="60" ${state.timeBudget===60?'selected':''}>60+ min</option></select></div>`;
 
   const pauseField = `
     <div class="card">
@@ -1743,26 +1674,17 @@ function viewMore(){
         <span class="small">Pause mode</span>
         <button class="sm ${state.paused?'primary':'ghost'}" id="toggle-pause">${state.paused?'Unpause':'Pause'}</button>
       </div>
-      <div class="small dim" style="margin-top:8px">Freezes the streak. No penalty for life events. Unpause when ready.</div>
-      ${state.pausedUntil ? `<div class="small dim" style="margin-top:6px">Paused until ${state.pausedUntil}</div>` : ''}
+      <div class="small dim" style="margin-top:8px">Freezes streak. No penalty.</div>
+      ${state.pausedUntil ? `<div class="small dim" style="margin-top:6px">Until ${state.pausedUntil}</div>` : ''}
     </div>`;
 
-  const commitField = locked
-    ? ''
-    : `<div class="card"><div class="field"><label>Commit to 30 days of use</label><div class="hint">Locks all editing for 30 days. The only exit is to use the System.</div></div><button class="sm primary" id="commit-30">Commit for 30 days</button></div>`;
-
-  const equipSection = locked ? '<div class="small dim">Locked during commitment.</div>' : renderEquipmentSection();
-  const aiSaveBtn = locked ? '<div class="small dim">Locked during commitment.</div>' : '<button class="sm primary" id="ai-save">Save AI settings</button>';
-  const profileSaveBtn = locked ? '' : '<button class="sm" id="profile-save">Save</button>';
-
-  return `${lockNote}
-    <h2>Profile</h2><div class="card">${nameField}${telosField}${budgetField}<div class="field"><label style="display:flex;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" id="profile-deload" ${state.deloadEnabled?'checked':''} ${locked?'disabled':''}><span style="text-transform:none;letter-spacing:0;color:var(--txt);font-size:13px">Deload every 10th week</span></label><div class="hint">${state.startedAt?`Started ${state.startedAt}. Week ${deloadWeekStatus().weekNum} now.`:'Not started yet.'}</div></div>${profileSaveBtn}</div>
+  return `
+    <h2>Profile</h2><div class="card">${nameField}${telosField}${budgetField}<div class="field"><label style="display:flex;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" id="profile-deload" ${state.deloadEnabled?'checked':''}><span style="text-transform:none;letter-spacing:0;color:var(--txt);font-size:13px">Deload every 10th week</span></label><div class="hint">${state.startedAt?`Started ${state.startedAt}. Week ${deloadWeekStatus().weekNum} now.`:'Not started yet.'}</div></div><button class="sm" id="profile-save">Save</button></div>
     <h2>Pause</h2>${pauseField}
-    ${commitField ? `<h2>Commit</h2>${commitField}` : ''}
-    <h2>Equipment</h2><div class="card">${equipSection}</div>
-    <h2>AI settings</h2><div class="card"><div class="notice">Optional. Key stays on this device.</div><div class="field"><label>API key</label><input id="ai-key" type="password" value="${esc(state.settings.apiKey)}" placeholder="sk-..." ${locked?'disabled':''}></div><div class="field"><label>Base URL</label><input id="ai-base" value="${esc(state.settings.apiBase)}" ${locked?'disabled':''}></div><div class="field"><label>Model</label><input id="ai-model" value="${esc(state.settings.apiModel)}" ${locked?'disabled':''}></div>${aiSaveBtn}</div>
-    <h2>Backup</h2><div class="card"><button class="primary" id="export" style="width:100%;margin-bottom:8px">Export backup</button><button id="import" style="width:100%;margin-bottom:8px">Import backup</button><button class="ghost danger" id="startover" style="width:100%" ${locked?'disabled':''}>Start over (erase all)</button></div>
-    <h2>Rules</h2><div class="card small dim"><p><b>Level = round(√power × 2)</b>, where power = sum(stats) + 3 × sum(skill level − 1).</p><p>Level-1 skills contribute 0 power — no free levels from adding skills.</p><p>Stats move only on a benchmark you pass. Testing down removes the level the stat gave you.</p><p>Milestone XP scales quadratically: M0 = 100 skill XP, M19 = ~1,544. Full 20-milestone ladder ≈ Lv 49 skill.</p><p>2-minute floor: any logged activity preserves the streak.</p><p>Milestones ask for one sentence before ticking. First-time quests pay double.</p><p><b>No XP for plans, lists or feelings.</b> The numbers here measure commitment to the game you chose to play — not progress in life. That's the honest framing.</p></div>`;
+    <h2>Equipment</h2><div class="card">${renderEquipmentSection()}</div>
+    <h2>AI settings</h2><div class="card"><div class="notice">Optional. Key stays on this device.</div><div class="field"><label>API key</label><input id="ai-key" type="password" value="${esc(state.settings.apiKey)}" placeholder="sk-..."></div><div class="field"><label>Base URL</label><input id="ai-base" value="${esc(state.settings.apiBase)}"></div><div class="field"><label>Model</label><input id="ai-model" value="${esc(state.settings.apiModel)}"></div><button class="sm primary" id="ai-save">Save AI settings</button></div>
+    <h2>Backup</h2><div class="card"><button class="primary" id="export" style="width:100%;margin-bottom:8px">Export backup</button><button id="import" style="width:100%;margin-bottom:8px">Import backup</button><button class="ghost danger" id="startover" style="width:100%">Start over</button></div>
+    <h2>Rules</h2><div class="card small dim"><p><b>Level = round(√power × 2)</b>, where power = sum(stats) + 3 × sum(skill level − 1).</p><p>Level-1 skills contribute 0 power. Level 100 ≈ 2,500 power.</p><p>Stats move only on a benchmark you pass.</p><p>Milestone XP scales quadratically — M0 = 100, M19 = ~1,544.</p><p>Any logged activity preserves the streak.</p><p>Milestones ask for one sentence before ticking. First-time quests pay double.</p><p>Everything is editable any time. Nothing is locked.</p></div>`;
 }
 
 /* ═══════════════════════════════════════════
@@ -1771,6 +1693,26 @@ function viewMore(){
 function closeModal(){ document.getElementById('modal').innerHTML = ''; }
 function openModal(html){
   document.getElementById('modal').innerHTML = `<div class="modal-bg" onclick="if(event.target===this)closeModal()"><div class="modal">${html}</div></div>`;
+}
+
+function openTelosModal(){
+  openModal(`
+    <h2>Telos</h2>
+    <p class="small dim">One sentence. What is this System for?</p>
+    <div class="field" style="margin-top:12px">
+      <textarea id="telos-edit" rows="3" placeholder="This System exists to get me from ___ to ___ by ___.">${esc(state.telos)}</textarea>
+    </div>
+    <div class="row" style="gap:8px">
+      <button class="ghost" id="telos-cancel" style="flex:1">Cancel</button>
+      <button class="primary" id="telos-save" style="flex:2">Save</button>
+    </div>
+  `);
+  document.getElementById('telos-cancel').onclick = closeModal;
+  document.getElementById('telos-save').onclick = () => {
+    state.telos = document.getElementById('telos-edit').value.trim();
+    state.telosDate = today();
+    save(); closeModal();
+  };
 }
 
 function shareProgress(){
@@ -1819,15 +1761,12 @@ function shareProgress(){
 }
 
 function openMilestoneFriction(skill, i, then){
-  const idx = i;
-  const milestoneText = skill.ladder[idx];
   openModal(`
-    <h2>Confirm milestone</h2>
-    <p class="small dim">In one sentence, what did you actually do to earn this?</p>
-    <div class="notice" style="margin-top:12px">${esc(milestoneText)}</div>
+    <h2>Mark milestone</h2>
+    <p class="small dim">One sentence on what you actually did. Optional — you can skip.</p>
+    <div class="notice" style="margin-top:12px">${esc(skill.ladder[i])}</div>
     <div class="field">
-      <label>What you did</label>
-      <textarea id="mf-note" rows="3" placeholder="e.g. Signed up at Companies House, opened the bank account, and bought the domain."></textarea>
+      <textarea id="mf-note" rows="2" placeholder="e.g. Registered at Companies House, opened bank, bought domain."></textarea>
     </div>
     <div class="row" style="gap:8px">
       <button class="ghost" id="mf-cancel" style="flex:1">Cancel</button>
@@ -1838,7 +1777,7 @@ function openMilestoneFriction(skill, i, then){
   document.getElementById('mf-save').onclick = () => {
     const note = document.getElementById('mf-note').value.trim();
     if (!skill.ladderNotes) skill.ladderNotes = {};
-    skill.ladderNotes[idx] = note;
+    skill.ladderNotes[i] = note;
     closeModal();
     then(note);
   };
@@ -1847,7 +1786,6 @@ function openMilestoneFriction(skill, i, then){
 function openSkillDetail(skillId){
   const skill = state.skills.find(s => s.id === skillId);
   if (!skill) return;
-  const locked = isCommitted();
   function renderDetail(){
     const ladder = skill.ladder || [], done = skill.ladderDone || [];
     const nextIdx = currentMilestoneIdx(skill);
@@ -1858,7 +1796,7 @@ function openSkillDetail(skillId){
       const isNext = i === nextIdx;
       const isPre = (skill.ladderPreticked||[]).includes(i);
       const willGive = milestoneSkillXP(i);
-      const note = skill.ladderNotes && skill.ladderNotes[i];
+      const note = skill.ladderNotes && skill.ladderNotes[`${skill.id}:m${i}`];
       return `<div class="tier-row ${isNext?'current':''} ${isDone?'below':''}" data-ladder="${i}"><div class="tier-val">${isDone?'✓':(isNext?'›':'·')}</div><div class="tier-desc">${esc(m)}${!isDone?`<div class="small dim mono">+${willGive} skill XP</div>`:''}${note?`<div class="small dim" style="font-style:italic">${esc(note)}</div>`:''}${isPre && isDone?`<div class="small dim" style="font-style:italic">calibration tick</div>`:''}</div></div>`;
     }).join('') : '<div class="dim small" style="padding:12px">No ladder set.</div>';
     const status = skill.status ? esc(skill.status) : '<span class="dim">Not set</span>';
@@ -1869,33 +1807,26 @@ function openSkillDetail(skillId){
       ${skill.calibratedLevel && skill.calibratedLevel > 1 ? `<div class="notice" style="background:rgba(255,200,87,.06);border-color:rgba(255,200,87,.3);font-size:13px"><b>Calibrated start:</b> Lv ${skill.calibratedLevel}</div>`:''}
       ${skill.identity?`<div class="notice" style="font-style:italic">"${esc(skill.identity)}"</div>`:''}
       ${nextMilestone?`<div class="milestone-focus"><b>Current focus:</b> ${esc(nextMilestone)}</div>`:''}
-      <div class="card"><div class="row between"><span class="dim small">STATUS</span><button class="sm ghost" id="sd-progress">Update</button></div><div style="margin-top:6px">${status}</div>${skill.quitCriteria?`<div class="small dim" style="margin-top:8px">Drop criteria: ${esc(skill.quitCriteria)}</div>`:''}</div>
+      <div class="card"><div class="row between"><span class="dim small">STATUS</span><button class="sm ghost" id="sd-progress">Update</button></div><div style="margin-top:6px">${status}</div></div>
       ${currentQuests.length>0?`<div class="row between" style="margin:16px 0 8px"><span class="dim small">DAILY QUESTS FOR CURRENT MILESTONE</span></div><div class="card">${currentQuests.map(q => `<div class="logrow"><span>${esc(q.text)}</span><span class="xp">+${q.xp}</span></div>`).join('')}</div>`:''}
       ${isBusinessUndecided?`<div class="notice"><b>Business not decided.</b> Tap Regenerate to let AI suggest 3 ideas and build the ladder.</div>`:''}
-      <div class="row between" style="margin:16px 0 8px"><span class="dim small">LADDER (${done.length}/${ladder.length})</span>${locked?'<span class="small dim">locked</span>':'<button class="sm ghost" id="sd-regen-ai">✨ Regenerate</button>'}</div>
+      <div class="row between" style="margin:16px 0 8px"><span class="dim small">LADDER (${done.length}/${ladder.length})</span><button class="sm ghost" id="sd-regen-ai">✨ Regenerate</button></div>
       <div style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:4px">${ladderHtml}</div>
       ${nextIdx>=0?`<div class="notice" style="margin-top:16px"><b>Next step:</b> ${esc(ladder[nextIdx])}</div>`:(ladder.length?`<div class="notice ok" style="margin-top:16px"><b>Ladder complete.</b></div>`:'')}
-      <div class="row" style="gap:8px;margin-top:16px"><button class="ghost" id="sd-pause" style="flex:1">${skill.active?'Pause':'Activate'}</button>${locked?'':'<button class="ghost" id="sd-edit" style="flex:1">Edit</button><button class="ghost danger" id="sd-del" style="flex:1">Delete</button>'}</div>`);
+      <div class="row" style="gap:8px;margin-top:16px"><button class="ghost" id="sd-pause" style="flex:1">${skill.active?'Pause':'Activate'}</button><button class="ghost" id="sd-edit" style="flex:1">Edit</button><button class="ghost danger" id="sd-del" style="flex:1">Delete</button></div>`);
     document.getElementById('sd-close').onclick = closeModal;
     document.getElementById('sd-progress').onclick = () => openProgressionModal(skill, renderDetail);
-    const regenBtn = document.getElementById('sd-regen-ai');
-    if (regenBtn) regenBtn.onclick = () => openLadderAI(skill, renderDetail);
+    document.getElementById('sd-regen-ai').onclick = () => openLadderAI(skill, renderDetail);
     document.getElementById('sd-pause').onclick = () => { skill.active = !skill.active; save(); renderDetail(); };
-    const editBtn = document.getElementById('sd-edit');
-    if (editBtn) editBtn.onclick = () => { closeModal(); openSkillEditor(skill.id); };
-    const delBtn = document.getElementById('sd-del');
-    if (delBtn) delBtn.onclick = () => { if (!confirm(`Delete "${skill.name}"?`)) return; state.skills = state.skills.filter(s => s.id !== skill.id); save(); closeModal(); };
+    document.getElementById('sd-edit').onclick = () => { closeModal(); openSkillEditor(skill.id); };
+    document.getElementById('sd-del').onclick = () => { if (!confirm(`Delete "${skill.name}"?`)) return; state.skills = state.skills.filter(s => s.id !== skill.id); save(); closeModal(); };
     document.querySelectorAll('[data-ladder]').forEach(el => {
       el.onclick = () => {
         const i = +el.dataset.ladder;
         if (skill.ladderDone && skill.ladderDone.includes(i)){
           untickMilestone(skill, i); save(); renderDetail();
         } else {
-          // Friction
-          openMilestoneFriction(skill, i, (note) => {
-            tickMilestone(skill, i);
-            save(); renderDetail();
-          });
+          openMilestoneFriction(skill, i, () => { tickMilestone(skill, i); save(); renderDetail(); });
         }
       };
     });
@@ -1909,7 +1840,7 @@ function openProgressionModal(skill, back){
   questions.forEach(q => { if (q.type==='days'||q.onlyIf) return; const m = q.options.find(o => o.label === skill.status || skill.status?.startsWith(o.label)); if (m) answers[q.id] = m.value; });
   if (skill.type === 'workout' && skill.plan){ answers.workoutDays = [...(skill.plan.workoutDays || [1,3,5])]; answers.attemptDay = skill.plan.attemptDay || 0; }
   function renderProg(){
-    openModal(`<h2>${esc(skill.name)} — progression</h2>${questions.map(q => {
+    openModal(`<h2>${esc(skill.name)} — update</h2>${questions.map(q => {
       if (q.type === 'days'){ const current = answers[q.id] !== undefined ? answers[q.id] : q.default; return `<div class="field"><label>${esc(q.label)}</label><div class="day-picker">${[0,1,2,3,4,5,6].map(d => { const on = q.multi ? current.includes(d) : current === d; return `<button type="button" class="${on?'primary':'ghost'}" data-pday="${q.id}|${d}|${q.multi?'multi':'single'}">${dayShort(d)}</button>`; }).join('')}</div></div>`; }
       const visible = !q.onlyIf || q.onlyIf(answers);
       if (!visible) return '';
@@ -1926,7 +1857,7 @@ function openProgressionModal(skill, back){
 function openLadderAI(skill, back){
   const prompt = buildLadderAIPrompt(skill);
   const key = state.settings.apiKey, base = state.settings.apiBase, model = state.settings.apiModel;
-  openModal(`<h2>Regenerate ladder</h2><div class="notice"><b>The AI sees your last 30 days, stats, equipment and current milestone.</b><br><br><b>Route 1 — API.</b> Save a key in More.<br><b>Route 2 — manual.</b> Copy prompt → paste into ChatGPT → paste JSON back.</div><div class="field"><label>Prompt</label><textarea id="la-prompt" rows="10" readonly>${esc(prompt)}</textarea><button class="sm" id="la-copy" style="margin-top:8px">Copy prompt</button></div>${key?`<button class="primary" id="la-run" style="width:100%">Generate via API (${esc(model)})</button><div id="la-status" class="small dim" style="margin-top:8px;text-align:center"></div>`:''}<div class="field" style="margin-top:16px"><label>Result</label><textarea id="la-result" rows="6" placeholder='["Milestone 1","Milestone 2",...]'></textarea></div><div class="row" style="gap:8px"><button class="ghost" id="la-cancel" style="flex:1">Cancel</button><button class="primary" id="la-save" style="flex:2">Replace ladder</button></div>`);
+  openModal(`<h2>Regenerate ladder</h2><div class="notice"><b>The AI sees your last 30 days, stats, equipment and current milestone.</b><br><br><b>Route 1 — API.</b> Save a key in More.<br><b>Route 2 — manual.</b> Copy prompt → paste into ChatGPT → paste JSON back.</div><div class="field"><label>Prompt</label><textarea id="la-prompt" rows="10" readonly>${esc(prompt)}</textarea><button class="sm" id="la-copy" style="margin-top:8px">Copy prompt</button></div>${key?`<button class="primary" id="la-run" style="width:100%">Generate via API</button><div id="la-status" class="small dim" style="margin-top:8px;text-align:center"></div>`:''}<div class="field" style="margin-top:16px"><label>Result</label><textarea id="la-result" rows="6" placeholder='["Milestone 1","Milestone 2",...]'></textarea></div><div class="row" style="gap:8px"><button class="ghost" id="la-cancel" style="flex:1">Cancel</button><button class="primary" id="la-save" style="flex:2">Replace ladder</button></div>`);
   document.getElementById('la-cancel').onclick = closeModal;
   document.getElementById('la-copy').onclick = () => { const el = document.getElementById('la-prompt'); el.select(); document.execCommand('copy'); const b = document.getElementById('la-copy'); b.textContent = 'Copied ✓'; setTimeout(() => { b.textContent = 'Copy prompt'; }, 1500); };
   const runBtn = document.getElementById('la-run');
@@ -1961,7 +1892,7 @@ function openSkillEditor(skillId){
     else if (idx >= 0 && draft.milestoneQuests[idx]) questsToEdit = draft.milestoneQuests[idx];
     else if (draft.quests) questsToEdit = draft.quests;
     const questSection = isWorkout ? `<div class="field"><label>Exercises</label><div id="exercises">${draft.plan.exercises.map((e,i) => `<div class="exercise-row"><input placeholder="Name" value="${esc(e.name)}" data-ex="${i}" data-key="name"><input type="number" min="1" placeholder="Sets" value="${e.sets}" data-ex="${i}" data-key="sets"><input type="number" min="1" placeholder="Reps" value="${e.reps}" data-ex="${i}" data-key="reps"><button class="sm ghost danger" data-remove-ex="${i}">×</button></div>`).join('')}</div><button class="sm" id="add-ex" style="margin-top:8px">+ Add exercise</button></div><div class="field"><label>Workout days</label><div class="day-picker">${[0,1,2,3,4,5,6].map(d => `<button type="button" class="${draft.plan.workoutDays.includes(d)?'primary':'ghost'}" data-wday="${d}">${dayShort(d)}</button>`).join('')}</div></div><div class="field"><label>Attempt day</label><div class="day-picker">${[0,1,2,3,4,5,6].map(d => `<button type="button" class="${draft.plan.attemptDay===d?'primary':'ghost'}" data-aday="${d}">${dayShort(d)}</button>`).join('')}</div></div>${showCardio?`<div class="field"><label style="display:flex;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" id="sk-cardio" ${draft.cardioEnabled!==false?'checked':''}><span style="text-transform:none;letter-spacing:0;color:var(--txt);font-size:13px">Cardio on rest days</span></label></div>`:''}` : `${currentMilestone?`<div class="milestone-focus"><b>Quests for:</b> ${esc(currentMilestone)}</div>`:''}<div class="field"><label>Daily quests</label><div id="quests">${questsToEdit.map((q,i) => `<div class="exercise-row" style="grid-template-columns:1fr 70px 30px"><input value="${esc(q.text)}" data-q="${i}" data-key="text"><input type="number" min="1" value="${q.xp}" data-q="${i}" data-key="xp"><button class="sm ghost danger" data-remove-q="${i}">×</button></div>`).join('')}</div><button class="sm" id="add-q" style="margin-top:8px">+ Add quest</button></div><button class="sm ghost" id="gen-ai" style="width:100%;margin-top:8px">✨ Generate quests with AI</button>`;
-    openModal(`<h2>${isNew?'New skill':'Edit skill'}</h2><div class="field"><label>Name</label><input id="sk-name" value="${esc(draft.name)}" maxlength="40"></div><div class="field"><label>Why this matters</label><input id="sk-why" value="${esc(draft.why)}" placeholder="One sentence."></div><div class="field"><label>Identity</label><input id="sk-identity" value="${esc(draft.identity)}" placeholder="I am someone who..."></div><div class="field"><label>Drop criteria</label><input id="sk-quit" value="${esc(draft.quitCriteria)}" placeholder="e.g. not touched in 30 days"></div><div class="field"><label>Status</label><input id="sk-status" value="${esc(draft.status||'')}"></div>${!isNew?`<div class="field"><label>Type</label><div class="row" style="gap:8px"><button class="sm ${draft.type==='standard'?'primary':'ghost'}" id="type-std" style="flex:1">Standard</button><button class="sm ${draft.type==='workout'?'primary':'ghost'}" id="type-wk" style="flex:1">Workout plan</button></div></div>`:''}${questSection}<div class="row" style="gap:8px;margin-top:16px"><button class="ghost" id="cancel" style="flex:1">Cancel</button><button class="primary" id="save" style="flex:2">${isNew?'Create':'Save'}</button></div>`);
+    openModal(`<h2>${isNew?'New skill':'Edit skill'}</h2><div class="field"><label>Name</label><input id="sk-name" value="${esc(draft.name)}" maxlength="40"></div><div class="field"><label>Status</label><input id="sk-status" value="${esc(draft.status||'')}" placeholder="e.g. Complete beginner"></div>${!isNew?`<div class="field"><label>Type</label><div class="row" style="gap:8px"><button class="sm ${draft.type==='standard'?'primary':'ghost'}" id="type-std" style="flex:1">Standard</button><button class="sm ${draft.type==='workout'?'primary':'ghost'}" id="type-wk" style="flex:1">Workout plan</button></div></div>`:''}${questSection}<hr><div class="small dim" style="margin-bottom:10px">Optional. Helpful for AI suggestions and for your own commitment.</div><div class="field"><label>Why this matters <span class="dim" style="text-transform:none;letter-spacing:0">(optional)</span></label><input id="sk-why" value="${esc(draft.why)}" placeholder="One sentence."></div><div class="field"><label>Identity <span class="dim" style="text-transform:none;letter-spacing:0">(optional)</span></label><input id="sk-identity" value="${esc(draft.identity)}" placeholder="I am someone who..."></div><div class="field"><label>Drop criteria <span class="dim" style="text-transform:none;letter-spacing:0">(optional)</span></label><input id="sk-quit" value="${esc(draft.quitCriteria)}" placeholder="e.g. not touched in 30 days"></div><div class="row" style="gap:8px;margin-top:16px"><button class="ghost" id="cancel" style="flex:1">Cancel</button><button class="primary" id="save" style="flex:2">${isNew?'Create':'Save'}</button></div>`);
     document.getElementById('cancel').onclick = closeModal;
     document.getElementById('sk-name').oninput = e => { draft.name = e.target.value; };
     document.getElementById('sk-why').oninput = e => { draft.why = e.target.value; };
@@ -2139,7 +2070,7 @@ function bind(){
       const [stat, vStr] = el.dataset.tier.split(':');
       const v = parseInt(vStr, 10), cur = state.stats[stat];
       const desc = BENCHMARKS[stat].tiers.find(t => t[0] === v)?.[1] || '';
-      if (v === cur){ if (confirm(`Re-test ${stat} at ${v} today?\n\n${desc}\n\nNo change to stat.`)){ state.statDates[stat] = today(); save(); } }
+      if (v === cur){ if (confirm(`Re-test ${stat} at ${v} today?\n\n${desc}\n\nNo change.`)){ state.statDates[stat] = today(); save(); } }
       else if (v > cur){
         if (confirm(`Pass ${stat} tier ${v}?\n\n${desc}\n\n${stat}: ${cur} → ${v}.`)){
           levelChangeReason = `${stat} up to ${v}`;
@@ -2148,7 +2079,7 @@ function bind(){
           save();
         }
       } else {
-        if (confirm(`Demote ${stat} to tier ${v}?\n\n${desc}\n\nLevel drops accordingly.`)){
+        if (confirm(`Demote ${stat} to tier ${v}?\n\n${desc}`)){
           levelChangeReason = `${stat} down to ${v}`;
           state.stats[stat] = v; state.statDates[stat] = today();
           save();
@@ -2171,21 +2102,14 @@ function bind(){
   };
   const togglePause = document.getElementById('toggle-pause');
   if (togglePause) togglePause.onclick = () => {
-    if (state.paused){
-      state.paused = false; state.pausedUntil = '';
-    } else {
-      if (!confirm('Pause the System? Streak freezes, no penalty. Unpause any time.')) return;
-      state.paused = true;
-      state.pausedUntil = dateOffset(14);
+    if (state.paused){ state.paused = false; state.pausedUntil = ''; }
+    else {
+      if (!confirm('Pause? Streak freezes, no penalty.')) return;
+      state.paused = true; state.pausedUntil = dateOffset(14);
     }
     save();
   };
-  const commitBtn = document.getElementById('commit-30');
-  if (commitBtn) commitBtn.onclick = () => {
-    if (!confirm('Commit to 30 days of use? All editing locks.')) return;
-    state.committedUntil = dateOffset(30);
-    save();
-  };
+  const addTelos = document.getElementById('add-telos'); if (addTelos) addTelos.onclick = openTelosModal;
   document.querySelectorAll('[data-eq]').forEach(el => { el.onchange = () => { state.equipment = state.equipment || []; const id = el.dataset.eq; const idx = state.equipment.indexOf(id); if (el.checked && idx < 0) state.equipment.push(id); if (!el.checked && idx >= 0) state.equipment.splice(idx, 1); save(); }; });
   document.querySelectorAll('[data-eqw]').forEach(el => { el.onchange = () => { state.equipmentWeights = state.equipmentWeights || {}; state.equipmentWeights[el.dataset.eqw] = parseFloat(el.value) || 0; save(); }; });
   document.querySelectorAll('[data-eqx]').forEach(el => { el.onchange = () => { state.equipmentWeights = state.equipmentWeights || {}; state.equipmentWeights[el.dataset.eqx] = el.checked; save(); }; });
@@ -2194,12 +2118,11 @@ function bind(){
   const imp = document.getElementById('import'); if (imp) imp.onclick = importBackup;
   const startOver = document.getElementById('startover');
   if (startOver) startOver.onclick = () => {
-    if (isCommitted()){ alert('Locked during commitment.'); return; }
     if (!confirm('Erase everything?')) return;
     if (!confirm('Really erase all progress?')) return;
     localStorage.removeItem(KEY);
     state = defaultState();
-    onboardStep = 1; onboardDraft.name = ''; onboardDraft.telos = ''; onboardDraft.stats = { ...DEFAULT_STATS }; onboardDraft.timeBudget = 30; onboardDraft.skills = []; onboardDraft.progression = {}; onboardDraft.why = {}; onboardDraft.identity = {}; onboardDraft.quit = {};
+    onboardStep = 1; onboardDraft.name = ''; onboardDraft.stats = { ...DEFAULT_STATS }; onboardDraft.timeBudget = 30; onboardDraft.skills = []; onboardDraft.progression = {};
     save();
   };
   const shareBtn = document.getElementById('share-btn'); if (shareBtn) shareBtn.onclick = shareProgress;

@@ -239,7 +239,7 @@ function parkedSkills(){ return (state.skills || []).filter(s => !s.active); }
 function activeSkillCount(){ return activeSkills().length; }
 
 /* ═══════════════════════════════════════════
-   PLAYER LEVEL
+   PLAYER LEVEL — floor for level, ceil for power boundaries
    ═══════════════════════════════════════════ */
 function computePowerFrom(stats, skills){
   const statSum = Object.values(stats || {}).reduce((a,b) => a + (b||0), 0);
@@ -249,11 +249,14 @@ function computePowerFrom(stats, skills){
 function computeLevelFrom(stats, skills){
   const power = computePowerFrom(stats, skills);
   if (power <= 0) return 1;
-  return Math.min(100, Math.max(1, Math.round(Math.sqrt(power) * 2)));
+  return Math.min(100, Math.max(1, Math.floor(Math.sqrt(power) * 2)));
 }
 function computeTotalPower(){ return computePowerFrom(state.stats, state.skills); }
 function computePlayerLevel(){ return computeLevelFrom(state.stats, state.skills); }
-function powerForLevel(n){ return Math.round(Math.pow(n / 2, 2)); }
+function powerForLevel(n){
+  if (n <= 1) return 0;
+  return Math.ceil(Math.pow(n / 2, 2));
+}
 
 /* ═══════════════════════════════════════════
    CALIBRATION
@@ -586,18 +589,163 @@ function currentMilestoneIdx(skill){
   for (let i = 0; i < ladder.length; i++) if (!done.includes(i)) return i;
   return -1;
 }
-function milestoneQuestFallback(skill, idx){
-  if (idx < 0 || !skill.ladder || !skill.ladder[idx]) return null;
-  return { id: newId(), text: `${skill.name}: ${skill.ladder[idx]}`, xp: 5 };
+
+/* ═══════════════════════════════════════════
+   MILESTONE QUEST GENERATION (per subtype + milestone)
+   ═══════════════════════════════════════════ */
+function generateMilestoneQuests(skill, milestoneText){
+  const name = skill.name;
+  const sub = skill.subtype || 'custom';
+  const ms = String(milestoneText || '').toLowerCase();
+
+  if (sub === 'language'){
+    if (/b1|b2|c1|c2|3,000|5,000|fluent|professional|no subtitle|novel/.test(ms)){
+      return [
+        { text: `${name}: 15 min speaking practice`, xp: 4 },
+        { text: `${name}: Read a news article and note 5 new words`, xp: 3 },
+        { text: `${name}: Review 10 words from your notes`, xp: 2 }
+      ];
+    }
+    if (/a2|1,500|past tense|simple conversation|travel|ordering/.test(ms)){
+      return [
+        { text: `${name}: 10 min speaking practice out loud`, xp: 4 },
+        { text: `${name}: 10 new words + review yesterday's`, xp: 3 },
+        { text: `${name}: 5 min listening (podcast or video)`, xp: 2 }
+      ];
+    }
+    return [
+      { text: `${name}: 10 new words + review yesterday's`, xp: 3 },
+      { text: `${name}: 5 min listening — slow speech`, xp: 2 },
+      { text: `${name}: Practice 5 basic phrases out loud`, xp: 2 }
+    ];
+  }
+
+  if (sub === 'coding'){
+    if (/html|css|git|js basics|javascript basics/.test(ms)){
+      return [
+        { text: `${name}: 20 min building or practising`, xp: 4 },
+        { text: `${name}: Read one tutorial or doc page and note 3 things`, xp: 2 }
+      ];
+    }
+    if (/3 small projects|python|read and fix/.test(ms)){
+      return [
+        { text: `${name}: 30 min on your current project`, xp: 6 },
+        { text: `${name}: Read & understand 20 lines of someone else's code`, xp: 3 }
+      ];
+    }
+    if (/api|database|typescript|react|auth|payment|tests|open.source/.test(ms)){
+      return [
+        { text: `${name}: 30 min on your current project`, xp: 6 },
+        { text: `${name}: Review or refactor one thing`, xp: 3 }
+      ];
+    }
+    return [
+      { text: `${name}: 30 min on your coding project`, xp: 6 },
+      { text: `${name}: Read one doc or tutorial page`, xp: 2 }
+    ];
+  }
+
+  if (sub === 'business'){
+    if (/idea|niche|one sentence/.test(ms)){
+      return [
+        { text: `${name}: Write down 3 candidate ideas`, xp: 3 },
+        { text: `${name}: 15 min market research`, xp: 3 }
+      ];
+    }
+    if (/customer conversation|10 customer|research/.test(ms)){
+      return [
+        { text: `${name}: Reach out to 1 potential customer`, xp: 5 },
+        { text: `${name}: Write down what you learned from a conversation`, xp: 3 }
+      ];
+    }
+    if (/proposition|one-page|registered|bank|domain|mvp|enquiry/.test(ms)){
+      return [
+        { text: `${name}: 30 min on your business build`, xp: 5 },
+        { text: `${name}: 1 small step toward launch (register, write, design)`, xp: 5 }
+      ];
+    }
+    return [
+      { text: `${name}: 1 customer or client conversation`, xp: 5 },
+      { text: `${name}: 30 min on the live business`, xp: 5 }
+    ];
+  }
+
+  if (sub === 'reading'){
+    return [
+      { text: `${name}: Read 30 min, phone away`, xp: 5 },
+      { text: `${name}: 3 sentences of notes on what you read`, xp: 2 }
+    ];
+  }
+
+  if (sub === 'writing'){
+    if (/premise|outline/.test(ms)){
+      return [
+        { text: `${name}: Write a 1-page premise`, xp: 3 },
+        { text: `${name}: Sketch 3 scenes for the outline`, xp: 3 }
+      ];
+    }
+    if (/1,000 words|first chapter/.test(ms)){
+      return [{ text: `${name}: Write 500 words`, xp: 5 }];
+    }
+    if (/10k|15k|30k|40k|draft/.test(ms)){
+      return [{ text: `${name}: Write 500–800 words on your draft`, xp: 5 }];
+    }
+    if (/editing|revision|beta|query|published|review|copies/.test(ms)){
+      return [{ text: `${name}: 30 min editing or marketing`, xp: 5 }];
+    }
+    return [{ text: `${name}: Write 300 words`, xp: 5 }];
+  }
+
+  if (sub === 'engineering'){
+    return [
+      { text: `${name}: 30 min technical study`, xp: 5 },
+      { text: `${name}: 1 portfolio or application step`, xp: 3 }
+    ];
+  }
+
+  if (sub === 'art'){
+    return [
+      { text: `${name}: 20 min drawing or painting practice`, xp: 4 },
+      { text: `${name}: Study one reference or technique`, xp: 2 }
+    ];
+  }
+
+  if (sub === 'instrument'){
+    if (/chord|scale|first/.test(ms)) return [{ text: `${name}: 15 min chord/scale practice`, xp: 3 }];
+    if (/song|play|performance/.test(ms)) return [{ text: `${name}: 15 min practicing a song`, xp: 3 }];
+    return [{ text: `${name}: 15 min practice`, xp: 3 }];
+  }
+
+  if (sub === 'mind'){
+    return [{ text: `${name}: 5–10 min practice`, xp: 2 }];
+  }
+
+  if (sub === 'publicspeaking'){
+    return [
+      { text: `${name}: Record a 2-min speech on any topic`, xp: 3 },
+      { text: `${name}: Review yesterday's recording`, xp: 2 }
+    ];
+  }
+
+  if (sub === 'cooking'){
+    return [
+      { text: `${name}: Cook one dish from scratch`, xp: 4 },
+      { text: `${name}: Practice one technique (knife skills, sauce, etc)`, xp: 3 }
+    ];
+  }
+
+  return [{ text: `${name}: ${milestoneText}`, xp: 5 }];
 }
+
 function ensureMilestoneQuests(skill){
   if (skill.type !== 'standard') return;
   if (!skill.milestoneQuests) skill.milestoneQuests = {};
   const idx = currentMilestoneIdx(skill);
   if (idx < 0) return;
   if (!skill.milestoneQuests[idx]){
-    const fallback = milestoneQuestFallback(skill, idx);
-    if (fallback) skill.milestoneQuests[idx] = [fallback];
+    const milestoneText = skill.ladder[idx];
+    const generated = generateMilestoneQuests(skill, milestoneText);
+    skill.milestoneQuests[idx] = generated.map(q => ({ id: newId(), text: q.text, xp: q.xp }));
   }
 }
 
@@ -765,7 +913,7 @@ let levelChangeReason = '';
 
 function defaultState(){
   return {
-    v: 16, onboarded: false, name: '', totalXP: 0,
+    v: 17, onboarded: false, name: '', totalXP: 0,
     telos: '', telosDate: '',
     stats: { ...DEFAULT_STATS }, statDates: {},
     skills: [], streak: 0, lastComplete: null,
@@ -825,6 +973,21 @@ function migrateSkill(s){
     if (calLevel > 1){
       s.calibratedLevel = calLevel;
       if (calLevel > (s.level || 1)){ s.level = calLevel; s.xp = 0; }
+    }
+  }
+  // Clean up old single-fallback milestone quests (the "Skill: Milestone" ones)
+  if (s.milestoneQuests && s.ladder && s.ladder.length > 0){
+    const idx = (function(){
+      const done = s.ladderDone || [];
+      for (let i = 0; i < s.ladder.length; i++) if (!done.includes(i)) return i;
+      return -1;
+    })();
+    if (idx >= 0 && s.milestoneQuests[idx]){
+      const qs = s.milestoneQuests[idx];
+      const oldText = `${s.name}: ${s.ladder[idx]}`;
+      if (qs.length === 1 && qs[0].text === oldText){
+        delete s.milestoneQuests[idx];
+      }
     }
   }
   return s;
@@ -1176,65 +1339,6 @@ function applyProgression(skill, answers){
   ensureMilestoneQuests(skill);
 }
 
-function defaultQuestsForSkill(skill){
-  const sub = skill.subtype || 'custom';
-  const status = (skill.status || '').toLowerCase();
-  const name = skill.name || 'practice';
-  if (sub === 'language'){
-    if (/a2|b1|b2|c1/i.test(status)) return [
-      { id: newId(), text: `${name} — 15 min speaking practice`, xp: 4 },
-      { id: newId(), text: `Read 15 min in ${name}`, xp: 3 },
-      { id: newId(), text: '10 new vocabulary words', xp: 2 }
-    ];
-    return [
-      { id: newId(), text: `${name} — 15 min vocabulary practice`, xp: 3 },
-      { id: newId(), text: `5 min listening in ${name}`, xp: 2 },
-      { id: newId(), text: '5 new words learned', xp: 2 }
-    ];
-  }
-  if (sub === 'business'){
-    if (/not decided|idea/i.test(status)) return [
-      { id: newId(), text: '15 min market research', xp: 3 },
-      { id: newId(), text: '1 business task', xp: 5 }
-    ];
-    return [
-      { id: newId(), text: '1 customer or client conversation', xp: 5 },
-      { id: newId(), text: '30 min on the live business', xp: 5 }
-    ];
-  }
-  if (sub === 'coding'){
-    if (/never|beginner|basics/i.test(status)) return [
-      { id: newId(), text: '20 min coding practice', xp: 4 },
-      { id: newId(), text: 'Read one tutorial or doc page', xp: 2 }
-    ];
-    return [
-      { id: newId(), text: '30 min on your coding project', xp: 6 },
-      { id: newId(), text: 'Review or refactor one thing', xp: 3 }
-    ];
-  }
-  if (sub === 'reading') return [
-    { id: newId(), text: 'Read 30 min, phone away', xp: 5 },
-    { id: newId(), text: '3 sentences of notes', xp: 2 }
-  ];
-  if (sub === 'writing'){
-    if (/idea|outline/i.test(status)) return [{ id: newId(), text: 'Write 200 words of premise', xp: 3 }];
-    if (/first_words|first_chapter|mid_draft/i.test(status)) return [{ id: newId(), text: 'Write 500 words', xp: 5 }];
-    if (/draft_done|editing|published/i.test(status)) return [{ id: newId(), text: '30 min editing or marketing', xp: 5 }];
-    return [{ id: newId(), text: 'Write 300 words', xp: 5 }];
-  }
-  if (sub === 'engineering') return [
-    { id: newId(), text: '30 min technical study', xp: 5 },
-    { id: newId(), text: '1 portfolio step', xp: 3 }
-  ];
-  if (sub === 'mind') return [{ id: newId(), text: `${name} — 5 min practice`, xp: 2 }];
-  if (sub === 'instrument') return [{ id: newId(), text: `${name} — 15 min practice`, xp: 3 }];
-  if (sub === 'art') return [{ id: newId(), text: `${name} — 20 min practice`, xp: 4 }];
-  if (sub === 'publicspeaking') return [{ id: newId(), text: '5 min out-loud practice or record a snippet', xp: 3 }];
-  if (sub === 'cooking') return [{ id: newId(), text: `${name} — cook one dish or practice one skill`, xp: 4 }];
-  if (sub === 'fitness') return [{ id: newId(), text: `${name} — 20 min session`, xp: 4 }];
-  return [{ id: newId(), text: `${name} — 20 min focused practice`, xp: 5 }];
-}
-
 /* ═══════════════════════════════════════════
    QUESTS
    ═══════════════════════════════════════════ */
@@ -1419,7 +1523,6 @@ function makeSkillFromTemplate(sug, detail){
   if (isWorkoutType){
     skill.plan = { exercises: deriveExercisesFromStats(), workoutDays: [1,3,5], attemptDay: 0, calibratedTo: { STR: state.stats.STR, equipment: [...(state.equipment||[])], weights: { ...(state.equipmentWeights||{}) } } };
   } else {
-    skill.quests = defaultQuestsForSkill(skill);
     ensureMilestoneQuests(skill);
   }
   return skill;
@@ -1479,7 +1582,7 @@ function renderOnboarding(){
 
   if (onboardStep === 2){
     const statSum = Object.values(onboardDraft.stats).reduce((a,b) => a+b, 0);
-    const estimatedLevel = statSum <= 0 ? 1 : Math.min(100, Math.max(1, Math.round(Math.sqrt(statSum) * 2)));
+    const estimatedLevel = statSum <= 0 ? 1 : Math.min(100, Math.max(1, Math.floor(Math.sqrt(statSum) * 2)));
     app.innerHTML = `
       <h1 style="margin-top:24px">Your starting stats</h1>
       <p class="dim" style="margin-top:8px">Pick the highest tier you can honestly pass today. A lower starting point costs nothing — a higher one corrupts every number after it. You can retest any time on the Stats tab.</p>
@@ -1804,7 +1907,7 @@ function viewStatus(){
     <div class="basics">
       <label class="${basics.slept?'checked':''}"><input type="checkbox" data-basic="slept" ${basics.slept?'checked':''}><span>Sleep 7h</span></label>
       <label class="${basics.water?'checked':''}"><input type="checkbox" data-basic="water" ${basics.water?'checked':''}><span>2L water</span></label>
-      <label class="${basics.veg?'checked':''}"><input type="checkbox" data-basic="veg" ${basics.veg?'checked':''}><span>Vegetables</span></label>
+      <label class="${basics.meals?'checked':''}"><input type="checkbox" data-basic="meals" ${basics.meals?'checked':''}><span>3 meals</span></label>
     </div>`;
 
   const pauseBanner = state.paused ? `<div class="notice pause"><b>Paused.</b> Streak frozen — no penalty. Unpause in More when ready.</div>` : '';
@@ -1934,13 +2037,33 @@ function renderBenchCard(k){
 }
 
 function viewLog(){
+  const skillOptions = state.skills.map(s => `<option value="${s.id}">${esc(s.name)}${s.active ? '' : ' (parked)'}</option>`).join('');
   const rows = state.log.length ? state.log.map(e => {
     const skill = e.skillId ? state.skills.find(s => s.id === e.skillId) : null;
     const first = e.firstTime ? `<span class="first-badge">first</span>` : '';
     const partial = e.finished === false ? `<span class="partial-badge">partial</span>` : '';
     return `<div class="logrow"><span style="flex:1"><span class="dim mono">${e.date.slice(5)}</span>${skill?` <span class="dim" style="font-size:11px">${esc(skill.name)} · </span>`:''}${esc(e.note)}${first}${partial}</span><span class="xp">${e.xp>0?'+':''}${e.xp}</span></div>`;
   }).join('') : '<div class="dim small">Nothing logged yet.</div>';
-  return `<h2>Log date</h2><div class="card"><input type="date" id="log-date" value="${logDate}" max="${today()}"><div class="small dim" style="margin-top:8px">Applies to quick logs and adjustments below. Use it to log something you did yesterday or earlier this week.</div></div><h2>Quick log</h2><div class="grid"><button data-xp="15" data-note="Workout">Workout +15</button><button data-xp="5" data-note="Reading">Reading +5</button><button data-xp="10" data-note="Deep work hour">Deep work +10</button><button data-xp="20" data-note="Book finished">Book +20</button><button data-xp="50" data-note="PR hit">PR +50</button><button data-xp="100" data-note="Milestone">Milestone +100</button></div><h2>Adjustment</h2><div class="card"><div class="row" style="gap:8px"><input type="number" id="adj" placeholder="±XP"><input type="text" id="adjnote" placeholder="reason"><button class="sm" id="adjgo">Add</button></div><div class="small dim" style="margin-top:8px">Use this only for corrections — logged as-is, never edited later.</div></div><h2>History <span class="dim small" style="text-transform:none;letter-spacing:0;margin-left:8px">Total earned: ${state.totalXP}</span></h2><div class="card">${rows}</div>`;
+  return `
+    <h2>Log activity</h2>
+    <div class="card">
+      <p class="small dim" style="margin-bottom:14px">Log something you've done — today or earlier this week. Enter the date, what it was, and how long it took; the System awards XP based on time.</p>
+      <div class="field"><label>Date</label><input type="date" id="log-date" value="${today()}" max="${today()}"></div>
+      <div class="field"><label>Skill <span class="dim" style="text-transform:none;letter-spacing:0">(or General)</span></label>
+        <select id="log-skill">
+          <option value="">— General / other —</option>
+          ${skillOptions}
+        </select>
+      </div>
+      <div class="field"><label>What did you do?</label><input id="log-note" placeholder="e.g. Read a chapter of Sapiens" maxlength="120"></div>
+      <div class="field"><label>Minutes</label><input type="number" id="log-mins" min="1" placeholder="e.g. 30"></div>
+      <div class="small" id="log-preview" style="min-height:18px;margin-bottom:12px;color:var(--accent);font-family:ui-monospace,monospace"></div>
+      <button class="primary" id="log-submit" style="width:100%">Log +XP</button>
+      <div class="small dim" style="margin-top:12px;line-height:1.5">Award rule: <b>1 XP per 6 minutes, minimum 2 XP</b>. Selecting a skill also credits its XP. A date of today counts toward your streak. Past dates are logged to history but don't extend the streak.</div>
+    </div>
+    <h2>History <span class="dim small" style="text-transform:none;letter-spacing:0;margin-left:8px">Total earned: ${state.totalXP}</span></h2>
+    <div class="card">${rows}</div>
+  `;
 }
 
 function viewMore(){
@@ -1971,11 +2094,11 @@ function viewMore(){
       </div>`;
 
   const rulesCard = `<div class="card small dim">
-    <p><b>How your level is calculated.</b> Level = round(√power × 2), where power = sum of all five stats + 3 × each skill's (level − 1). A skill at level 1 contributes nothing; a skill at level 20 contributes 57. Level 100 needs about 2,500 power — a decade goal, not a month's.</p>
-    <p><b>How skills level.</b> Each skill has its own XP counter. Ticking quests earns XP. Hitting milestones earns a lot more — and the amount scales with how far up the ladder you are (milestone 1 pays 100 XP; milestone 20 pays ~1,500).</p>
-    <p><b>How stats move.</b> Stats never move on their own. You test them on the Stats tab by tapping a tier. If you pass a higher tier than your current one, your stat rises and your level with it. If you test down later, you drop honestly. There's no XP reward for stat changes because the stat <i>is</i> the reward.</p>
-    <p><b>How streaks work.</b> Log anything — one quest, one quick log, anything — and the streak survives. Miss a full day and it resets. No penalty spiral. Show up the next day and you start again.</p>
-    <p><b>What titles mean.</b> Skills unlock a new title each time they hit a new rank (D, C, B, A, S). Your streak unlocks milestone titles at 7, 30, 90, 180 and 365 days. All of them display on your Status page.</p>
+    <p><b>How your level is calculated.</b> Level = floor(√power × 2), where power = sum of all five stats + 3 × each skill's (level − 1). A skill at level 1 contributes nothing; a skill at level 20 contributes 57. Level 100 needs about 2,500 power.</p>
+    <p><b>How skills level.</b> Each skill has its own XP counter. Ticking quests earns XP. Hitting milestones earns a lot more — the amount scales with how far up the ladder you are (milestone 1 pays 100 XP; milestone 20 pays ~1,500).</p>
+    <p><b>How stats move.</b> Stats never move on their own. You test them on the Stats tab by tapping a tier. Pass a higher tier than your current one and your stat rises, and your level with it. Test down later and you drop honestly. No XP for stat changes — the stat <i>is</i> the reward.</p>
+    <p><b>How streaks work.</b> Log anything — one quest, one activity, anything — and the streak survives. Miss a full day and it resets. No penalty spiral. Show up the next day and you start again.</p>
+    <p><b>What titles mean.</b> Skills unlock a new title each time they hit a new rank (D, C, B, A, S). Your streak unlocks milestone titles at 7, 30, 90, 180 and 365 days.</p>
     <p><b>Weekly reviews.</b> After your first 7 days, a Weekly Reviews button appears on Status. Each completed week shows a full breakdown — activities, XP, skills trained, days active, streak, notable events — plus suggestions for the week ahead.</p>
   </div>`;
 
@@ -2333,7 +2456,6 @@ function openSkillEditor(skillId){
     let questsToEdit = [];
     if (isWorkout) questsToEdit = draft.plan?.exercises || [];
     else if (idx >= 0 && draft.milestoneQuests[idx]) questsToEdit = draft.milestoneQuests[idx];
-    else if (draft.quests) questsToEdit = draft.quests;
     const questSection = isWorkout ? `<div class="field"><label>Exercises</label><div id="exercises">${draft.plan.exercises.map((e,i) => `<div class="exercise-row"><input placeholder="Name" value="${esc(e.name)}" data-ex="${i}" data-key="name"><input type="number" min="1" placeholder="Sets" value="${e.sets}" data-ex="${i}" data-key="sets"><input type="number" min="1" placeholder="Reps" value="${e.reps}" data-ex="${i}" data-key="reps"><button class="sm ghost danger" data-remove-ex="${i}">×</button></div>`).join('')}</div><button class="sm" id="add-ex" style="margin-top:8px">+ Add exercise</button></div><div class="field"><label>Workout days</label><div class="day-picker">${[0,1,2,3,4,5,6].map(d => `<button type="button" class="${draft.plan.workoutDays.includes(d)?'primary':'ghost'}" data-wday="${d}">${dayShort(d)}</button>`).join('')}</div></div><div class="field"><label>Attempt day</label><div class="day-picker">${[0,1,2,3,4,5,6].map(d => `<button type="button" class="${draft.plan.attemptDay===d?'primary':'ghost'}" data-aday="${d}">${dayShort(d)}</button>`).join('')}</div></div>${showCardio?`<div class="field"><label style="display:flex;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" id="sk-cardio" ${draft.cardioEnabled!==false?'checked':''}><span style="text-transform:none;letter-spacing:0;color:var(--txt);font-size:13px">Cardio on rest days</span></label></div>`:''}` : `${currentMilestone?`<div class="milestone-focus"><b>Quests for:</b> ${esc(currentMilestone)}</div>`:''}<div class="field"><label>Daily quests</label><div id="quests">${questsToEdit.map((q,i) => `<div class="exercise-row" style="grid-template-columns:1fr 70px 30px"><input value="${esc(q.text)}" data-q="${i}" data-key="text"><input type="number" min="1" value="${q.xp}" data-q="${i}" data-key="xp"><button class="sm ghost danger" data-remove-q="${i}">×</button></div>`).join('')}</div><button class="sm" id="add-q" style="margin-top:8px">+ Add quest</button></div><button class="sm ghost" id="gen-ai" style="width:100%;margin-top:8px">✨ Generate quests with AI</button>`;
     openModal(`<h2>${isNew?'New skill':'Edit skill'}</h2><div class="field"><label>Name</label><input id="sk-name" value="${esc(draft.name)}" maxlength="40"></div><div class="field"><label>Status</label><input id="sk-status" value="${esc(draft.status||'')}" placeholder="e.g. Complete beginner"></div>${!isNew?`<div class="field"><label>Type</label><div class="row" style="gap:8px"><button class="sm ${draft.type==='standard'?'primary':'ghost'}" id="type-std" style="flex:1">Standard</button><button class="sm ${draft.type==='workout'?'primary':'ghost'}" id="type-wk" style="flex:1">Workout plan</button></div></div>`:''}${questSection}<hr><div class="small dim" style="margin-bottom:10px">Optional. Feeds the AI when it generates quests, and shows on your skill card.</div><div class="field"><label>Why this matters <span class="dim" style="text-transform:none;letter-spacing:0">(optional)</span></label><input id="sk-why" value="${esc(draft.why)}" placeholder="One sentence."></div><div class="field"><label>Identity <span class="dim" style="text-transform:none;letter-spacing:0">(optional)</span></label><input id="sk-identity" value="${esc(draft.identity)}" placeholder="I am someone who..."></div><div class="field"><label>Drop criteria <span class="dim" style="text-transform:none;letter-spacing:0">(optional)</span></label><input id="sk-quit" value="${esc(draft.quitCriteria)}" placeholder="e.g. not touched in 30 days"></div><div class="row" style="gap:8px;margin-top:16px"><button class="ghost" id="cancel" style="flex:1">Cancel</button><button class="primary" id="save" style="flex:2">${isNew?'Create':'Save'}</button></div>`);
     document.getElementById('cancel').onclick = closeModal;
@@ -2343,7 +2465,7 @@ function openSkillEditor(skillId){
     document.getElementById('sk-quit').oninput = e => { draft.quitCriteria = e.target.value; };
     document.getElementById('sk-status').oninput = e => { draft.status = e.target.value; };
     const typeStd = document.getElementById('type-std'), typeWk = document.getElementById('type-wk');
-    if (typeStd) typeStd.onclick = () => { if (draft.type==='standard') return; draft.type = 'standard'; draft.quests = defaultQuestsForSkill(draft); delete draft.plan; renderEditor(); };
+    if (typeStd) typeStd.onclick = () => { if (draft.type==='standard') return; draft.type = 'standard'; draft.quests = []; delete draft.plan; renderEditor(); };
     if (typeWk) typeWk.onclick = () => { if (draft.type==='workout') return; draft.type = 'workout'; draft.plan = { exercises: deriveExercisesFromStats(), workoutDays:[1,3,5], attemptDay:0, calibratedTo:{ STR: state.stats.STR, equipment: [...(state.equipment||[])], weights: { ...(state.equipmentWeights||{}) } } }; delete draft.quests; renderEditor(); };
     document.getElementById('save').onclick = () => {
       if (!draft.name.trim()) return alert('Name required.');
@@ -2356,9 +2478,9 @@ function openSkillEditor(skillId){
       ensureMilestoneQuests(draft); save(); closeModal();
     };
     if (draft.type === 'standard'){
-      document.getElementById('add-q').onclick = () => { if (idx >= 0){ if (!draft.milestoneQuests[idx]) draft.milestoneQuests[idx] = []; draft.milestoneQuests[idx].push({ id: newId(), text:'', xp:5 }); } else { draft.quests = draft.quests || []; draft.quests.push({ id:newId(), text:'', xp:5 }); } renderEditor(); };
-      document.querySelectorAll('[data-remove-q]').forEach(b => { b.onclick = () => { const i = +b.dataset.removeQ; if (idx >= 0 && draft.milestoneQuests[idx]) draft.milestoneQuests[idx].splice(i,1); else if (draft.quests) draft.quests.splice(i,1); renderEditor(); }; });
-      document.querySelectorAll('[data-q]').forEach(el => { el.oninput = () => { const i = +el.dataset.q, k = el.dataset.key; const v = k==='xp'?parseInt(el.value,10)||1:el.value; if (idx >= 0 && draft.milestoneQuests[idx]) draft.milestoneQuests[idx][i][k] = v; else if (draft.quests) draft.quests[i][k] = v; }; });
+      document.getElementById('add-q').onclick = () => { if (idx >= 0){ if (!draft.milestoneQuests[idx]) draft.milestoneQuests[idx] = []; draft.milestoneQuests[idx].push({ id: newId(), text:'', xp:5 }); } renderEditor(); };
+      document.querySelectorAll('[data-remove-q]').forEach(b => { b.onclick = () => { const i = +b.dataset.removeQ; if (idx >= 0 && draft.milestoneQuests[idx]) draft.milestoneQuests[idx].splice(i,1); renderEditor(); }; });
+      document.querySelectorAll('[data-q]').forEach(el => { el.oninput = () => { const i = +el.dataset.q, k = el.dataset.key; const v = k==='xp'?parseInt(el.value,10)||1:el.value; if (idx >= 0 && draft.milestoneQuests[idx]) draft.milestoneQuests[idx][i][k] = v; }; });
       document.getElementById('gen-ai').onclick = () => openAIGenerator(draft, renderEditor);
     } else {
       document.getElementById('add-ex').onclick = () => { draft.plan.exercises.push({ name:'', sets:3, reps:10, unit:'reps' }); draft.plan.userEdited = true; renderEditor(); };
@@ -2385,7 +2507,6 @@ function openAIGenerator(draft, back){
     const idx = currentMilestoneIdx(draft);
     if (!draft.milestoneQuests) draft.milestoneQuests = {};
     if (idx >= 0) draft.milestoneQuests[idx] = arr.map(q => ({ id: newId(), text: String(q), xp: 5 }));
-    else { draft.quests = draft.quests || []; arr.forEach(q => draft.quests.push({ id: newId(), text: String(q), xp: 5 })); }
     closeModal(); back();
   };
 }
@@ -2541,14 +2662,47 @@ function bind(){
       }
     };
   });
-  document.querySelectorAll('[data-xp]').forEach(el => { el.onclick = () => { addXP(+el.dataset.xp, el.dataset.note, null, logDate); save(); }; });
-  const logDateInput = document.getElementById('log-date'); if (logDateInput) logDateInput.onchange = () => { logDate = logDateInput.value || today(); };
+
+  /* Log activity */
+  const logSubmit = document.getElementById('log-submit');
+  if (logSubmit) logSubmit.onclick = () => {
+    const dateEl = document.getElementById('log-date');
+    const skillEl = document.getElementById('log-skill');
+    const noteEl = document.getElementById('log-note');
+    const minsEl = document.getElementById('log-mins');
+    const date = (dateEl && dateEl.value) || today();
+    const skillId = (skillEl && skillEl.value) || null;
+    const noteText = (noteEl && noteEl.value || '').trim();
+    const mins = parseInt(minsEl && minsEl.value, 10);
+    if (!noteText) return alert('Enter what you did.');
+    if (!mins || mins <= 0) return alert('Enter how many minutes it took.');
+    const xp = Math.max(2, Math.round(mins / 6));
+    const skill = skillId ? state.skills.find(s => s.id === skillId) : null;
+    const note = `${noteText} (${mins} min)`;
+    const logId = addXP(xp, note, null, date, skillId, { finished: true });
+    if (skill) addSkillXP(skill, xp);
+    save();
+    showToast(`Logged: +${xp} XP${skill ? ' · ' + skill.name : ''}`, 'var(--accent)');
+  };
+  const logMinsInput = document.getElementById('log-mins');
+  if (logMinsInput) logMinsInput.oninput = () => {
+    const mins = parseInt(logMinsInput.value, 10);
+    const preview = document.getElementById('log-preview');
+    if (preview){
+      if (!isNaN(mins) && mins > 0){
+        const xp = Math.max(2, Math.round(mins / 6));
+        preview.textContent = `→ +${xp} XP`;
+      } else {
+        preview.textContent = '';
+      }
+    }
+  };
+
   const addSkill = document.getElementById('add-skill');
   if (addSkill) addSkill.onclick = () => {
     if (activeSkillCount() >= MAX_ACTIVE_SKILLS){ alert(`Max ${MAX_ACTIVE_SKILLS} active. Park one first.`); return; }
     openSkillPicker(skill => { if (activeSkillCount() >= MAX_ACTIVE_SKILLS) { alert(`Max ${MAX_ACTIVE_SKILLS} active.`); return; } state.skills.push(skill); save(); });
   };
-  const adjgo = document.getElementById('adjgo'); if (adjgo) adjgo.onclick = () => { const xp = parseInt(document.getElementById('adj').value, 10); const note = document.getElementById('adjnote').value || 'Adjustment'; if (!xp) return; addXP(xp, note, null, logDate); save(); };
   const pSave = document.getElementById('profile-save');
   if (pSave) pSave.onclick = () => {
     state.name = document.getElementById('profile-name').value.trim();

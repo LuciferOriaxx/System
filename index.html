@@ -16,7 +16,7 @@
   --accent:#4da6ff;--gold:#ffc857;--danger:#ff5c5c;--ok:#3ddc97;--violet:#a06eff}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{margin:0;background:var(--bg);color:var(--txt);
-  font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
   padding-bottom:76px}
 .mono{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
 .wrap{max-width:640px;margin:0 auto;padding:16px}
@@ -44,8 +44,11 @@ input[type=checkbox]{width:auto;min-height:auto}
 .big{font-size:38px;font-weight:700;letter-spacing:-.02em;line-height:1}
 .dim{color:var(--dim)}
 .small{font-size:12px}
+p{margin:0 0 10px 0}
+p:last-child{margin-bottom:0}
 .tag{font-size:11px;letter-spacing:.1em;padding:3px 8px;border-radius:4px;background:#1d2836;color:var(--dim)}
 .tag.on{background:rgba(77,166,255,.15);color:var(--accent)}
+.tag.gold{background:rgba(255,200,87,.15);color:var(--gold)}
 .quest{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
 .quest:last-child{border-bottom:none}
 .chk{width:24px;height:24px;border:2px solid var(--line);border-radius:6px;flex:0 0 auto;
@@ -66,7 +69,7 @@ hr{border:none;border-top:1px solid var(--line);margin:14px 0}
 .field{margin-bottom:14px}
 .field label{display:block;font-size:12px;color:var(--dim);margin-bottom:6px;
   text-transform:uppercase;letter-spacing:.1em}
-.field .hint{font-size:12px;color:var(--dim);margin-top:6px;line-height:1.4}
+.field .hint{font-size:12px;color:var(--dim);margin-top:6px;line-height:1.5}
 .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100;
   display:flex;align-items:flex-end;justify-content:center}
 .modal{background:var(--panel);border-radius:16px 16px 0 0;width:100%;max-width:640px;
@@ -82,6 +85,7 @@ hr{border:none;border-top:1px solid var(--line);margin:14px 0}
   border-radius:8px;padding:12px;font-size:13px;margin-bottom:16px}
 .notice.ok{background:rgba(61,220,151,.08);border-color:rgba(61,220,151,.25)}
 .notice.warn{background:rgba(255,200,87,.08);border-color:rgba(255,200,87,.25)}
+.notice.gold{background:rgba(255,200,87,.08);border-color:rgba(255,200,87,.35)}
 .notice.deload{background:rgba(160,110,255,.08);border-color:rgba(160,110,255,.3)}
 .notice.pause{background:rgba(255,200,87,.08);border-color:rgba(255,200,87,.3)}
 .hide{display:none}
@@ -103,7 +107,7 @@ details>summary:active{background:#16202e}
 .tier-val{width:26px;text-align:right;font-family:ui-monospace,monospace;
   font-weight:600;font-size:14px;color:var(--dim);flex:0 0 auto;padding-top:1px}
 .tier-row.current .tier-val{color:var(--accent);font-weight:700}
-.tier-desc{flex:1;font-size:13px;line-height:1.4}
+.tier-desc{flex:1;font-size:13px;line-height:1.5}
 .prog-section{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:12px}
 .day-picker{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
 .day-picker button{min-height:38px;padding:6px 4px;font-size:13px}
@@ -137,6 +141,9 @@ details>summary:active{background:#16202e}
 .slot-counter{display:inline-block;font-family:ui-monospace,monospace;font-size:12px;letter-spacing:.1em;
   color:var(--dim);padding:2px 8px;border-radius:4px;background:#0a0e14;border:1px solid var(--line)}
 .slot-counter.full{color:var(--gold);border-color:rgba(255,200,87,.4)}
+.commit-tag{display:inline-flex;align-items:center;gap:6px;font-size:11px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--gold);padding:3px 9px;border-radius:4px;
+  background:rgba(255,200,87,.1);border:1px solid rgba(255,200,87,.3);font-weight:600}
 .levelup-toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:190;
   padding:10px 18px;border-radius:10px;background:#111823;border:1px solid var(--line);
   box-shadow:0 8px 24px rgba(0,0,0,.5);font-size:13px;animation:fadeIn .3s ease;max-width:92vw;text-align:center}
@@ -195,10 +202,17 @@ details>summary:active{background:#16202e}
 
 <script>
 /* ═══════════════════════════════════════════
-   RULES & CONSTANTS
+   CONSTANTS
    ═══════════════════════════════════════════ */
 const MAX_ACTIVE_SKILLS = 5;
 const COMMIT_DAYS = 30;
+const STREAK_TITLES = [
+  { days: 7,   title: 'Initiate' },
+  { days: 30,  title: 'Dedicated' },
+  { days: 90,  title: 'Habit Maker' },
+  { days: 180, title: 'Disciplined' },
+  { days: 365, title: 'Year One' }
+];
 const skillXpForLevel = L => 10 * L;
 const RANK_TABLE = [[50,'S'],[40,'A'],[30,'B'],[20,'C'],[10,'D'],[1,'E']];
 const rankOf = lvl => RANK_TABLE.find(([m]) => lvl >= m)[1];
@@ -220,7 +234,6 @@ function subtractSkillXP(skill, amount){
   }
   if (skill.xp < 0) skill.xp = 0;
 }
-
 function activeSkills(){ return (state.skills || []).filter(s => s.active); }
 function parkedSkills(){ return (state.skills || []).filter(s => !s.active); }
 function activeSkillCount(){ return activeSkills().length; }
@@ -243,7 +256,7 @@ function computePlayerLevel(){ return computeLevelFrom(state.stats, state.skills
 function powerForLevel(n){ return Math.round(Math.pow(n / 2, 2)); }
 
 /* ═══════════════════════════════════════════
-   SKILL CALIBRATION
+   CALIBRATION
    ═══════════════════════════════════════════ */
 function calibrateFromPreTicks(preTickedCount, totalMilestones){
   if (totalMilestones <= 0) return 1;
@@ -314,7 +327,7 @@ function titleForSkill(skill){
 const BENCHMARKS = {
   STR: {
     label: 'Strength',
-    note: 'Bodyweight. A chair, table or wall counts. Stop each test when form breaks.',
+    note: 'Tests of raw bodyweight strength. A chair, table, wall or floor is all you need — no gym. For each test, stop when your form breaks. That number is your tier.',
     tiers: [
       [5,'5 pushups · 15 squats · 20s plank'],
       [10,'15 pushups · 25 squats · 45s plank · 5 chair dips'],
@@ -331,7 +344,7 @@ const BENCHMARKS = {
   },
   AGI: {
     label: 'Agility',
-    note: 'Mobility, flexibility, balance. No equipment. Never bounce into a stretch.',
+    note: 'Mobility, flexibility and balance. No equipment. Never bounce into a stretch — settle into it slowly. Stop before pain.',
     tiers: [
       [5,'Touch knees · 10 comfortable-depth squats'],
       [10,'Touch toes with straight legs · squat below parallel'],
@@ -345,7 +358,7 @@ const BENCHMARKS = {
   },
   VIT: {
     label: 'Vitality',
-    note: 'Endurance with bodyweight. Indoor only. Cardio quests train this — bench tests confirm it.',
+    note: 'Endurance — measured indoors with bodyweight only. No running required. Cardio quests train this; these tests confirm it.',
     tiers: [
       [5,'20 squats unbroken · 30s wall sit'],
       [10,'30 squats unbroken · 45s wall sit · 45s plank'],
@@ -361,7 +374,7 @@ const BENCHMARKS = {
   },
   INT: {
     label: 'Intelligence',
-    note: 'Books with notes, courses, applied learning. Last 12 months only.',
+    note: 'Books finished with notes, courses completed, and whether you applied what you learned. Scored on the last 12 months only — past qualifications are capability, not current practice.',
     tiers: [
       [5,'1 book finished · keeping a journal'],
       [10,'6 books/year with notes'],
@@ -375,7 +388,7 @@ const BENCHMARKS = {
   },
   PER: {
     label: 'Perception',
-    note: 'Three routes — pick one: meditation, written reflection, or undistracted reading.',
+    note: 'Focus and attention. Three valid routes — pick one and stick with it: meditation, written reflection (pen and paper, one subject), or undistracted reading (phone in another room).',
     tiers: [
       [1,'Floor — no practice'],
       [5,'5 min meditation OR 10 min written reflection OR 15 min undistracted reading'],
@@ -475,6 +488,7 @@ function renderEquipmentSection(){
   return `
     <div class="field">
       <label>Equipment you have</label>
+      <p class="small dim" style="margin-bottom:10px">Tick what you have. Workouts use only what you tick. If you don't have a pullup bar, exercises swap to table rows; no dip bars, chair dips. Weights you enter set your working reps for dumbbell, barbell and kettlebell movements.</p>
       <div style="display:flex;flex-direction:column;gap:4px">
         ${EQUIPMENT_OPTIONS.map(eq => {
           const checked = equip.includes(eq.id);
@@ -608,7 +622,7 @@ let levelChangeReason = '';
 
 function defaultState(){
   return {
-    v: 14, onboarded: false, name: '', totalXP: 0,
+    v: 15, onboarded: false, name: '', totalXP: 0,
     telos: '', telosDate: '',
     stats: { ...DEFAULT_STATS }, statDates: {},
     skills: [], streak: 0, lastComplete: null,
@@ -712,6 +726,7 @@ function load(){
 function save(){
   localStorage.setItem(KEY, JSON.stringify(state));
   checkSkillTitles();
+  checkStreakTitles();
   checkLevelUp();
   render();
 }
@@ -746,6 +761,15 @@ function checkSkillTitles(){
   });
 }
 
+function checkStreakTitles(){
+  STREAK_TITLES.forEach(({ days, title }) => {
+    if (state.streak >= days && !state.titles.includes(title)){
+      state.titles.push(title);
+      setTimeout(() => showToast(`Title earned: ${title}`, 'var(--gold)'), 400);
+    }
+  });
+}
+
 function checkLevelUp(){
   const current = computePlayerLevel();
   const prev = state.lastPlayerLevel || 1;
@@ -765,6 +789,16 @@ function checkLevelUp(){
     showLevelAdjust(old, current, levelChangeReason);
     levelChangeReason = '';
   }
+}
+
+function showToast(msg, color){
+  document.querySelectorAll('.levelup-toast').forEach(e => e.remove());
+  const el = document.createElement('div');
+  el.className = 'levelup-toast';
+  if (color) el.style.color = color;
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 4000);
 }
 
 function showLevelUp(level){
@@ -798,7 +832,7 @@ function showLevelAdjust(oldLvl, newLvl, reason){
 }
 
 /* ═══════════════════════════════════════════
-   COMMITMENT
+   COMMITMENT TAG (visual only, no enforcement)
    ═══════════════════════════════════════════ */
 function isCommitted(){
   if (!state.committedUntil) return false;
@@ -1134,17 +1168,17 @@ function toggleQuest(quest){
 
 function showObjectiveModal(quest, logId, skill, skillXp, isFirst){
   const question = isFirst
-    ? `<div class="notice" style="background:rgba(255,200,87,.08);border-color:rgba(255,200,87,.3)"><b>First time.</b> 2× XP awarded.</div>`
+    ? `<div class="notice" style="background:rgba(255,200,87,.08);border-color:rgba(255,200,87,.3)"><b>First time.</b> 2× XP awarded. This is the moment the skill begins.</div>`
     : '';
   openModal(`
     <h2>${esc(quest.text)}</h2>
     ${question}
-    <p class="small dim">Did you complete the full quest, or only part?</p>
+    <p class="small dim">Did you complete the full quest, or only part of it?</p>
     <div class="row" style="gap:8px;margin-top:12px">
       <button class="primary" id="obj-full" style="flex:1">Full</button>
       <button class="ghost" id="obj-partial" style="flex:1">Partial</button>
     </div>
-    <p class="small dim" style="margin-top:16px">Harder than last time?</p>
+    <p class="small dim" style="margin-top:16px">Was it harder than last time?</p>
     <div class="row" style="gap:8px;margin-top:12px">
       <button class="ghost" id="obj-harder" style="flex:1">Harder</button>
       <button class="ghost" id="obj-same" style="flex:1">Same</button>
@@ -1271,7 +1305,7 @@ function makeSkillFromTemplate(sug, detail){
 }
 
 /* ═══════════════════════════════════════════
-   ONBOARDING
+   ONBOARDING — 4 steps: welcome → stats → skills → calibration
    ═══════════════════════════════════════════ */
 let tab = 'status';
 let onboardStep = 1;
@@ -1281,60 +1315,89 @@ function renderOnboarding(){
   document.getElementById('nav').classList.add('hide');
   const app = document.getElementById('app');
 
+  /* STEP 1 — WELCOME / EXPLANATION PAGE */
   if (onboardStep === 1){
+    app.innerHTML = `
+      <h1 style="margin-top:24px">Welcome to The System</h1>
+      <p class="dim" style="margin-top:8px">A personal tracker that turns your goals into a game. Everything lives on this device — no account, no cloud, nothing leaves your phone.</p>
+
+      <h2>What it does</h2>
+      <div class="card">
+        <p>You pick a few <b>skills</b> to work on — say, coding, Spanish, calisthenics. Each skill has a <b>progression ladder</b>: a list of milestones from "started" to "mastered."</p>
+        <p>Every skill generates <b>daily quests</b> — small, specific things to do that day. Ticking a quest earns <b>XP</b> and moves you up the ladder.</p>
+        <p>Your <b>player level</b> comes from your stats and skill levels combined. It can't be gamed — it only goes up when you actually get better at things.</p>
+      </div>
+
+      <h2>The rules, in plain language</h2>
+      <div class="card">
+        <p><b>No XP for plans.</b> Ticking a quest means you did the thing, not that you meant to. Plans, lists, and intentions earn nothing.</p>
+        <p><b>Stats only move on a test.</b> Each of your five stats (Strength, Agility, Vitality, Intelligence, Perception) has published tiers with concrete benchmarks. You only rise when you can honestly pass the next tier's test. If you test down later, you go down. That's the point — the number should reflect reality, not hope.</p>
+        <p><b>Any activity keeps the streak.</b> One quest is enough to keep today counted. Missing a full day breaks it. Showing up even a little keeps it alive. No penalty spiral — just reset.</p>
+        <p><b>Everything is editable.</b> Skills, quests, ladders, stats — change any of it at any time. This is your game. Nothing is locked.</p>
+      </div>
+
+      <h2>What you earn along the way</h2>
+      <div class="card">
+        <p><b>Levels and ranks</b> rise as your stats and skills improve. Rank goes E → D → C → B → A → S.</p>
+        <p><b>Titles</b> unlock when a skill reaches a new rank, or when your streak hits a milestone. They appear on your Status page.</p>
+        <p><b>Streak titles:</b> <span class="skill-title">Initiate</span> at 7 days · <span class="skill-title">Dedicated</span> at 30 · <span class="skill-title">Habit Maker</span> at 90 · <span class="skill-title">Disciplined</span> at 180 · <span class="skill-title">Year One</span> at 365.</p>
+      </div>
+
+      <h2>The 30-day commitment tag</h2>
+      <div class="card">
+        <p>Optional. If you want, you can set a personal commitment to use the System for 30 days. It shows as a gold tag on your Status page — a small reminder of what you said you'd do. It doesn't lock anything, doesn't restrict you, doesn't punish you. It's motivation, not enforcement.</p>
+      </div>
+
+      <button class="primary" id="ob-next" style="width:100%;margin-top:20px;margin-bottom:12px">Begin setup</button>
+      <p class="small dim" style="text-align:center">Already have a backup? <a href="#" id="ob-import" style="color:var(--accent)">Import it</a></p>
+    `;
+    document.getElementById('ob-next').onclick = () => { onboardStep = 2; render(); };
+    document.getElementById('ob-import').onclick = (e) => { e.preventDefault(); importBackup(); };
+    return;
+  }
+
+  /* STEP 2 — NAME + STATS + TIME */
+  if (onboardStep === 2){
     const statSum = Object.values(onboardDraft.stats).reduce((a,b) => a+b, 0);
     const estimatedLevel = statSum <= 0 ? 1 : Math.min(100, Math.max(1, Math.round(Math.sqrt(statSum) * 2)));
     app.innerHTML = `
-      <h1 style="margin-top:24px">The System</h1>
-      <p class="dim" style="margin-top:8px">A personal tracker. Three steps, then you're in.</p>
+      <h1 style="margin-top:24px">Your starting stats</h1>
+      <p class="dim" style="margin-top:8px">Pick the highest tier you can honestly pass today. A lower starting point costs nothing — a higher one corrupts every number after it. You can retest any time on the Stats tab.</p>
 
-      <div class="notice" style="margin-top:16px">
-        <b>Read this first.</b> When you finish setup, you'll be committed for <b>${COMMIT_DAYS} days</b>. During that time:
-        <ul style="margin:8px 0 0 18px;padding:0;font-size:13px;line-height:1.6">
-          <li>✓ Log, tick quests, test stats, milestones, pause — all work</li>
-          <li>✓ Swap skills in and out (max ${MAX_ACTIVE_SKILLS} active, unlimited parked)</li>
-          <li>✓ Add new skills from the catalog, delete skills you regret</li>
-          <li>✗ Cannot edit skill contents (quests, ladder, name)</li>
-          <li>✗ Cannot change settings or start over</li>
-        </ul>
-        <div style="margin-top:8px;font-size:12px;color:var(--dim)">The point is to stop you from tweaking the app instead of using it. If you don't want this, stop here.</div>
-      </div>
-
-      <div class="card">
+      <div class="card" style="margin-top:16px">
         <div class="field">
           <label>Your name <span class="dim" style="text-transform:none;letter-spacing:0">(optional)</span></label>
           <input id="ob-name" placeholder="Name" value="${esc(onboardDraft.name)}" maxlength="40">
         </div>
       </div>
 
-      <h2>Starting stats</h2>
-      <p class="small dim" style="margin-top:-4px;margin-bottom:12px">Pick the highest tier you can pass today. Retest any time.</p>
       <div class="card">
         ${['STR','AGI','VIT','INT','PER'].map(k => {
           const b = BENCHMARKS[k];
           const cur = onboardDraft.stats[k];
-          return `<div class="field"><label>${k} · ${b.label}</label><select data-obstat="${k}">${b.tiers.map(([v, desc]) => `<option value="${v}" ${v===cur?'selected':''}>${v} — ${esc(desc)}</option>`).join('')}</select></div>`;
+          return `<div class="field"><label>${k} · ${b.label}</label><select data-obstat="${k}">${b.tiers.map(([v, desc]) => `<option value="${v}" ${v===cur?'selected':''}>${v} — ${esc(desc)}</option>`).join('')}</select><div class="hint">${esc(b.note.split('.')[0])}.</div></div>`;
         }).join('')}
       </div>
 
       <div class="card" style="background:rgba(77,166,255,.06);border-color:rgba(77,166,255,.3)">
         <div class="row between"><span class="dim small">STARTING LEVEL</span><span class="mono" style="font-size:22px;font-weight:700;color:var(--accent)">Lv ${estimatedLevel}</span></div>
+        <div class="small dim" style="margin-top:6px">Derived from your stats alone. Adding skills won't raise it until you level them up.</div>
       </div>
 
       <div class="card">
         <div class="field">
           <label>Daily time budget</label>
           <select data-obtb>
-            <option value="15" ${onboardDraft.timeBudget===15?'selected':''}>15 min</option>
-            <option value="30" ${onboardDraft.timeBudget===30?'selected':''}>30 min</option>
-            <option value="45" ${onboardDraft.timeBudget===45?'selected':''}>45 min</option>
-            <option value="60" ${onboardDraft.timeBudget===60?'selected':''}>60+ min</option>
+            <option value="15" ${onboardDraft.timeBudget===15?'selected':''}>15 min — one small thing per day</option>
+            <option value="30" ${onboardDraft.timeBudget===30?'selected':''}>30 min — a solid daily practice</option>
+            <option value="45" ${onboardDraft.timeBudget===45?'selected':''}>45 min — a full workout or deep session</option>
+            <option value="60" ${onboardDraft.timeBudget===60?'selected':''}>60+ min — intense, multiple activities</option>
           </select>
+          <div class="hint">This sets how long your workout plans and daily quests are. You can change it later in More.</div>
         </div>
       </div>
 
-      <button class="primary" id="ob-next" style="width:100%;margin-bottom:12px">Continue</button>
-      <p class="small dim" style="text-align:center">Already have a backup? <a href="#" id="ob-import" style="color:var(--accent)">Import it</a></p>
+      <div class="row" style="gap:8px"><button class="ghost" id="ob-back" style="flex:1">Back</button><button class="primary" id="ob-next" style="flex:2">Continue</button></div>
     `;
     document.querySelectorAll('[data-obstat]').forEach(sel => {
       sel.onchange = () => {
@@ -1343,23 +1406,24 @@ function renderOnboarding(){
       };
     });
     document.querySelector('[data-obtb]').onchange = e => { onboardDraft.timeBudget = parseInt(e.target.value, 10); };
+    document.getElementById('ob-back').onclick = () => { onboardStep = 1; render(); };
     document.getElementById('ob-next').onclick = () => {
       onboardDraft.name = document.getElementById('ob-name').value.trim();
-      onboardStep = 2; render();
+      onboardStep = 3; render();
     };
-    document.getElementById('ob-import').onclick = (e) => { e.preventDefault(); importBackup(); };
     return;
   }
 
-  if (onboardStep === 2){
+  /* STEP 3 — SKILLS */
+  if (onboardStep === 3){
     const count = onboardDraft.skills.length;
     const atCap = count >= MAX_ACTIVE_SKILLS;
     app.innerHTML = `
       <h1 style="margin-top:24px">Your skills</h1>
-      <p class="dim" style="margin-top:8px">Pick what you want to level. Max ${MAX_ACTIVE_SKILLS} active. You can add or remove more later — or park any skill and swap in a different one without losing progress.</p>
+      <p class="dim" style="margin-top:8px">Choose up to five skills to work on at once. Each skill gets its own progression ladder and its own daily quests. You can add, remove, or swap any skill at any time — parked skills keep all their progress.</p>
       <div class="card" style="padding:10px 14px"><div class="row between"><span class="small dim">Active skills</span><span class="slot-counter ${atCap?'full':''}">${count}/${MAX_ACTIVE_SKILLS}</span></div></div>
       ${onboardDraft.skills.length ? `<div class="card">${onboardDraft.skills.map((s, i) => `<div class="skill-row" style="cursor:default"><span>${esc(s.name)}</span><button class="sm ghost danger" data-obrm="${i}">Remove</button></div>`).join('')}</div>` : ''}
-      ${atCap ? `<div class="notice" style="margin-top:12px">At the 5-skill cap. Remove one above to free a slot, or continue — you'll be able to swap later from the Skills tab.</div>` : `
+      ${atCap ? `<div class="notice" style="margin-top:12px">At the 5-skill cap. Remove one above to free a slot, or continue — you'll be able to add more later from the Skills tab.</div>` : `
         <h2>Add a skill</h2>
         <div>
           ${SKILL_SUGGESTIONS.map(sug => `<details><summary>${esc(sug.label)}</summary>${sug.options.map(opt => `<div class="tier-row" data-obadd="${sug.id}|${esc(opt)}" style="cursor:pointer"><div class="tier-desc">${esc(opt)}</div></div>`).join('')}</details>`).join('')}
@@ -1393,15 +1457,16 @@ function renderOnboarding(){
       document.getElementById('ob-custom').value = '';
       render();
     };
-    document.getElementById('ob-back').onclick = () => { onboardStep = 1; render(); };
+    document.getElementById('ob-back').onclick = () => { onboardStep = 2; render(); };
     document.getElementById('ob-next').onclick = () => {
       if (onboardDraft.skills.length === 0){ finishOnboarding(); return; }
-      onboardStep = 3; render();
+      onboardStep = 4; render();
     };
     return;
   }
 
-  if (onboardStep === 3) renderProgressionStep();
+  /* STEP 4 — CALIBRATION */
+  if (onboardStep === 4) renderProgressionStep();
 }
 
 function renderProgressionStep(){
@@ -1427,9 +1492,8 @@ function renderProgressionStep(){
   }).join('');
 
   app.innerHTML = `
-    <h1 style="margin-top:24px">Calibration</h1>
-    <p class="dim" style="margin-top:8px">Answer where you're at for each skill. This sets a calibrated starting level — a business with a domain and bank starts higher than one with just an idea.</p>
-    <div class="notice warn" style="font-size:12px">Calibration locks once you start. Anything you skip stays at Lv 1 for 30 days — you can still work your way up from there, just slower.</div>
+    <h1 style="margin-top:24px">Where you're at</h1>
+    <p class="dim" style="margin-top:8px">A quick calibration for each skill. Your answers set the starting level — a business with a bank account and domain starts higher than one with just an idea. Skip anything you're unsure about and start from the beginning.</p>
     ${showEquipment ? `<div class="card">${renderEquipmentSection()}</div>` : ''}
     ${body}
     <div class="row" style="gap:8px;margin-top:16px">
@@ -1483,7 +1547,7 @@ function renderProgressionStep(){
     };
   });
 
-  document.getElementById('ob-back').onclick = () => { onboardStep = 2; render(); };
+  document.getElementById('ob-back').onclick = () => { onboardStep = 3; render(); };
   document.getElementById('ob-skip').onclick = () => finishOnboarding();
   document.getElementById('ob-next').onclick = () => {
     if (showEquipment) state.equipmentConfigured = true;
@@ -1515,11 +1579,11 @@ function finishOnboarding(){
   state.totalXP = 0;
   state.startedAt = today();
   state.lastOpenedDate = today();
-  state.committedUntil = dateOffset(COMMIT_DAYS);
   state.onboarded = true;
   state.lastPlayerLevel = computePlayerLevel();
   state.lastPlayerRank = rankOf(state.lastPlayerLevel);
   checkSkillTitles();
+  checkStreakTitles();
   save(); tab = 'status';
 }
 
@@ -1625,8 +1689,8 @@ function viewStatus(){
       <label class="${basics.veg?'checked':''}"><input type="checkbox" data-basic="veg" ${basics.veg?'checked':''}><span>Vegetables</span></label>
     </div>`;
 
-  const pauseBanner = state.paused ? `<div class="notice pause"><b>Paused.</b> Streak frozen. Unpause in More when ready.</div>` : '';
-  const commitBanner = isCommitted() ? `<div class="notice" style="background:rgba(77,166,255,.06);border-color:rgba(77,166,255,.3)"><b>Committed for ${commitRemainingDays()} more days.</b> Swap skills freely — editing contents waits until then.</div>` : '';
+  const pauseBanner = state.paused ? `<div class="notice pause"><b>Paused.</b> Streak frozen — no penalty. Unpause in More when ready.</div>` : '';
+  const commitTag = isCommitted() ? `<div class="row" style="margin-bottom:12px;justify-content:center"><span class="commit-tag">✓ Committed · ${commitRemainingDays()} days remaining</span></div>` : '';
   const telosHtml = state.telos
     ? `<div class="card"><div class="small dim" style="font-style:italic">"${esc(state.telos)}"</div></div>`
     : `<div class="card"><div class="row between"><div class="small dim" style="flex:1">What is this System for? One sentence.</div><button class="sm ghost" id="add-telos">Add</button></div></div>`;
@@ -1634,10 +1698,10 @@ function viewStatus(){
   return `
     <div class="row between" style="margin-bottom:16px"><h1>The System</h1><button class="sm ghost" id="share-btn">Share ↗</button></div>
     ${pauseBanner}
-    ${commitBanner}
+    ${commitTag}
     <div class="card"><div class="row between"><div><div class="dim small mono">${esc(state.name || 'PLAYER')}</div><div class="big mono">Lv ${lvl}</div></div><div style="text-align:right"><div class="dim small mono">RANK</div><div class="big mono" style="color:var(--accent)">${rankOf(lvl)}</div></div></div>${powerBar()}</div>
     ${telosHtml}
-    <div class="card"><div class="row between"><span class="dim small">STREAK</span><span class="mono" style="font-size:20px">${state.streak} <span class="dim small">days</span></span></div><div class="week-strip">${weekHtml}</div><div class="small dim" style="margin-top:14px;margin-bottom:6px">Year</div><div class="heatmap-year">${yearHtml}</div></div>
+    <div class="card"><div class="row between"><span class="dim small">STREAK</span><span class="mono" style="font-size:20px">${state.streak} <span class="dim small">days</span></span></div><div class="week-strip">${weekHtml}</div><div class="small dim" style="margin-top:14px;margin-bottom:6px">Last year</div><div class="heatmap-year">${yearHtml}</div></div>
     <div class="card"><div class="dim small" style="margin-bottom:2px">TODAY'S BASICS</div>${basicsHtml}</div>
     <h2>Stats</h2>
     <div class="card">${stats}<button class="ghost sm" data-nav="bench" style="width:100%;margin-top:12px">View benchmarks & test →</button></div>
@@ -1653,14 +1717,14 @@ function viewQuests(){
   const day = new Date().getDay();
   const doneCount = list.filter(q => isQuestDone(q.id)).length;
   const deload = deloadWeekStatus();
-  const deloadHtml = deload.isDeload ? `<div class="notice deload"><b>Deload week ${deload.weekNum}.</b> Halve your workouts. Keep the reading habit.</div>` : '';
+  const deloadHtml = deload.isDeload ? `<div class="notice deload"><b>Deload week ${deload.weekNum}.</b> Halve your workouts. Keep the reading habit. This prevents burnout, not weakness.</div>` : '';
   const pauseHtml = state.paused ? `<div class="notice pause"><b>Paused.</b> Quests won't count toward streak until you unpause.</div>` : '';
   const nudges = state.skills.filter(s => s.active && s.type === 'workout' && s.subtype === 'fitness' && s.plan && s.plan.attemptDay !== day && (s.workoutsSinceAttempt||0) >= 4);
-  const nudgeHtml = nudges.map(s => `<div class="notice warn"><b>${esc(s.name)}</b>: ${s.workoutsSinceAttempt} workouts since last attempt. Ready to test?<button class="sm primary" data-nudge-attempt="${s.id}" style="width:100%;margin-top:8px">Test my max now</button></div>`).join('');
+  const nudgeHtml = nudges.map(s => `<div class="notice warn"><b>${esc(s.name)}</b>: ${s.workoutsSinceAttempt} workouts since last attempt. Time to test your max.<button class="sm primary" data-nudge-attempt="${s.id}" style="width:100%;margin-top:8px">Test my max now</button></div>`).join('');
   const items = list.length ? list.map(q => {
     const done = isQuestDone(q.id);
-    return `<div class="quest" data-quest="${q.id}"><div class="chk ${done?'done':''}">${done?'✓':''}</div><div style="flex:1;${done?'opacity:.5':''}"><div style="${done?'text-decoration:line-through':''}">${esc(q.text)}</div><div class="small dim mono">+${q.xp} XP${q.kind==='cardio'?' · VIT training':''}${q.kind==='attempt'?' · test your max':''}</div>${q.milestone?`<div class="small dim" style="margin-top:2px">Milestone: ${esc(q.milestone)}</div>`:''}</div></div>`;
-  }).join('') : '<div class="dim small" style="padding:12px 0">No quests today. Add a skill in Skills tab.</div>';
+    return `<div class="quest" data-quest="${q.id}"><div class="chk ${done?'done':''}">${done?'✓':''}</div><div style="flex:1;${done?'opacity:.5':''}"><div style="${done?'text-decoration:line-through':''}">${esc(q.text)}</div><div class="small dim mono">+${q.xp} XP${q.kind==='cardio'?' · trains VIT':''}${q.kind==='attempt'?' · test your max':''}</div>${q.milestone?`<div class="small dim" style="margin-top:2px">Milestone: ${esc(q.milestone)}</div>`:''}</div></div>`;
+  }).join('') : '<div class="dim small" style="padding:12px 0">No quests today. Add a skill in the Skills tab.</div>';
   return `<h2>Today · ${dayName(day)} ${today().slice(5)}</h2>${pauseHtml}${deloadHtml}${nudgeHtml}<div class="card">${items}</div><div class="card row between"><span class="small dim">${doneCount} / ${list.length} done</span><span class="small dim mono">${state.streak} day streak</span></div>`;
 }
 
@@ -1706,7 +1770,7 @@ function viewSkills(){
   const parkedHtml = parked.length ? parked.map(s => renderCard(s, true)).join('') : '';
 
   const addBtn = atCap
-    ? `<div class="small dim" style="text-align:center;padding:10px">At ${MAX_ACTIVE_SKILLS}/${MAX_ACTIVE_SKILLS}. Park one to free a slot, or delete one.</div>`
+    ? `<div class="small dim" style="text-align:center;padding:10px">At ${MAX_ACTIVE_SKILLS}/${MAX_ACTIVE_SKILLS} active. Park one to free a slot, or delete one.</div>`
     : `<button class="primary" id="add-skill" style="width:100%;margin-top:12px">+ Add skill</button>`;
 
   return `
@@ -1718,13 +1782,13 @@ function viewSkills(){
     ${activeHtml}
     ${addBtn}
     <h2 style="margin-top:24px">Parked ${parked.length ? `(${parked.length})` : ''}</h2>
-    <p class="small dim" style="margin-top:-4px;margin-bottom:12px">Progress kept. Activate to resume quests — if you have a free slot.</p>
+    <p class="small dim" style="margin-top:-4px;margin-bottom:12px">Paused skills. All progress kept. Activate to resume daily quests — if you have a free slot.</p>
     ${parkedHtml || '<div class="small dim" style="padding:8px 0">None parked.</div>'}
   `;
 }
 
 function viewBench(){
-  return `<h1>Benchmarks</h1><div class="card" style="margin-top:16px"><p class="small">Each stat is scored 1–100 and directly affects your player level. Tap a tier to log a test.</p></div>${['STR','AGI','VIT','INT','PER'].map(renderBenchCard).join('')}`;
+  return `<h1>Benchmarks</h1><div class="card" style="margin-top:16px"><p class="small">Each stat is scored 1–100. To log a test, expand a stat and tap the highest tier you can honestly pass today.</p><p class="small dim" style="margin-top:8px"><b>Higher</b> than current → stat rises, level rises. <b>Same</b> → refreshes the test date, no change. <b>Lower</b> → demotes honestly, level drops. No XP for stat changes — the stat <i>is</i> the reward.</p></div>${['STR','AGI','VIT','INT','PER'].map(renderBenchCard).join('')}`;
 }
 function renderBenchCard(k){
   const b = BENCHMARKS[k];
@@ -1747,17 +1811,13 @@ function viewLog(){
     const partial = e.finished === false ? `<span class="partial-badge">partial</span>` : '';
     return `<div class="logrow"><span style="flex:1"><span class="dim mono">${e.date.slice(5)}</span>${skill?` <span class="dim" style="font-size:11px">${esc(skill.name)} · </span>`:''}${esc(e.note)}${first}${partial}${diff}</span><span class="xp">${e.xp>0?'+':''}${e.xp}</span></div>`;
   }).join('') : '<div class="dim small">Nothing logged yet.</div>';
-  return `<h2>Log date</h2><div class="card"><input type="date" id="log-date" value="${logDate}" max="${today()}"></div><h2>Quick log</h2><div class="grid"><button data-xp="15" data-note="Workout">Workout +15</button><button data-xp="5" data-note="Reading">Reading +5</button><button data-xp="10" data-note="Deep work hour">Deep work +10</button><button data-xp="20" data-note="Book finished">Book +20</button><button data-xp="50" data-note="PR hit">PR +50</button><button data-xp="100" data-note="Milestone">Milestone +100</button></div><h2>Adjustment</h2><div class="card"><div class="row" style="gap:8px"><input type="number" id="adj" placeholder="±XP"><input type="text" id="adjnote" placeholder="reason"><button class="sm" id="adjgo">Add</button></div></div><h2>History <span class="dim small" style="text-transform:none;letter-spacing:0;margin-left:8px">Total earned: ${state.totalXP}</span></h2><div class="card">${rows}</div>`;
+  return `<h2>Log date</h2><div class="card"><input type="date" id="log-date" value="${logDate}" max="${today()}"><div class="small dim" style="margin-top:8px">Applies to quick logs and adjustments below. Use it to log something you did yesterday or earlier this week.</div></div><h2>Quick log</h2><div class="grid"><button data-xp="15" data-note="Workout">Workout +15</button><button data-xp="5" data-note="Reading">Reading +5</button><button data-xp="10" data-note="Deep work hour">Deep work +10</button><button data-xp="20" data-note="Book finished">Book +20</button><button data-xp="50" data-note="PR hit">PR +50</button><button data-xp="100" data-note="Milestone">Milestone +100</button></div><h2>Adjustment</h2><div class="card"><div class="row" style="gap:8px"><input type="number" id="adj" placeholder="±XP"><input type="text" id="adjnote" placeholder="reason"><button class="sm" id="adjgo">Add</button></div><div class="small dim" style="margin-top:8px">Use this only for corrections — logged as-is, never edited later.</div></div><h2>History <span class="dim small" style="text-transform:none;letter-spacing:0;margin-left:8px">Total earned: ${state.totalXP}</span></h2><div class="card">${rows}</div>`;
 }
 
 function viewMore(){
-  const locked = isCommitted();
-  const lockNote = locked ? `<div class="notice"><b>Committed for ${commitRemainingDays()} more days.</b> You can still log, tick quests, test stats, and swap skills. Editing skill contents and changing settings is locked until then.</div>` : '';
-
-  const telosField = `<div class="field"><label>Telos <span class="dim" style="text-transform:none;letter-spacing:0">(optional)</span></label><textarea id="telos-input" rows="2" placeholder="What is this System for? One sentence." ${locked?'disabled':''}>${esc(state.telos)}</textarea></div>`;
-  const nameField = `<div class="field"><label>Name</label><input id="profile-name" value="${esc(state.name)}" maxlength="40" ${locked?'disabled':''}></div>`;
-  const budgetField = `<div class="field"><label>Daily time budget</label><select id="profile-budget" ${locked?'disabled':''}><option value="15" ${state.timeBudget===15?'selected':''}>15 min</option><option value="30" ${state.timeBudget===30?'selected':''}>30 min</option><option value="45" ${state.timeBudget===45?'selected':''}>45 min</option><option value="60" ${state.timeBudget===60?'selected':''}>60+ min</option></select></div>`;
-  const saveBtn = locked ? '' : '<button class="sm" id="profile-save">Save</button>';
+  const telosField = `<div class="field"><label>Telos <span class="dim" style="text-transform:none;letter-spacing:0">(optional)</span></label><textarea id="telos-input" rows="2" placeholder="What is this System for? One sentence.">${esc(state.telos)}</textarea><div class="hint">One sentence. "This System exists to get me from ___ to ___ by ___." If you can't write it, that's fine — leave it blank.</div></div>`;
+  const nameField = `<div class="field"><label>Name</label><input id="profile-name" value="${esc(state.name)}" maxlength="40"></div>`;
+  const budgetField = `<div class="field"><label>Daily time budget</label><select id="profile-budget"><option value="15" ${state.timeBudget===15?'selected':''}>15 min</option><option value="30" ${state.timeBudget===30?'selected':''}>30 min</option><option value="45" ${state.timeBudget===45?'selected':''}>45 min</option><option value="60" ${state.timeBudget===60?'selected':''}>60+ min</option></select><div class="hint">Controls how long workout plans and daily quests are. Change it and any fitness skill will re-calibrate on the next Recalculate.</div></div>`;
 
   const pauseField = `
     <div class="card">
@@ -1765,25 +1825,39 @@ function viewMore(){
         <span class="small">Pause mode</span>
         <button class="sm ${state.paused?'primary':'ghost'}" id="toggle-pause">${state.paused?'Unpause':'Pause'}</button>
       </div>
-      <div class="small dim" style="margin-top:8px">Freezes streak. No penalty.</div>
-      ${state.pausedUntil ? `<div class="small dim" style="margin-top:6px">Until ${state.pausedUntil}</div>` : ''}
+      <p class="small dim" style="margin-top:8px">Freezes the streak — no penalty for life events. Nothing else changes. Unpause whenever you're ready.</p>
+      ${state.pausedUntil ? `<p class="small dim">Auto-unpauses on ${state.pausedUntil}.</p>` : ''}
     </div>`;
 
-  const commitField = locked
-    ? `<div class="card"><div class="small dim">Committed until <b style="color:var(--txt)">${state.committedUntil}</b>. ${commitRemainingDays()} days remaining.</div></div>`
-    : `<div class="card"><div class="small dim">Not committed. Commit for ${COMMIT_DAYS} days?</div><button class="sm primary" id="commit-30" style="margin-top:10px">Commit</button></div>`;
+  const commitSection = isCommitted()
+    ? `<div class="card">
+        <div class="row between"><span class="small">30-day commitment tag</span><span class="tag gold">${commitRemainingDays()} days left</span></div>
+        <p class="small dim" style="margin-top:10px">Committed until ${state.committedUntil}. It's just a reminder of what you said you'd do — no restrictions on anything.</p>
+        <button class="sm ghost" id="cancel-commit" style="margin-top:10px">Cancel tag</button>
+      </div>`
+    : `<div class="card">
+        <div class="row between"><span class="small">30-day commitment tag</span><span class="tag">Not set</span></div>
+        <p class="small dim" style="margin-top:10px">Optional. Sets a gold "Committed" badge on your Status page for 30 days. Nothing is locked — this is motivation, not enforcement.</p>
+        <button class="sm primary" id="commit-30" style="margin-top:10px">Commit for 30 days</button>
+      </div>`;
 
-  const equipSection = renderEquipmentSection();
-  const aiSaveBtn = '<button class="sm primary" id="ai-save">Save AI settings</button>';
+  const rulesCard = `<div class="card small dim">
+    <p><b>How your level is calculated.</b> Level = round(√power × 2), where power = sum of all five stats + 3 × each skill's (level − 1). A skill at level 1 contributes nothing; a skill at level 20 contributes 57. Level 100 needs about 2,500 power — a decade goal, not a month's.</p>
+    <p><b>How skills level.</b> Each skill has its own XP counter. Ticking quests earns XP. Hitting milestones earns a lot more — and the amount scales with how far up the ladder you are (milestone 1 pays 100 XP; milestone 20 pays ~1,500).</p>
+    <p><b>How stats move.</b> Stats never move on their own. You test them on the Stats tab by tapping a tier. If you pass a higher tier than your current one, your stat rises and your level with it. If you test down later, you drop honestly. There's no XP reward for stat changes because the stat <i>is</i> the reward.</p>
+    <p><b>How streaks work.</b> Log anything — one quest, one quick log, anything — and the streak survives. Miss a full day and it resets. No penalty spiral. Show up the next day and you start again.</p>
+    <p><b>What titles mean.</b> Skills unlock a new title each time they hit a new rank (D, C, B, A, S). Your streak unlocks milestone titles at 7, 30, 90, 180 and 365 days. All of them display on your Status page.</p>
+  </div>`;
 
-  return `${lockNote}
-    <h2>Profile</h2><div class="card">${nameField}${telosField}${budgetField}<div class="field"><label style="display:flex;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" id="profile-deload" ${state.deloadEnabled?'checked':''} ${locked?'disabled':''}><span style="text-transform:none;letter-spacing:0;color:var(--txt);font-size:13px">Deload every 10th week</span></label><div class="hint">${state.startedAt?`Started ${state.startedAt}. Week ${deloadWeekStatus().weekNum} now.`:'Not started yet.'}</div></div>${saveBtn}</div>
+  return `
+    <h2>Profile</h2><div class="card">${nameField}${telosField}${budgetField}<div class="field"><label style="display:flex;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" id="profile-deload" ${state.deloadEnabled?'checked':''}><span style="text-transform:none;letter-spacing:0;color:var(--txt);font-size:13px">Deload every 10th week</span></label><div class="hint">${state.startedAt?`Started ${state.startedAt}. You're in week ${deloadWeekStatus().weekNum}.`:'Not started yet.'}</div></div><button class="sm" id="profile-save">Save</button></div>
     <h2>Pause</h2>${pauseField}
-    <h2>Commitment</h2>${commitField}
-    <h2>Equipment</h2><div class="card">${equipSection}</div>
-    <h2>AI settings</h2><div class="card"><div class="notice">Optional. Key stays on this device.</div><div class="field"><label>API key</label><input id="ai-key" type="password" value="${esc(state.settings.apiKey)}" placeholder="sk-..."></div><div class="field"><label>Base URL</label><input id="ai-base" value="${esc(state.settings.apiBase)}"></div><div class="field"><label>Model</label><input id="ai-model" value="${esc(state.settings.apiModel)}"></div>${aiSaveBtn}</div>
-    <h2>Backup</h2><div class="card"><button class="primary" id="export" style="width:100%;margin-bottom:8px">Export backup</button><button id="import" style="width:100%;margin-bottom:8px">Import backup</button><button class="ghost danger" id="startover" style="width:100%" ${locked?'disabled':''}>Start over</button></div>
-    <h2>Rules</h2><div class="card small dim"><p><b>Level = round(√power × 2)</b>, where power = sum(stats) + 3 × sum(skill level − 1).</p><p>Level-1 skills contribute 0 power. Level 100 ≈ 2,500 power.</p><p>Stats move only on a benchmark you pass.</p><p>Milestone XP scales quadratically — M0 = 100, M19 = ~1,544.</p><p>Any logged activity preserves the streak.</p><p>Max ${MAX_ACTIVE_SKILLS} active skills. Park one to swap — progress preserved.</p><p>Commitment for ${COMMIT_DAYS} days locks skill editing and settings. Adding, deleting, and swapping skills still works.</p></div>`;
+    <h2>Commitment</h2>${commitSection}
+    <h2>Equipment</h2><div class="card">${renderEquipmentSection()}</div>
+    <h2>AI settings</h2><div class="card"><div class="notice">Optional. Used only when you tap "Generate with AI". The key stays on this device.</div><div class="field"><label>API key</label><input id="ai-key" type="password" value="${esc(state.settings.apiKey)}" placeholder="sk-..."></div><div class="field"><label>Base URL</label><input id="ai-base" value="${esc(state.settings.apiBase)}"></div><div class="field"><label>Model</label><input id="ai-model" value="${esc(state.settings.apiModel)}"></div><button class="sm primary" id="ai-save">Save AI settings</button></div>
+    <h2>Backup</h2><div class="card"><button class="primary" id="export" style="width:100%;margin-bottom:8px">Export backup</button><button id="import" style="width:100%;margin-bottom:8px">Import backup</button><button class="ghost danger" id="startover" style="width:100%">Start over</button></div>
+    <h2>How this all works</h2>${rulesCard}
+  `;
 }
 
 /* ═══════════════════════════════════════════
@@ -1862,7 +1936,7 @@ function shareProgress(){
 function openMilestoneFriction(skill, i, then){
   openModal(`
     <h2>Mark milestone</h2>
-    <p class="small dim">One sentence on what you actually did. Optional — you can skip.</p>
+    <p class="small dim">In one sentence, what did you actually do to earn this? Optional — you can skip.</p>
     <div class="notice" style="margin-top:12px">${esc(skill.ladder[i])}</div>
     <div class="field">
       <textarea id="mf-note" rows="2" placeholder="e.g. Registered at Companies House, opened bank, bought domain."></textarea>
@@ -1901,7 +1975,6 @@ function togglePark(skillId){
 function openSkillDetail(skillId){
   const skill = state.skills.find(s => s.id === skillId);
   if (!skill) return;
-  const locked = isCommitted();
   function renderDetail(){
     const ladder = skill.ladder || [], done = skill.ladderDone || [];
     const nextIdx = currentMilestoneIdx(skill);
@@ -1921,30 +1994,26 @@ function openSkillDetail(skillId){
     const parked = !skill.active;
     openModal(`
       <div class="row between" style="margin-bottom:16px"><div><h2 style="margin:0">${esc(skill.name)}</h2>${parked?`<div class="parked-tag" style="margin-top:6px">parked</div>`:''}${title?`<div class="skill-title" style="margin-top:6px">${esc(title)}</div>`:''}</div><button class="sm ghost" id="sd-close">×</button></div>
-      ${skill.calibratedLevel && skill.calibratedLevel > 1 ? `<div class="notice" style="background:rgba(255,200,87,.06);border-color:rgba(255,200,87,.3);font-size:13px"><b>Calibrated start:</b> Lv ${skill.calibratedLevel}</div>`:''}
+      ${skill.calibratedLevel && skill.calibratedLevel > 1 ? `<div class="notice" style="background:rgba(255,200,87,.06);border-color:rgba(255,200,87,.3);font-size:13px"><b>Calibrated start:</b> Lv ${skill.calibratedLevel}. Your progression answers said you were already past the early ladder.</div>`:''}
       ${skill.identity?`<div class="notice" style="font-style:italic">"${esc(skill.identity)}"</div>`:''}
       ${nextMilestone?`<div class="milestone-focus"><b>Current focus:</b> ${esc(nextMilestone)}</div>`:''}
-      <div class="card"><div class="row between"><span class="dim small">STATUS</span>${locked?'':'<button class="sm ghost" id="sd-progress">Update</button>'}</div><div style="margin-top:6px">${status}</div></div>
+      <div class="card"><div class="row between"><span class="dim small">STATUS</span><button class="sm ghost" id="sd-progress">Update</button></div><div style="margin-top:6px">${status}</div></div>
       ${currentQuests.length>0?`<div class="row between" style="margin:16px 0 8px"><span class="dim small">DAILY QUESTS FOR CURRENT MILESTONE</span></div><div class="card">${currentQuests.map(q => `<div class="logrow"><span>${esc(q.text)}</span><span class="xp">+${q.xp}</span></div>`).join('')}</div>`:''}
-      ${isBusinessUndecided?`<div class="notice"><b>Business not decided.</b> ${locked?'Regenerate will unlock after commitment.':'Tap Regenerate to let AI suggest 3 ideas and build the ladder.'}</div>`:''}
-      <div class="row between" style="margin:16px 0 8px"><span class="dim small">LADDER (${done.length}/${ladder.length})</span>${locked?'<span class="small dim">locked</span>':'<button class="sm ghost" id="sd-regen-ai">✨ Regenerate</button>'}</div>
+      ${isBusinessUndecided?`<div class="notice"><b>Business not decided.</b> Tap Regenerate to let AI suggest 3 ideas and build the ladder.</div>`:''}
+      <div class="row between" style="margin:16px 0 8px"><span class="dim small">LADDER (${done.length}/${ladder.length})</span><button class="sm ghost" id="sd-regen-ai">✨ Regenerate</button></div>
       <div style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:4px">${ladderHtml}</div>
       ${nextIdx>=0?`<div class="notice" style="margin-top:16px"><b>Next step:</b> ${esc(ladder[nextIdx])}</div>`:(ladder.length?`<div class="notice ok" style="margin-top:16px"><b>Ladder complete.</b></div>`:'')}
       <div class="row" style="gap:8px;margin-top:16px">
         <button class="ghost" id="sd-park" style="flex:1">${skill.active?'Park':'Activate'}</button>
-        ${locked?'':'<button class="ghost" id="sd-edit" style="flex:1">Edit</button>'}
+        <button class="ghost" id="sd-edit" style="flex:1">Edit</button>
         <button class="ghost danger" id="sd-del" style="flex:1">Delete</button>
       </div>
-      ${locked?`<div class="small dim" style="margin-top:10px;text-align:center">Editing is locked during commitment (${commitRemainingDays()} days).</div>`:''}
     `);
     document.getElementById('sd-close').onclick = closeModal;
-    const progBtn = document.getElementById('sd-progress');
-    if (progBtn) progBtn.onclick = () => openProgressionModal(skill, renderDetail);
-    const regenBtn = document.getElementById('sd-regen-ai');
-    if (regenBtn) regenBtn.onclick = () => openLadderAI(skill, renderDetail);
+    document.getElementById('sd-progress').onclick = () => openProgressionModal(skill, renderDetail);
+    document.getElementById('sd-regen-ai').onclick = () => openLadderAI(skill, renderDetail);
     document.getElementById('sd-park').onclick = () => { togglePark(skill.id); closeModal(); };
-    const editBtn = document.getElementById('sd-edit');
-    if (editBtn) editBtn.onclick = () => { closeModal(); openSkillEditor(skill.id); };
+    document.getElementById('sd-edit').onclick = () => { closeModal(); openSkillEditor(skill.id); };
     document.getElementById('sd-del').onclick = () => {
       if (!confirm(`Delete "${skill.name}" permanently? Its progress and milestones will be lost. If you just want a break, use Park instead.`)) return;
       state.skills = state.skills.filter(s => s.id !== skill.id);
@@ -1970,7 +2039,7 @@ function openProgressionModal(skill, back){
   questions.forEach(q => { if (q.type==='days'||q.onlyIf) return; const m = q.options.find(o => o.label === skill.status || skill.status?.startsWith(o.label)); if (m) answers[q.id] = m.value; });
   if (skill.type === 'workout' && skill.plan){ answers.workoutDays = [...(skill.plan.workoutDays || [1,3,5])]; answers.attemptDay = skill.plan.attemptDay || 0; }
   function renderProg(){
-    openModal(`<h2>${esc(skill.name)} — update</h2>${questions.map(q => {
+    openModal(`<h2>${esc(skill.name)} — update</h2><p class="small dim">Answer where you're at now. This adjusts your current milestone, daily quests, and (for fitness) exercises.</p>${questions.map(q => {
       if (q.type === 'days'){ const current = answers[q.id] !== undefined ? answers[q.id] : q.default; return `<div class="field"><label>${esc(q.label)}</label><div class="day-picker">${[0,1,2,3,4,5,6].map(d => { const on = q.multi ? current.includes(d) : current === d; return `<button type="button" class="${on?'primary':'ghost'}" data-pday="${q.id}|${d}|${q.multi?'multi':'single'}">${dayShort(d)}</button>`; }).join('')}</div></div>`; }
       const visible = !q.onlyIf || q.onlyIf(answers);
       if (!visible) return '';
@@ -2006,16 +2075,6 @@ function openLadderAI(skill, back){
 
 function openSkillEditor(skillId){
   const skill = skillId ? state.skills.find(s => s.id === skillId) : null;
-  /* PATCH: only block editing of EXISTING skills during commit. Creating new skills is allowed. */
-  if (isCommitted() && skill){
-    openModal(`
-      <h2>Locked</h2>
-      <p class="small dim">Skill editing is locked during commitment. ${commitRemainingDays()} days remaining.</p>
-      <p class="small dim" style="margin-top:10px">You can still park, activate, delete this skill, or add a new one from the catalog. Just not edit this skill's contents.</p>
-      <button class="primary" style="width:100%;margin-top:16px" onclick="closeModal()">OK</button>
-    `);
-    return;
-  }
   const isNew = !skill;
   const draft = skill ? JSON.parse(JSON.stringify(skill)) : makeSkillFromTemplate({ subtype: 'custom', label: 'New skill' }, 'New skill');
   draft.ladderDone = draft.ladderDone || []; draft.ladderEarned = draft.ladderEarned || [];
@@ -2032,7 +2091,7 @@ function openSkillEditor(skillId){
     else if (idx >= 0 && draft.milestoneQuests[idx]) questsToEdit = draft.milestoneQuests[idx];
     else if (draft.quests) questsToEdit = draft.quests;
     const questSection = isWorkout ? `<div class="field"><label>Exercises</label><div id="exercises">${draft.plan.exercises.map((e,i) => `<div class="exercise-row"><input placeholder="Name" value="${esc(e.name)}" data-ex="${i}" data-key="name"><input type="number" min="1" placeholder="Sets" value="${e.sets}" data-ex="${i}" data-key="sets"><input type="number" min="1" placeholder="Reps" value="${e.reps}" data-ex="${i}" data-key="reps"><button class="sm ghost danger" data-remove-ex="${i}">×</button></div>`).join('')}</div><button class="sm" id="add-ex" style="margin-top:8px">+ Add exercise</button></div><div class="field"><label>Workout days</label><div class="day-picker">${[0,1,2,3,4,5,6].map(d => `<button type="button" class="${draft.plan.workoutDays.includes(d)?'primary':'ghost'}" data-wday="${d}">${dayShort(d)}</button>`).join('')}</div></div><div class="field"><label>Attempt day</label><div class="day-picker">${[0,1,2,3,4,5,6].map(d => `<button type="button" class="${draft.plan.attemptDay===d?'primary':'ghost'}" data-aday="${d}">${dayShort(d)}</button>`).join('')}</div></div>${showCardio?`<div class="field"><label style="display:flex;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" id="sk-cardio" ${draft.cardioEnabled!==false?'checked':''}><span style="text-transform:none;letter-spacing:0;color:var(--txt);font-size:13px">Cardio on rest days</span></label></div>`:''}` : `${currentMilestone?`<div class="milestone-focus"><b>Quests for:</b> ${esc(currentMilestone)}</div>`:''}<div class="field"><label>Daily quests</label><div id="quests">${questsToEdit.map((q,i) => `<div class="exercise-row" style="grid-template-columns:1fr 70px 30px"><input value="${esc(q.text)}" data-q="${i}" data-key="text"><input type="number" min="1" value="${q.xp}" data-q="${i}" data-key="xp"><button class="sm ghost danger" data-remove-q="${i}">×</button></div>`).join('')}</div><button class="sm" id="add-q" style="margin-top:8px">+ Add quest</button></div><button class="sm ghost" id="gen-ai" style="width:100%;margin-top:8px">✨ Generate quests with AI</button>`;
-    openModal(`<h2>${isNew?'New skill':'Edit skill'}</h2><div class="field"><label>Name</label><input id="sk-name" value="${esc(draft.name)}" maxlength="40"></div><div class="field"><label>Status</label><input id="sk-status" value="${esc(draft.status||'')}" placeholder="e.g. Complete beginner"></div>${!isNew?`<div class="field"><label>Type</label><div class="row" style="gap:8px"><button class="sm ${draft.type==='standard'?'primary':'ghost'}" id="type-std" style="flex:1">Standard</button><button class="sm ${draft.type==='workout'?'primary':'ghost'}" id="type-wk" style="flex:1">Workout plan</button></div></div>`:''}${questSection}<hr><div class="small dim" style="margin-bottom:10px">Optional. Helpful for AI suggestions and your own commitment.</div><div class="field"><label>Why this matters <span class="dim" style="text-transform:none;letter-spacing:0">(optional)</span></label><input id="sk-why" value="${esc(draft.why)}" placeholder="One sentence."></div><div class="field"><label>Identity <span class="dim" style="text-transform:none;letter-spacing:0">(optional)</span></label><input id="sk-identity" value="${esc(draft.identity)}" placeholder="I am someone who..."></div><div class="field"><label>Drop criteria <span class="dim" style="text-transform:none;letter-spacing:0">(optional)</span></label><input id="sk-quit" value="${esc(draft.quitCriteria)}" placeholder="e.g. not touched in 30 days"></div><div class="row" style="gap:8px;margin-top:16px"><button class="ghost" id="cancel" style="flex:1">Cancel</button><button class="primary" id="save" style="flex:2">${isNew?'Create':'Save'}</button></div>`);
+    openModal(`<h2>${isNew?'New skill':'Edit skill'}</h2><div class="field"><label>Name</label><input id="sk-name" value="${esc(draft.name)}" maxlength="40"></div><div class="field"><label>Status</label><input id="sk-status" value="${esc(draft.status||'')}" placeholder="e.g. Complete beginner"></div>${!isNew?`<div class="field"><label>Type</label><div class="row" style="gap:8px"><button class="sm ${draft.type==='standard'?'primary':'ghost'}" id="type-std" style="flex:1">Standard</button><button class="sm ${draft.type==='workout'?'primary':'ghost'}" id="type-wk" style="flex:1">Workout plan</button></div></div>`:''}${questSection}<hr><div class="small dim" style="margin-bottom:10px">Optional. Feeds the AI when it generates quests, and shows on your skill card.</div><div class="field"><label>Why this matters <span class="dim" style="text-transform:none;letter-spacing:0">(optional)</span></label><input id="sk-why" value="${esc(draft.why)}" placeholder="One sentence."></div><div class="field"><label>Identity <span class="dim" style="text-transform:none;letter-spacing:0">(optional)</span></label><input id="sk-identity" value="${esc(draft.identity)}" placeholder="I am someone who..."></div><div class="field"><label>Drop criteria <span class="dim" style="text-transform:none;letter-spacing:0">(optional)</span></label><input id="sk-quit" value="${esc(draft.quitCriteria)}" placeholder="e.g. not touched in 30 days"></div><div class="row" style="gap:8px;margin-top:16px"><button class="ghost" id="cancel" style="flex:1">Cancel</button><button class="primary" id="save" style="flex:2">${isNew?'Create':'Save'}</button></div>`);
     document.getElementById('cancel').onclick = closeModal;
     document.getElementById('sk-name').oninput = e => { draft.name = e.target.value; };
     document.getElementById('sk-why').oninput = e => { draft.why = e.target.value; };
@@ -2220,16 +2279,16 @@ function bind(){
       const [stat, vStr] = el.dataset.tier.split(':');
       const v = parseInt(vStr, 10), cur = state.stats[stat];
       const desc = BENCHMARKS[stat].tiers.find(t => t[0] === v)?.[1] || '';
-      if (v === cur){ if (confirm(`Re-test ${stat} at ${v} today?\n\n${desc}\n\nNo change.`)){ state.statDates[stat] = today(); save(); } }
+      if (v === cur){ if (confirm(`Re-test ${stat} at ${v} today?\n\n${desc}\n\nNo change — the date refreshes but your stat stays.`)){ state.statDates[stat] = today(); save(); } }
       else if (v > cur){
-        if (confirm(`Pass ${stat} tier ${v}?\n\n${desc}\n\n${stat}: ${cur} → ${v}.`)){
+        if (confirm(`Pass ${stat} tier ${v}?\n\n${desc}\n\n${stat}: ${cur} → ${v}. Your level will rise.`)){
           levelChangeReason = `${stat} up to ${v}`;
           state.stats[stat] = v; state.statDates[stat] = today();
           state.benchmarks.unshift(`${stat} ${v} — ${today()}`);
           save();
         }
       } else {
-        if (confirm(`Demote ${stat} to tier ${v}?\n\n${desc}`)){
+        if (confirm(`Demote ${stat} to tier ${v}?\n\n${desc}\n\nYour level will drop accordingly. Honest calibration.`)){
           levelChangeReason = `${stat} down to ${v}`;
           state.stats[stat] = v; state.statDates[stat] = today();
           save();
@@ -2239,7 +2298,6 @@ function bind(){
   });
   document.querySelectorAll('[data-xp]').forEach(el => { el.onclick = () => { addXP(+el.dataset.xp, el.dataset.note, null, logDate); save(); }; });
   const logDateInput = document.getElementById('log-date'); if (logDateInput) logDateInput.onchange = () => { logDate = logDateInput.value || today(); };
-  /* PATCH: adding a new skill is allowed during the commit lock — only the 5-slot cap blocks it. */
   const addSkill = document.getElementById('add-skill');
   if (addSkill) addSkill.onclick = () => {
     if (activeSkillCount() >= MAX_ACTIVE_SKILLS){ alert(`Max ${MAX_ACTIVE_SKILLS} active. Park one first.`); return; }
@@ -2259,15 +2317,21 @@ function bind(){
   if (togglePause) togglePause.onclick = () => {
     if (state.paused){ state.paused = false; state.pausedUntil = ''; }
     else {
-      if (!confirm('Pause? Streak freezes, no penalty.')) return;
+      if (!confirm('Pause? Streak freezes, no penalty. Nothing else changes.')) return;
       state.paused = true; state.pausedUntil = dateOffset(14);
     }
     save();
   };
   const commitBtn = document.getElementById('commit-30');
   if (commitBtn) commitBtn.onclick = () => {
-    if (!confirm(`Commit for ${COMMIT_DAYS} days? Skill editing and settings will lock. You can still add, delete, and swap skills and use everything else.`)) return;
+    if (!confirm(`Set the 30-day commitment tag? It shows as a gold badge on your Status page. Nothing is locked.`)) return;
     state.committedUntil = dateOffset(COMMIT_DAYS);
+    save();
+  };
+  const cancelCommit = document.getElementById('cancel-commit');
+  if (cancelCommit) cancelCommit.onclick = () => {
+    if (!confirm('Cancel the commitment tag?')) return;
+    state.committedUntil = '';
     save();
   };
   const addTelos = document.getElementById('add-telos'); if (addTelos) addTelos.onclick = openTelosModal;
@@ -2279,7 +2343,6 @@ function bind(){
   const imp = document.getElementById('import'); if (imp) imp.onclick = importBackup;
   const startOver = document.getElementById('startover');
   if (startOver) startOver.onclick = () => {
-    if (isCommitted()){ alert(`Locked during commitment (${commitRemainingDays()} days).`); return; }
     if (!confirm('Erase everything?')) return;
     if (!confirm('Really erase all progress?')) return;
     localStorage.removeItem(KEY);

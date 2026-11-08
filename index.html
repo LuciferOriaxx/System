@@ -86,6 +86,7 @@ hr{border:none;border-top:1px solid var(--line);margin:14px 0}
 .notice.ok{background:rgba(61,220,151,.08);border-color:rgba(61,220,151,.25)}
 .notice.warn{background:rgba(255,200,87,.08);border-color:rgba(255,200,87,.25)}
 .notice.gold{background:rgba(255,200,87,.08);border-color:rgba(255,200,87,.35)}
+.notice.lock{background:rgba(255,200,87,.06);border-color:rgba(255,200,87,.3)}
 .notice.deload{background:rgba(160,110,255,.08);border-color:rgba(160,110,255,.3)}
 .notice.pause{background:rgba(255,200,87,.08);border-color:rgba(255,200,87,.3)}
 .hide{display:none}
@@ -144,6 +145,10 @@ details>summary:active{background:#16202e}
 .commit-tag{display:inline-flex;align-items:center;gap:6px;font-size:11px;letter-spacing:.1em;
   text-transform:uppercase;color:var(--gold);padding:3px 9px;border-radius:4px;
   background:rgba(255,200,87,.1);border:1px solid rgba(255,200,87,.3);font-weight:600}
+.commit-tag.unlocked{color:var(--ok);background:rgba(61,220,151,.1);border-color:rgba(61,220,151,.3)}
+.lock-banner{background:rgba(255,200,87,.06);border:1px solid rgba(255,200,87,.3);
+  border-radius:10px;padding:12px;font-size:13px;margin-bottom:12px;
+  display:flex;align-items:center;gap:10px}
 .levelup-toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:190;
   padding:10px 18px;border-radius:10px;background:#111823;border:1px solid var(--line);
   box-shadow:0 8px 24px rgba(0,0,0,.5);font-size:13px;animation:fadeIn .3s ease;max-width:92vw;text-align:center}
@@ -239,7 +244,7 @@ function parkedSkills(){ return (state.skills || []).filter(s => !s.active); }
 function activeSkillCount(){ return activeSkills().length; }
 
 /* ═══════════════════════════════════════════
-   PLAYER LEVEL — floor for level, ceil for power boundaries
+   PLAYER LEVEL
    ═══════════════════════════════════════════ */
 function computePowerFrom(stats, skills){
   const statSum = Object.values(stats || {}).reduce((a,b) => a + (b||0), 0);
@@ -549,14 +554,94 @@ const LADDER_PRESETS = {
   reading: ['1 book finished this month','6 books/year with notes','12 books/year with applied ideas','18 books/year','24 books/year','30 books/year','Read a difficult book','One project built from books','50 books/year','Read across 5 different fields','Original synthesis published','100+ books/year or a book written'],
   writing: ['Premise + outline','First 1,000 words','First chapter','5 writing days/week for a month','10k words','15k words','30k words — Act 1 complete','40k words','Full first draft','First reread and revision','Beta readers engaged','Structural revision','Edited draft','Line edit','Query letter or pitch','Submission or self-pub ready','Published','10 reviews','100 copies sold','Second book started'],
   fitness: ['Complete first full workout','1 week of consistent workouts','4 weeks consistent','First PR (new max)','Noticeable strength gain','8 weeks consistent — habit locked','Complete a full program','Hit intermediate benchmarks (STR 30)','6 months consistent','Hit advanced benchmarks (STR 50)','Teach someone else a movement','Hit elite benchmarks (STR 70)','1 year consistent','Hit STR 85+','Maintain consistency for 2 years'],
-  engineering: ['Branch chosen','Maths and mechanics refreshed','CAD refresher done','3 portfolio drawings or models','Portfolio project complete','Professional body affiliate membership','5 applications submitted','First interview','First role or contract','First project delivered','EngTech registration','2 years of experience','Lead a project','IEng registration','CEng registration'],
+  engineering: ['Choose one discipline and get a standard textbook','Mathematics refresher — calculus, linear algebra','Physics refresher — mechanics, electromagnetism','Learn one CAD tool to a basic level','Learn a computing language (Python or MATLAB)','Study the core science of the discipline','Study the core applications of the discipline','Work through 20+ practice problems','Design a small project in your discipline','Build or model the design','Test and document the design','Portfolio project to professional standard','Read one standard or code relevant to your discipline','Teach or tutor someone on a topic you\'ve learned'],
   art: ['Foundational technique studied','First 30 drawings/sketches','One coherent series (10 pieces)','Public sharing begun','First commission or sale','100 drawings completed','Recognisable style','Local exhibition or feature','Consistent body of work (50 pieces)','First gallery or show','Teach a class','Sell regularly','Regional recognition','National recognition','Retrospective or major award'],
   instrument: ['First chord or scale learned','15 min daily for a week','Play a simple song end-to-end','Basic scales in 2 keys','4 weeks consistent practice','Play 5 songs by memory','Barre chords or equivalent technique','Play with another musician','First performance (any setting)','Compose or improvise','Comfortable across keys','Play in a band or ensemble','Teach a beginner','Record an album or EP','Perform live for 100+ people'],
   mind: ['First 5-min practice','1 week consistent','4 weeks consistent','30 min uninterrupted session','Noticeable focus change in life','45 min session','3 months consistent','Practice becomes automatic','6 months consistent','Teach someone else','1 year consistent','Extended retreat or deep dive','Full day of practice','Recognised by others as calm and focused','Mastery'],
   publicspeaking: ['First 3-min speech recorded','Studied one speaking framework','Presented to 1 person','Presented to 5 people','Presented to 20 people','Joined a local speaking club','First formal speech','First paid or invited talk','10 talks given','Speak without notes','Handle Q&A confidently','Speak to 100+ people','Coach someone else','Keynote at an event','Known for your speaking'],
   cooking: ['First meal cooked from scratch','10 recipes learned by heart','Cook a full meal for 4 people','Knife skills practiced','One consistent cuisine learned','Confident with any ingredient given','First dish you would serve a chef','Cookbook or blog started','Teach someone to cook','50 recipes learned','Host a dinner party','Master a difficult technique','Pop-up or catering gig','Write a cookbook','Recognised chef']
 };
-function defaultLadderFor(subtype){ return LADDER_PRESETS[subtype] ? [...LADDER_PRESETS[subtype]] : null; }
+
+/* ═══════════════════════════════════════════
+   ENGINEERING BRANCH LADDERS (self-study focused)
+   ═══════════════════════════════════════════ */
+const ENGINEERING_LADDERS = {
+  'Civil': [
+    'Statics & dynamics — free-body diagrams and basic problems',
+    'Mechanics of materials — stress, strain, bending, torsion',
+    'Engineering materials — concrete, steel, timber properties',
+    'Applied mathematics — calculus, linear algebra, differential equations',
+    'Structural analysis — beams, trusses, frames',
+    'Fluid mechanics — hydrostatics, Bernoulli, pipe flow',
+    'Thermofluids — heat transfer basics, thermodynamics laws',
+    'Geotechnics — soil classification, bearing capacity',
+    'Computing for engineers — Python or MATLAB for a real problem',
+    'CAD — model a building element in AutoCAD or Revit',
+    'Design a small structural element to code',
+    'Sustainability & codes — Eurocodes, embodied carbon',
+    'Portfolio project to professional standard',
+    'Teach or tutor someone on a topic you\'ve learned'
+  ],
+  'Mechanical': [
+    'Statics & dynamics — free-body diagrams and basic problems',
+    'Mechanics of materials — stress, strain, bending, torsion',
+    'Engineering materials — metals, polymers, ceramics',
+    'Applied mathematics — calculus, linear algebra, differential equations',
+    'Thermodynamics — laws, cycles, entropy',
+    'Fluid mechanics — pipe flow, pumps, Bernoulli',
+    'Heat transfer — conduction, convection, radiation',
+    'Machine design — gears, bearings, shafts, joints',
+    'Manufacturing processes — turning, milling, casting',
+    'Computing for engineers — Python or MATLAB',
+    'CAD proficiency — Fusion 360, SolidWorks or FreeCAD',
+    'Design a complete machine or system',
+    'Portfolio project to professional standard',
+    'Teach or tutor someone on a topic you\'ve learned'
+  ],
+  'Electrical': [
+    'Circuit theory — Ohm, Kirchhoff, Thevenin, Norton',
+    'Applied mathematics — complex numbers, phasors, Laplace',
+    'Analogue electronics — diodes, transistors, op-amps',
+    'Digital electronics — logic gates, boolean algebra, adders',
+    'Electromagnetics — fields, induction, Maxwell intro',
+    'Signals & systems — Fourier, convolution, sampling',
+    'Control systems — feedback, stability, PID',
+    'Power systems — AC circuits, transformers, three-phase',
+    'Microcontrollers — Arduino or STM32 basics',
+    'Computing for engineers — Python for simulation',
+    'Design a small circuit or embedded system',
+    'PCB design — build one working board',
+    'Portfolio project to professional standard',
+    'Teach or tutor someone on a topic you\'ve learned'
+  ],
+  'Software': [
+    'Programming basics — pick one language and stick with it',
+    'Data structures — arrays, lists, trees, hash maps',
+    'Algorithms — sorting, searching, complexity',
+    'Paradigms — object-oriented and functional',
+    'Databases — SQL, schema design, indices',
+    'Networks — TCP/IP, HTTP, DNS',
+    'Operating systems basics — processes, memory, files',
+    'Systems design — scaling, caching, queues',
+    'Testing & quality — unit, integration, end-to-end',
+    'Version control & CI/CD',
+    'A significant project, deployed and used by others',
+    'Open source contribution — one merged pull request',
+    'Portfolio project to professional standard',
+    'Teach or tutor someone on a topic you\'ve learned'
+  ],
+  'Other': LADDER_PRESETS.engineering
+};
+
+function engineeringLadderFor(branch){
+  const l = ENGINEERING_LADDERS[branch] || ENGINEERING_LADDERS['Other'];
+  return [...l];
+}
+
+function defaultLadderFor(subtype, detail){
+  if (subtype === 'engineering' && detail) return engineeringLadderFor(detail);
+  return LADDER_PRESETS[subtype] ? [...LADDER_PRESETS[subtype]] : null;
+}
 
 /* ═══════════════════════════════════════════
    HELPERS
@@ -568,6 +653,7 @@ function yesterday(){ const d = new Date(); d.setDate(d.getDate()-1); return `${
 function dateOffset(n){ const d = new Date(); d.setDate(d.getDate()+n); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
 function dayName(n){ return ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][n]; }
 function dayShort(n){ return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][n]; }
+function currentTime(){ const d = new Date(); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; }
 function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function daysSinceDate(dateStr){
   if (!dateStr) return null;
@@ -591,7 +677,7 @@ function currentMilestoneIdx(skill){
 }
 
 /* ═══════════════════════════════════════════
-   MILESTONE QUEST GENERATION (per subtype + milestone)
+   MILESTONE QUEST GENERATION
    ═══════════════════════════════════════════ */
 function generateMilestoneQuests(skill, milestoneText){
   const name = skill.name;
@@ -697,9 +783,41 @@ function generateMilestoneQuests(skill, milestoneText){
   }
 
   if (sub === 'engineering'){
+    const original = milestoneText || '';
+    if (/computing/i.test(original)){
+      return [
+        { text: `${name}: 30 min coding — solve a problem with code`, xp: 5 },
+        { text: `${name}: Study one relevant library or function`, xp: 3 }
+      ];
+    }
+    if (/CAD/i.test(original)){
+      return [
+        { text: `${name}: 30 min in CAD software`, xp: 5 },
+        { text: `${name}: Model one small element or feature`, xp: 4 }
+      ];
+    }
+    if (/portfolio|professional standard/i.test(original)){
+      return [
+        { text: `${name}: 30 min on your portfolio project`, xp: 5 },
+        { text: `${name}: Write up one section or drawing`, xp: 4 }
+      ];
+    }
+    if (/teach|tutor/i.test(original)){
+      return [
+        { text: `${name}: Explain one topic to someone (or write it out)`, xp: 4 },
+        { text: `${name}: Prepare a teaching note or example`, xp: 3 }
+      ];
+    }
+    if (/design a|design one/i.test(original)){
+      return [
+        { text: `${name}: 30 min on the design`, xp: 5 },
+        { text: `${name}: Sketch or draw one part of it`, xp: 3 }
+      ];
+    }
+    const topic = original.split('—')[0].split(' - ')[0].split('.')[0].trim();
     return [
-      { text: `${name}: 30 min technical study`, xp: 5 },
-      { text: `${name}: 1 portfolio or application step`, xp: 3 }
+      { text: `${name}: 30 min study — ${topic}`, xp: 5 },
+      { text: `${name}: Solve 3 practice problems on ${topic}`, xp: 4 }
     ];
   }
 
@@ -867,7 +985,7 @@ function generateWeekSuggestions({ skillActivity, silentSkills, partialQuests, f
 
   const zeroDays = 7 - activeDays;
   if (zeroDays >= 2){
-    suggestions.push(`${zeroDays} days with no activity. The 2-minute floor exists for exactly this — one pushup, one sentence, one line of code keeps the streak alive. Showing up matters more than the amount.`);
+    suggestions.push(`${zeroDays} days with no activity. The 2-minute floor exists for exactly this — one pushup, one sentence, one line of code keeps the streak alive.`);
   }
 
   if (streakAtEnd === 0 && activeDays > 0){
@@ -913,7 +1031,7 @@ let levelChangeReason = '';
 
 function defaultState(){
   return {
-    v: 17, onboarded: false, name: '', totalXP: 0,
+    v: 18, onboarded: false, name: '', totalXP: 0,
     telos: '', telosDate: '',
     stats: { ...DEFAULT_STATS }, statDates: {},
     skills: [], streak: 0, lastComplete: null,
@@ -925,6 +1043,7 @@ function defaultState(){
     startedAt: null, deloadEnabled: true,
     paused: false, pausedUntil: '',
     committedUntil: '',
+    commitmentUnlockedDate: '',
     lastOpenedDate: '',
     dailyBasics: {},
     firsts: [],
@@ -947,7 +1066,7 @@ function migrateSkill(s){
     else s.subtype = 'custom';
     s.detail = s.detail || s.name || '';
     s.status = s.status || '';
-    s.ladder = defaultLadderFor(s.subtype);
+    s.ladder = defaultLadderFor(s.subtype, s.detail);
     s.ladderDone = [];
   }
   if (!s.ladderDone) s.ladderDone = [];
@@ -975,7 +1094,7 @@ function migrateSkill(s){
       if (calLevel > (s.level || 1)){ s.level = calLevel; s.xp = 0; }
     }
   }
-  // Clean up old single-fallback milestone quests (the "Skill: Milestone" ones)
+  // Clean up old single-fallback milestone quests
   if (s.milestoneQuests && s.ladder && s.ladder.length > 0){
     const idx = (function(){
       const done = s.ladderDone || [];
@@ -1011,6 +1130,7 @@ function load(){
     if (!parsed.ladderNotes) parsed.ladderNotes = {};
     if (!parsed.telos) parsed.telos = '';
     if (!parsed.committedUntil) parsed.committedUntil = '';
+    if (!parsed.commitmentUnlockedDate) parsed.commitmentUnlockedDate = '';
 
     if (!parsed.startedAt){
       if (parsed.log && parsed.log.length > 0){
@@ -1048,7 +1168,7 @@ function save(){
 
 function addXP(amount, note, id, date, skillId, opts){
   opts = opts || {};
-  const entry = { id: id || newId(), date: date || today(), xp: amount, note, skillId: skillId || null, finished: opts.finished, firstTime: opts.firstTime };
+  const entry = { id: id || newId(), date: date || today(), time: opts.time || null, xp: amount, note, skillId: skillId || null, finished: opts.finished, firstTime: opts.firstTime };
   state.totalXP += amount;
   state.log.unshift(entry);
   state.log = state.log.slice(0, 500);
@@ -1147,16 +1267,59 @@ function showLevelAdjust(oldLvl, newLvl, reason){
 }
 
 /* ═══════════════════════════════════════════
-   COMMITMENT TAG (visual only)
+   COMMITMENT — locks skill edits, 24h grace on unlock
    ═══════════════════════════════════════════ */
-function isCommitted(){
+function commitmentActive(){
   if (!state.committedUntil) return false;
-  return state.committedUntil >= today();
+  if (state.committedUntil < today()) return false;
+  if (state.commitmentUnlockedDate){
+    const d = daysSinceDate(state.commitmentUnlockedDate);
+    if (d !== null && d >= 1) return false;
+  }
+  return true;
+}
+function isLocked(){ return commitmentActive() && !state.commitmentUnlockedDate; }
+function commitUnlockedGrace(){
+  if (!state.committedUntil || state.committedUntil < today()) return false;
+  if (!state.commitmentUnlockedDate) return false;
+  const d = daysSinceDate(state.commitmentUnlockedDate);
+  return d !== null && d < 1;
 }
 function commitRemainingDays(){
   if (!state.committedUntil) return 0;
   const d = daysSinceDate(state.committedUntil);
   return d === null ? 0 : Math.max(0, -d);
+}
+function commitGraceHoursRemaining(){
+  if (!state.commitmentUnlockedDate) return 0;
+  // grace ends 24 hours after unlockedDate (which is a date; treat as midnight + 24h from that date)
+  const d = new Date(state.commitmentUnlockedDate + 'T00:00:00');
+  d.setDate(d.getDate() + 1);
+  const ms = d.getTime() - Date.now();
+  return Math.max(0, Math.ceil(ms / (1000*60*60)));
+}
+
+function doCommit(){
+  if (commitmentActive() && state.commitmentUnlockedDate){
+    // In grace period — re-lock, keep timer
+    state.commitmentUnlockedDate = '';
+  } else {
+    // Fresh commit
+    state.committedUntil = dateOffset(COMMIT_DAYS);
+    state.commitmentUnlockedDate = '';
+  }
+  save();
+}
+
+function doUnlock(){
+  state.commitmentUnlockedDate = today();
+  save();
+}
+
+function doEndCommitment(){
+  state.committedUntil = '';
+  state.commitmentUnlockedDate = '';
+  save();
 }
 
 /* ═══════════════════════════════════════════
@@ -1295,12 +1458,12 @@ function progressionFor(skill){
     { value:'editing', label:'Editing', preTick: [0,1,2,3,4,5,6,7,8,9,10,11,12,13] },
     { value:'published', label:'Published', preTick: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17] }
   ]}];
-  if (sub === 'engineering') return [{ id: 'stage', label: 'Where are you?', options: [
-    { value:'start', label:'Starting fresh', preTick: [] },
-    { value:'refreshing', label:'Refreshing', preTick: [0,1] },
-    { value:'portfolio', label:'Building portfolio', preTick: [0,1,2,3,4] },
-    { value:'applying', label:'Applying', preTick: [0,1,2,3,4,5,6,7] },
-    { value:'working', label:'Working in field', preTick: [0,1,2,3,4,5,6,7,8,9,10] }
+  if (sub === 'engineering') return [{ id: 'stage', label: 'Where are you now?', options: [
+    { value:'start', label:'Starting from scratch', preTick: [] },
+    { value:'refreshing', label:'Refreshing the basics', preTick: [0,1] },
+    { value:'portfolio', label:'I have or am building a portfolio', preTick: [0,1,2,3,4] },
+    { value:'applying', label:'Professional-level knowledge in most areas', preTick: [0,1,2,3,4,5,6,7] },
+    { value:'working', label:'Years of experience / working in the field', preTick: [0,1,2,3,4,5,6,7,8,9,10] }
   ]}];
   return [{ id: 'level', label: 'Where are you now?', options: [
     { value:'beginner', label:'Complete beginner', preTick: [] },
@@ -1401,7 +1564,7 @@ function toggleQuest(quest){
   const mult = isFirst ? 2 : 1;
   const awardedXp = quest.xp * mult;
 
-  const logId = addXP(awardedXp, quest.text, null, null, quest.skillId, { finished: true, firstTime: isFirst });
+  const logId = addXP(awardedXp, quest.text, null, null, quest.skillId, { finished: true, firstTime: isFirst, time: currentTime() });
   if (isFirst) state.firsts.push(quest.id);
 
   const extraLogIds = [];
@@ -1412,8 +1575,8 @@ function toggleQuest(quest){
     skillXp = awardedXp;
     if (leveled){
       const newRank = rankOf(skill.level);
-      if (newRank !== oldRank) extraLogIds.push(addXP(0, `${skill.name} — Rank ${newRank}`, null, null, skill.id, { skipStreak: true }));
-      else extraLogIds.push(addXP(0, `${skill.name} reached Lv ${skill.level}`, null, null, skill.id, { skipStreak: true }));
+      if (newRank !== oldRank) extraLogIds.push(addXP(0, `${skill.name} — Rank ${newRank}`, null, null, skill.id, { skipStreak: true, time: currentTime() }));
+      else extraLogIds.push(addXP(0, `${skill.name} reached Lv ${skill.level}`, null, null, skill.id, { skipStreak: true, time: currentTime() }));
     }
     if (quest.kind === 'workout') skill.workoutsSinceAttempt = (skill.workoutsSinceAttempt || 0) + 1;
   }
@@ -1513,7 +1676,7 @@ function makeSkillFromTemplate(sug, detail){
   const skill = {
     id: newId(), name, subtype, detail: detail || '', status: '',
     active: true, level: 1, xp: 0,
-    ladder: defaultLadderFor(subtype), ladderDone: [], ladderEarned: [],
+    ladder: defaultLadderFor(subtype, detail), ladderDone: [], ladderEarned: [],
     ladderXpLogs: {}, ladderPreticked: [],
     workoutsSinceAttempt: 0, cardioEnabled: true,
     why: '', identity: '', quitCriteria: '', milestoneQuests: {},
@@ -1556,7 +1719,7 @@ function renderOnboarding(){
         <p><b>No XP for plans.</b> Ticking a quest means you did the thing, not that you meant to. Plans, lists, and intentions earn nothing.</p>
         <p><b>Stats only move on a test.</b> Each of your five stats has published tiers with concrete benchmarks. You only rise when you can honestly pass the next tier's test. If you test down later, you go down. The number should reflect reality, not hope.</p>
         <p><b>Any activity keeps the streak.</b> One quest is enough to keep today counted. Missing a full day breaks it. No penalty spiral — just reset.</p>
-        <p><b>Everything is editable.</b> Skills, quests, ladders, stats — change any of it at any time. Nothing is locked.</p>
+        <p><b>Editing is always available</b> — unless you choose to commit for 30 days. That's a self-imposed lock you can undo any time. More on that below.</p>
       </div>
 
       <h2>What you earn along the way</h2>
@@ -1567,9 +1730,10 @@ function renderOnboarding(){
         <p><b>Weekly reviews</b> unlock after your first 7 days. Each week shows a full breakdown of what you did, and suggestions for the next week.</p>
       </div>
 
-      <h2>The 30-day commitment tag</h2>
+      <h2>The 30-day commitment</h2>
       <div class="card">
-        <p>Optional. If you want, you can set a personal commitment to use the System for 30 days. It shows as a gold tag on your Status page. It doesn't lock anything, doesn't restrict you, doesn't punish you. It's motivation, not enforcement.</p>
+        <p>Optional. If you press Commit, your skills lock for 30 days — you can't add, edit, or delete them. You can still log, tick quests, test stats, and everything else. The point is to stop yourself from endlessly tweaking the System instead of using it.</p>
+        <p>You can unlock any time. Unlocking gives you a <b>24-hour grace period</b> to make changes. If you re-lock within 24 hours, the timer keeps going. If you don't, the commitment ends and the next one starts fresh at 30 days.</p>
       </div>
 
       <button class="primary" id="ob-next" style="width:100%;margin-top:20px;margin-bottom:12px">Begin setup</button>
@@ -1911,7 +2075,14 @@ function viewStatus(){
     </div>`;
 
   const pauseBanner = state.paused ? `<div class="notice pause"><b>Paused.</b> Streak frozen — no penalty. Unpause in More when ready.</div>` : '';
-  const commitTag = isCommitted() ? `<div class="row" style="margin-bottom:12px;justify-content:center"><span class="commit-tag">✓ Committed · ${commitRemainingDays()} days remaining</span></div>` : '';
+
+  let commitTag = '';
+  if (isLocked()){
+    commitTag = `<div class="row" style="margin-bottom:12px;justify-content:center"><span class="commit-tag">🔒 Committed · ${commitRemainingDays()} days remaining</span></div>`;
+  } else if (commitUnlockedGrace()){
+    commitTag = `<div class="row" style="margin-bottom:12px;justify-content:center"><span class="commit-tag unlocked">🔓 Unlocked · re-lock within 24h to keep progress</span></div>`;
+  }
+
   const telosHtml = state.telos
     ? `<div class="card"><div class="small dim" style="font-style:italic">"${esc(state.telos)}"</div></div>`
     : `<div class="card"><div class="row between"><div class="small dim" style="flex:1">What is this System for? One sentence.</div><button class="sm ghost" id="add-telos">Add</button></div></div>`;
@@ -1966,6 +2137,7 @@ function viewSkills(){
   const parked = parkedSkills();
   const count = active.length;
   const atCap = count >= MAX_ACTIVE_SKILLS;
+  const locked = isLocked();
 
   function renderCard(s, isParked){
     const need = skillXpForLevel(s.level);
@@ -2002,11 +2174,19 @@ function viewSkills(){
   const activeHtml = active.length ? active.map(s => renderCard(s, false)).join('') : '<div class="card dim small">No active skills.</div>';
   const parkedHtml = parked.length ? parked.map(s => renderCard(s, true)).join('') : '';
 
-  const addBtn = atCap
-    ? `<div class="small dim" style="text-align:center;padding:10px">At ${MAX_ACTIVE_SKILLS}/${MAX_ACTIVE_SKILLS} active. Park one to free a slot, or delete one.</div>`
-    : `<button class="primary" id="add-skill" style="width:100%;margin-top:12px">+ Add skill</button>`;
+  let addBtn = '';
+  if (locked){
+    addBtn = `<div class="small dim" style="text-align:center;padding:10px">🔒 Skills are locked during commitment. <button class="sm ghost" data-unlock-skills style="margin-left:6px">Unlock</button></div>`;
+  } else if (atCap){
+    addBtn = `<div class="small dim" style="text-align:center;padding:10px">At ${MAX_ACTIVE_SKILLS}/${MAX_ACTIVE_SKILLS} active. Park one to free a slot, or delete one.</div>`;
+  } else {
+    addBtn = `<button class="primary" id="add-skill" style="width:100%;margin-top:12px">+ Add skill</button>`;
+  }
+
+  const lockBanner = locked ? `<div class="lock-banner"><span style="font-size:16px">🔒</span><div style="flex:1;font-size:13px">Skills are locked during commitment. You can still log, tick quests, test stats, and park/activate skills. <button class="sm ghost" data-unlock-skills style="margin-left:6px">Unlock</button></div></div>` : '';
 
   return `
+    ${lockBanner}
     <div class="row between" style="margin-bottom:12px">
       <h1 style="margin:0">Skills</h1>
       <span class="slot-counter ${atCap?'full':''}">${count}/${MAX_ACTIVE_SKILLS}</span>
@@ -2042,13 +2222,15 @@ function viewLog(){
     const skill = e.skillId ? state.skills.find(s => s.id === e.skillId) : null;
     const first = e.firstTime ? `<span class="first-badge">first</span>` : '';
     const partial = e.finished === false ? `<span class="partial-badge">partial</span>` : '';
-    return `<div class="logrow"><span style="flex:1"><span class="dim mono">${e.date.slice(5)}</span>${skill?` <span class="dim" style="font-size:11px">${esc(skill.name)} · </span>`:''}${esc(e.note)}${first}${partial}</span><span class="xp">${e.xp>0?'+':''}${e.xp}</span></div>`;
+    const timeStr = e.time ? ` ${e.time}` : '';
+    return `<div class="logrow"><span style="flex:1"><span class="dim mono">${e.date.slice(5)}${timeStr}</span>${skill?` <span class="dim" style="font-size:11px">${esc(skill.name)} · </span>`:''}${esc(e.note)}${first}${partial}</span><span class="xp">${e.xp>0?'+':''}${e.xp}</span></div>`;
   }).join('') : '<div class="dim small">Nothing logged yet.</div>';
   return `
     <h2>Log activity</h2>
     <div class="card">
-      <p class="small dim" style="margin-bottom:14px">Log something you've done — today or earlier this week. Enter the date, what it was, and how long it took; the System awards XP based on time.</p>
+      <p class="small dim" style="margin-bottom:14px">Log something you've done — today or earlier this week. Enter the date, time, what it was, and how long it took; the System awards XP based on time.</p>
       <div class="field"><label>Date</label><input type="date" id="log-date" value="${today()}" max="${today()}"></div>
+      <div class="field"><label>Time</label><input type="time" id="log-time" value="${currentTime()}"></div>
       <div class="field"><label>Skill <span class="dim" style="text-transform:none;letter-spacing:0">(or General)</span></label>
         <select id="log-skill">
           <option value="">— General / other —</option>
@@ -2081,17 +2263,33 @@ function viewMore(){
       ${state.pausedUntil ? `<p class="small dim">Auto-unpauses on ${state.pausedUntil}.</p>` : ''}
     </div>`;
 
-  const commitSection = isCommitted()
-    ? `<div class="card">
-        <div class="row between"><span class="small">30-day commitment tag</span><span class="tag gold">${commitRemainingDays()} days left</span></div>
-        <p class="small dim" style="margin-top:10px">Committed until ${state.committedUntil}. It's just a reminder of what you said you'd do — no restrictions on anything.</p>
-        <button class="sm ghost" id="cancel-commit" style="margin-top:10px">Cancel tag</button>
-      </div>`
-    : `<div class="card">
-        <div class="row between"><span class="small">30-day commitment tag</span><span class="tag">Not set</span></div>
-        <p class="small dim" style="margin-top:10px">Optional. Sets a gold "Committed" badge on your Status page for 30 days. Nothing is locked — this is motivation, not enforcement.</p>
-        <button class="sm primary" id="commit-30" style="margin-top:10px">Commit for 30 days</button>
-      </div>`;
+  let commitSection;
+  if (isLocked()){
+    commitSection = `<div class="card">
+      <div class="row between"><span class="small">30-day commitment</span><span class="tag gold">🔒 ${commitRemainingDays()} days left</span></div>
+      <p class="small dim" style="margin-top:10px">You are committed until ${state.committedUntil}. Skills are locked — you can't add, edit, or delete them. Everything else works normally: logging, ticking quests, testing stats, parking skills.</p>
+      <p class="small dim" style="margin-top:8px"><b>If you unlock now</b>, you get a 24-hour grace period to make changes. Re-lock within 24h to keep your progress. Don't re-lock and the commitment ends — the next commit starts fresh at 30 days.</p>
+      <button class="sm primary" id="commit-unlock" style="margin-top:10px">Unlock (24h grace)</button>
+    </div>`;
+  } else if (commitUnlockedGrace()){
+    const hoursLeft = commitGraceHoursRemaining();
+    commitSection = `<div class="card">
+      <div class="row between"><span class="small">30-day commitment</span><span class="tag gold">🔓 Unlocked · grace</span></div>
+      <p class="small dim" style="margin-top:10px">You unlocked with <b>${hoursLeft} hour${hoursLeft === 1 ? '' : 's'}</b> left in your grace period. Skills are editable right now.</p>
+      <p class="small dim" style="margin-top:8px">Re-lock before the grace period ends and the timer keeps running. Let it end and the commitment ends — the next commit starts fresh at 30 days.</p>
+      <div class="row" style="gap:8px;margin-top:10px">
+        <button class="sm primary" id="commit-relock" style="flex:1">Re-lock</button>
+        <button class="sm ghost" id="commit-end" style="flex:1">End commitment</button>
+      </div>
+    </div>`;
+  } else {
+    commitSection = `<div class="card">
+      <div class="row between"><span class="small">30-day commitment</span><span class="tag">Not set</span></div>
+      <p class="small dim" style="margin-top:10px"><b>Commit for 30 days</b> to lock your skills. This is a self-imposed restriction designed to stop you from endlessly tweaking the System instead of using it.</p>
+      <p class="small dim" style="margin-top:8px">While locked you can't add, edit, or delete skills. You <b>can</b> still log activities, tick quests, test stats, and park/activate skills. Unlock any time (24-hour grace to make changes before the timer resets).</p>
+      <button class="sm primary" id="commit-start" style="margin-top:10px">Commit for 30 days</button>
+    </div>`;
+  }
 
   const rulesCard = `<div class="card small dim">
     <p><b>How your level is calculated.</b> Level = floor(√power × 2), where power = sum of all five stats + 3 × each skill's (level − 1). A skill at level 1 contributes nothing; a skill at level 20 contributes 57. Level 100 needs about 2,500 power.</p>
@@ -2100,6 +2298,7 @@ function viewMore(){
     <p><b>How streaks work.</b> Log anything — one quest, one activity, anything — and the streak survives. Miss a full day and it resets. No penalty spiral. Show up the next day and you start again.</p>
     <p><b>What titles mean.</b> Skills unlock a new title each time they hit a new rank (D, C, B, A, S). Your streak unlocks milestone titles at 7, 30, 90, 180 and 365 days.</p>
     <p><b>Weekly reviews.</b> After your first 7 days, a Weekly Reviews button appears on Status. Each completed week shows a full breakdown — activities, XP, skills trained, days active, streak, notable events — plus suggestions for the week ahead.</p>
+    <p><b>Commitment.</b> Pressing Commit locks your skills for 30 days. Unlocking gives a 24-hour grace to make edits; re-lock within it and the timer keeps running, otherwise the commitment ends and the next one starts fresh.</p>
   </div>`;
 
   return `
@@ -2343,6 +2542,7 @@ function openSkillDetail(skillId){
   const skill = state.skills.find(s => s.id === skillId);
   if (!skill) return;
   function renderDetail(){
+    const locked = isLocked();
     const ladder = skill.ladder || [], done = skill.ladderDone || [];
     const nextIdx = currentMilestoneIdx(skill);
     const nextMilestone = (nextIdx >= 0) ? ladder[nextIdx] : null;
@@ -2361,27 +2561,31 @@ function openSkillDetail(skillId){
     const parked = !skill.active;
     openModal(`
       <div class="row between" style="margin-bottom:16px"><div><h2 style="margin:0">${esc(skill.name)}</h2>${parked?`<div class="parked-tag" style="margin-top:6px">parked</div>`:''}${title?`<div class="skill-title" style="margin-top:6px">${esc(title)}</div>`:''}</div><button class="sm ghost" id="sd-close">×</button></div>
+      ${locked?`<div class="notice lock"><b>🔒 Locked.</b> Skills are locked during commitment. You can still tick milestones and use this skill — but editing, regenerating, and deleting are locked. Unlock in More.</div>`:''}
       ${skill.calibratedLevel && skill.calibratedLevel > 1 ? `<div class="notice" style="background:rgba(255,200,87,.06);border-color:rgba(255,200,87,.3);font-size:13px"><b>Calibrated start:</b> Lv ${skill.calibratedLevel}. Your progression answers said you were already past the early ladder.</div>`:''}
       ${skill.identity?`<div class="notice" style="font-style:italic">"${esc(skill.identity)}"</div>`:''}
       ${nextMilestone?`<div class="milestone-focus"><b>Current focus:</b> ${esc(nextMilestone)}</div>`:''}
-      <div class="card"><div class="row between"><span class="dim small">STATUS</span><button class="sm ghost" id="sd-progress">Update</button></div><div style="margin-top:6px">${status}</div></div>
+      <div class="card"><div class="row between"><span class="dim small">STATUS</span>${locked?'':`<button class="sm ghost" id="sd-progress">Update</button>`}</div><div style="margin-top:6px">${status}</div></div>
       ${currentQuests.length>0?`<div class="row between" style="margin:16px 0 8px"><span class="dim small">DAILY QUESTS FOR CURRENT MILESTONE</span></div><div class="card">${currentQuests.map(q => `<div class="logrow"><span>${esc(q.text)}</span><span class="xp">+${q.xp}</span></div>`).join('')}</div>`:''}
-      ${isBusinessUndecided?`<div class="notice"><b>Business not decided.</b> Tap Regenerate to let AI suggest 3 ideas and build the ladder.</div>`:''}
-      <div class="row between" style="margin:16px 0 8px"><span class="dim small">LADDER (${done.length}/${ladder.length})</span><button class="sm ghost" id="sd-regen-ai">✨ Regenerate</button></div>
+      ${isBusinessUndecided?`<div class="notice"><b>Business not decided.</b> ${locked?'Regenerate is locked during commitment.':'Tap Regenerate to let AI suggest 3 ideas and build the ladder.'}</div>`:''}
+      <div class="row between" style="margin:16px 0 8px"><span class="dim small">LADDER (${done.length}/${ladder.length})</span>${locked?'<span class="small dim">🔒 Regenerate locked</span>':`<button class="sm ghost" id="sd-regen-ai">✨ Regenerate</button>`}</div>
       <div style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:4px">${ladderHtml}</div>
       ${nextIdx>=0?`<div class="notice" style="margin-top:16px"><b>Next step:</b> ${esc(ladder[nextIdx])}</div>`:(ladder.length?`<div class="notice ok" style="margin-top:16px"><b>Ladder complete.</b></div>`:'')}
       <div class="row" style="gap:8px;margin-top:16px">
         <button class="ghost" id="sd-park" style="flex:1">${skill.active?'Park':'Activate'}</button>
-        <button class="ghost" id="sd-edit" style="flex:1">Edit</button>
-        <button class="ghost danger" id="sd-del" style="flex:1">Delete</button>
+        ${locked?'':`<button class="ghost" id="sd-edit" style="flex:1">Edit</button><button class="ghost danger" id="sd-del" style="flex:1">Delete</button>`}
       </div>
     `);
     document.getElementById('sd-close').onclick = closeModal;
-    document.getElementById('sd-progress').onclick = () => openProgressionModal(skill, renderDetail);
-    document.getElementById('sd-regen-ai').onclick = () => openLadderAI(skill, renderDetail);
+    const progBtn = document.getElementById('sd-progress');
+    if (progBtn) progBtn.onclick = () => openProgressionModal(skill, renderDetail);
+    const regenBtn = document.getElementById('sd-regen-ai');
+    if (regenBtn) regenBtn.onclick = () => openLadderAI(skill, renderDetail);
     document.getElementById('sd-park').onclick = () => { togglePark(skill.id); closeModal(); };
-    document.getElementById('sd-edit').onclick = () => { closeModal(); openSkillEditor(skill.id); };
-    document.getElementById('sd-del').onclick = () => {
+    const editBtn = document.getElementById('sd-edit');
+    if (editBtn) editBtn.onclick = () => { closeModal(); openSkillEditor(skill.id); };
+    const delBtn = document.getElementById('sd-del');
+    if (delBtn) delBtn.onclick = () => {
       if (!confirm(`Delete "${skill.name}" permanently? Its progress and milestones will be lost. If you just want a break, use Park instead.`)) return;
       state.skills = state.skills.filter(s => s.id !== skill.id);
       save(); closeModal();
@@ -2401,6 +2605,7 @@ function openSkillDetail(skillId){
 }
 
 function openProgressionModal(skill, back){
+  if (isLocked()){ alert('Skills are locked during commitment. Unlock in More to change them.'); return; }
   const questions = progressionFor(skill);
   const answers = {};
   questions.forEach(q => { if (q.type==='days'||q.onlyIf) return; const m = q.options.find(o => o.label === skill.status || skill.status?.startsWith(o.label)); if (m) answers[q.id] = m.value; });
@@ -2421,6 +2626,7 @@ function openProgressionModal(skill, back){
 }
 
 function openLadderAI(skill, back){
+  if (isLocked()){ alert('Skills are locked during commitment. Unlock in More to regenerate ladders.'); return; }
   const prompt = buildLadderAIPrompt(skill);
   const key = state.settings.apiKey, base = state.settings.apiBase, model = state.settings.apiModel;
   openModal(`<h2>Regenerate ladder</h2><div class="notice"><b>The AI sees your last 30 days, stats, equipment and current milestone.</b><br><br><b>Route 1 — API.</b> Save a key in More.<br><b>Route 2 — manual.</b> Copy prompt → paste into ChatGPT → paste JSON back.</div><div class="field"><label>Prompt</label><textarea id="la-prompt" rows="10" readonly>${esc(prompt)}</textarea><button class="sm" id="la-copy" style="margin-top:8px">Copy prompt</button></div>${key?`<button class="primary" id="la-run" style="width:100%">Generate via API</button><div id="la-status" class="small dim" style="margin-top:8px;text-align:center"></div>`:''}<div class="field" style="margin-top:16px"><label>Result</label><textarea id="la-result" rows="6" placeholder='["Milestone 1","Milestone 2",...]'></textarea></div><div class="row" style="gap:8px"><button class="ghost" id="la-cancel" style="flex:1">Cancel</button><button class="primary" id="la-save" style="flex:2">Replace ladder</button></div>`);
@@ -2441,6 +2647,7 @@ function openLadderAI(skill, back){
 }
 
 function openSkillEditor(skillId){
+  if (isLocked()){ alert('Skills are locked during commitment. Unlock in More to edit them.'); return; }
   const skill = skillId ? state.skills.find(s => s.id === skillId) : null;
   const isNew = !skill;
   const draft = skill ? JSON.parse(JSON.stringify(skill)) : makeSkillFromTemplate({ subtype: 'custom', label: 'New skill' }, 'New skill');
@@ -2472,7 +2679,7 @@ function openSkillEditor(skillId){
       const cardioEl = document.getElementById('sk-cardio'); if (cardioEl) draft.cardioEnabled = cardioEl.checked;
       if (isNew){
         if (activeSkillCount() >= MAX_ACTIVE_SKILLS){ alert(`Max ${MAX_ACTIVE_SKILLS} active skills.`); return; }
-        draft.id = newId(); draft.level = 1; draft.xp = 0; draft.active = true; if (!draft.ladder) draft.ladder = defaultLadderFor(draft.subtype || 'custom'); if (draft.workoutsSinceAttempt === undefined) draft.workoutsSinceAttempt = 0; if (draft.cardioEnabled === undefined) draft.cardioEnabled = true; state.skills.push(draft);
+        draft.id = newId(); draft.level = 1; draft.xp = 0; draft.active = true; if (!draft.ladder) draft.ladder = defaultLadderFor(draft.subtype || 'custom', draft.detail); if (draft.workoutsSinceAttempt === undefined) draft.workoutsSinceAttempt = 0; if (draft.cardioEnabled === undefined) draft.cardioEnabled = true; state.skills.push(draft);
       }
       else { const i = state.skills.findIndex(s => s.id === draft.id); state.skills[i] = draft; }
       ensureMilestoneQuests(draft); save(); closeModal();
@@ -2525,12 +2732,12 @@ function openAttemptDay(skillId){
       const qid = `${skill.id}:attempt`, t = today();
       state.quests[t] = state.quests[t] || {};
       if (!state.quests[t][qid]){
-        const logId = addXP(50, `${skill.name} attempt day`, null, null, skill.id, { finished: true });
+        const logId = addXP(50, `${skill.name} attempt day`, null, null, skill.id, { finished: true, time: currentTime() });
         const oldRank = rankOf(skill.level);
         addSkillXP(skill, 50);
         const extra = [];
         const newRank = rankOf(skill.level);
-        if (newRank !== oldRank) extra.push(addXP(0, `${skill.name} — Rank ${newRank}`, null, null, skill.id, { skipStreak: true }));
+        if (newRank !== oldRank) extra.push(addXP(0, `${skill.name} — Rank ${newRank}`, null, null, skill.id, { skipStreak: true, time: currentTime() }));
         state.quests[t][qid] = { logId, extraLogIds: extra, xp: 50, skillXp: 50 };
         state.benchmarks.unshift(`${skill.name} attempt — ${t}`);
       }
@@ -2541,6 +2748,7 @@ function openAttemptDay(skillId){
 }
 
 function openSkillPicker(onCreated){
+  if (isLocked()){ alert('Skills are locked during commitment. Unlock in More to add skills.'); return; }
   let selected = null;
   function renderPicker(){
     if (!selected){
@@ -2586,6 +2794,7 @@ function importBackup(){
         if (!state.dailyBasics) state.dailyBasics = {};
         if (!state.ladderNotes) state.ladderNotes = {};
         if (!state.startedAt) state.startedAt = today();
+        if (!state.commitmentUnlockedDate) state.commitmentUnlockedDate = '';
         state.lastPlayerLevel = computePlayerLevel();
         state.lastPlayerRank = rankOf(state.lastPlayerLevel);
         save();
@@ -2663,14 +2872,15 @@ function bind(){
     };
   });
 
-  /* Log activity */
   const logSubmit = document.getElementById('log-submit');
   if (logSubmit) logSubmit.onclick = () => {
     const dateEl = document.getElementById('log-date');
+    const timeEl = document.getElementById('log-time');
     const skillEl = document.getElementById('log-skill');
     const noteEl = document.getElementById('log-note');
     const minsEl = document.getElementById('log-mins');
     const date = (dateEl && dateEl.value) || today();
+    const time = (timeEl && timeEl.value) || currentTime();
     const skillId = (skillEl && skillEl.value) || null;
     const noteText = (noteEl && noteEl.value || '').trim();
     const mins = parseInt(minsEl && minsEl.value, 10);
@@ -2679,7 +2889,7 @@ function bind(){
     const xp = Math.max(2, Math.round(mins / 6));
     const skill = skillId ? state.skills.find(s => s.id === skillId) : null;
     const note = `${noteText} (${mins} min)`;
-    const logId = addXP(xp, note, null, date, skillId, { finished: true });
+    const logId = addXP(xp, note, null, date, skillId, { finished: true, time });
     if (skill) addSkillXP(skill, xp);
     save();
     showToast(`Logged: +${xp} XP${skill ? ' · ' + skill.name : ''}`, 'var(--accent)');
@@ -2700,9 +2910,15 @@ function bind(){
 
   const addSkill = document.getElementById('add-skill');
   if (addSkill) addSkill.onclick = () => {
+    if (isLocked()){ alert('Skills are locked during commitment. Unlock in More to add skills.'); return; }
     if (activeSkillCount() >= MAX_ACTIVE_SKILLS){ alert(`Max ${MAX_ACTIVE_SKILLS} active. Park one first.`); return; }
     openSkillPicker(skill => { if (activeSkillCount() >= MAX_ACTIVE_SKILLS) { alert(`Max ${MAX_ACTIVE_SKILLS} active.`); return; } state.skills.push(skill); save(); });
   };
+
+  document.querySelectorAll('[data-unlock-skills]').forEach(el => {
+    el.onclick = () => { if (confirm('Unlock skills? You get a 24-hour grace period to make changes. Re-lock within 24h to keep your commitment running.')) doUnlock(); };
+  });
+
   const pSave = document.getElementById('profile-save');
   if (pSave) pSave.onclick = () => {
     state.name = document.getElementById('profile-name').value.trim();
@@ -2721,18 +2937,26 @@ function bind(){
     }
     save();
   };
-  const commitBtn = document.getElementById('commit-30');
-  if (commitBtn) commitBtn.onclick = () => {
-    if (!confirm(`Set the 30-day commitment tag? It shows as a gold badge on your Status page. Nothing is locked.`)) return;
-    state.committedUntil = dateOffset(COMMIT_DAYS);
-    save();
+  const commitStart = document.getElementById('commit-start');
+  if (commitStart) commitStart.onclick = () => {
+    if (!confirm(`Commit for ${COMMIT_DAYS} days? Your skills will lock — you won't be able to add, edit, or delete them. You can still log, tick quests, and use everything else. Unlock any time (24h grace to make edits).`)) return;
+    doCommit();
   };
-  const cancelCommit = document.getElementById('cancel-commit');
-  if (cancelCommit) cancelCommit.onclick = () => {
-    if (!confirm('Cancel the commitment tag?')) return;
-    state.committedUntil = '';
-    save();
+  const commitUnlockBtn = document.getElementById('commit-unlock');
+  if (commitUnlockBtn) commitUnlockBtn.onclick = () => {
+    if (!confirm('Unlock skills? You get a 24-hour grace period. Re-lock within 24h to keep your commitment running; otherwise the commitment ends and the next one starts fresh.')) return;
+    doUnlock();
   };
+  const commitRelockBtn = document.getElementById('commit-relock');
+  if (commitRelockBtn) commitRelockBtn.onclick = () => {
+    doCommit();
+  };
+  const commitEndBtn = document.getElementById('commit-end');
+  if (commitEndBtn) commitEndBtn.onclick = () => {
+    if (!confirm('End this commitment? Skills will unlock and the countdown stops.')) return;
+    doEndCommitment();
+  };
+
   const addTelos = document.getElementById('add-telos'); if (addTelos) addTelos.onclick = openTelosModal;
   const openReviews = document.getElementById('open-reviews'); if (openReviews) openReviews.onclick = openWeeklyReviewList;
   document.querySelectorAll('[data-eq]').forEach(el => { el.onchange = () => { state.equipment = state.equipment || []; const id = el.dataset.eq; const idx = state.equipment.indexOf(id); if (el.checked && idx < 0) state.equipment.push(id); if (!el.checked && idx >= 0) state.equipment.splice(idx, 1); save(); }; });
